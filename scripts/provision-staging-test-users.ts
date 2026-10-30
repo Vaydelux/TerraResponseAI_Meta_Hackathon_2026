@@ -15,6 +15,7 @@ async function main() {
   const inputRef = process.env.CONFIRM_PROJECT_REF ?? "";
   if (confirmed !== "CREATE-STAGING-TEST-USERS" ||
       !/^[a-z0-9]{12,32}$/.test(ref) ||
+      !/^[a-z0-9]{12,32}$/.test(production) ||
       ref === production || ref === "ywopsafppyykhwrejliz" ||
       inputRef !== ref || url !== `https://${ref}.supabase.co` || !key) {
     throw new Error("Staging-only guard failed. No identities created.");
