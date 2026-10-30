@@ -13,7 +13,7 @@ export function interpretAnalysisResponse(
   status: number,
   value: unknown,
 ): Exclude<AnalysisProgress, { kind: "requesting" }> {
-  const body = value && typeof value === "object"
+  const body: { ok?: unknown; error?: { code?: string } } = value && typeof value === "object"
     ? value as { ok?: unknown; error?: { code?: string } }
     : {};
   if (status >= 200 && status < 300 && body.ok === true) {
