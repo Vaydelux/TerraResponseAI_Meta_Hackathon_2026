@@ -30,6 +30,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured, serviceRoleKey, supabaseUrl } from "@/lib/supabase/env";
 import { createClient } from "@supabase/supabase-js";
 import { safeAuthPath } from "@/lib/auth/safe-redirect";
+import { signupFailure } from "@/lib/auth/signup-error";
 
 export type SignInState = { error?: string } | null;
 
@@ -254,7 +255,7 @@ export async function bootstrapFirstAdminAction(email: string): Promise<{ ok: bo
  */
 export type SignUpState =
   | { status: "idle" }
-  | { status: "error"; message: string }
+  | { status: "error"; message: string; field?: "email" | "password" }
   | { status: "success"; message: string };
 
 function registrationCallbackUrl(): string | undefined {
@@ -315,10 +316,7 @@ export async function signUpAction(formData: FormData): Promise<SignUpState> {
       // Keep provider error details in protected server logs; do not
       // reveal account existence or internal database failure messages.
       console.error("[auth] Sign-up request failed", { status: error.status, code: error.code });
-      return {
-        status: "error",
-        message: "Registration could not be completed. Check that sign-ups are enabled, and try again later.",
-      };
+      return { status: "error", ...signupFailure(error.code, error.status) };
     }
     return {
       status: "success",
