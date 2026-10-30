@@ -27,6 +27,7 @@ export function WeatherContext({ reportId, hasLocation }: WeatherContextProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noLocation, setNoLocation] = useState(!hasLocation);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!hasLocation) {
@@ -37,11 +38,19 @@ export function WeatherContext({ reportId, hasLocation }: WeatherContextProps) {
       return;
     }
 
-    let aborted = false;
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) {
+        setLoading(true);
+        setError(null);
+        setNoLocation(false);
+        setWeather(null);
+      }
+    });
     async function load() {
       try {
-        const res = await fetch(`/api/weather?reportId=${reportId}`);
-        if (aborted) return;
+        const res = await fetch(`/api/weather?reportId=${encodeURIComponent(reportId)}`, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         const body = await res.json();
         if (!res.ok) {
           setError(body?.error?.message ?? "Weather unavailable");
@@ -56,15 +65,15 @@ export function WeatherContext({ reportId, hasLocation }: WeatherContextProps) {
         setWeather(body.weather);
         setLoading(false);
       } catch {
-        if (!aborted) {
+        if (!controller.signal.aborted) {
           setError("Could not load weather context.");
           setLoading(false);
         }
       }
     }
     load();
-    return () => { aborted = true; };
-  }, [reportId, hasLocation]);
+    return () => controller.abort();
+  }, [reportId, hasLocation, retryCount]);
 
   if (noLocation) {
     return (
@@ -95,6 +104,10 @@ export function WeatherContext({ reportId, hasLocation }: WeatherContextProps) {
         <p className="t-meta" style={{ color: "var(--ink-3)" }}>
           {error ?? "Weather forecast is temporarily unavailable. The report is still fully usable."}
         </p>
+        <button type="button" className="btn" style={{ marginTop: "var(--s-3)" }}
+          onClick={() => setRetryCount((count) => count + 1)}>
+          Retry weather forecast
+        </button>
       </div>
     );
   }
@@ -218,10 +231,10 @@ export function WeatherContext({ reportId, hasLocation }: WeatherContextProps) {
         }}
       >
         <span className="t-meta">
-          Forecast valid: {new Date(weather.validFrom).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })} — {new Date(weather.validUntil).toLocaleString(undefined, { timeStyle: "short" })}
+          Forecast valid: {new Date(weather.validFrom).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short", timeZone: weather.timezone })} — {new Date(weather.validUntil).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short", timeZone: weather.timezone })}
         </span>
         <span className="t-meta">
-          {weather.timezone} · Retrieved {new Date(weather.retrievedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+          {weather.timezone} · Retrieved {new Date(weather.retrievedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: weather.timezone })}
         </span>
       </div>
 
