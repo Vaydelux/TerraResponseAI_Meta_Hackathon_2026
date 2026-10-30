@@ -59,6 +59,14 @@ If no longer needed, delete a secret in the GitHub Actions settings and revoke t
 GitHub workflows can use secrets, but the connected assistant cannot retrieve their values. This is intentional.
 
 
+## Fresh runs versus old reruns
+
+GitHub **Re-run jobs** always replays the same commit and workflow definition as the original run. A failed preview originally created on commit `6eb990e` cannot acquire the newly added `project_ref` input, even if you edit the variable later.
+
+This workflow now supports two ways to create a **fresh** run: (1) use **Run workflow** with branch `main` (and optionally enter `project_ref`), or (2) after the workflow file is changed on `main`, GitHub automatically starts a new read-only preview. The automatic trigger only watches edits to `.github/workflows/supabase-staging-preview.yml`; it does not run on every source commit.
+
+The automatic trigger has **no manual input**. It requires `STAGING_SUPABASE_PROJECT_REF` to exist as a repository or staging environment Action Variable/Secret. If missing, the job fails at preflight without connecting to any database. The environment-level review protections, if configured, still apply. Both trigger types are read-only and scoped to the linked staging project.
+
 ## CLI version and migration filename safety
 
 The preview pins **Supabase CLI 2.72.7** so a new CLI release cannot silently change the meaning of a remote-target flag. The workflow uses explicit `--linked` flags after linking the designated staging project and only runs `db push --dry-run`. It cannot modify the remote database.
