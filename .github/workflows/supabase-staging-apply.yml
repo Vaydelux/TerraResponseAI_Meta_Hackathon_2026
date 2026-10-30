@@ -33,9 +33,9 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF || secrets.STAGING_SUPABASE_PROJECT_REF }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
       CONFIRM_PROJECT_REF: ${{ inputs.staging_project_ref }}
       CONFIRM_ACTION: ${{ inputs.confirmation }}
       PRODUCTION_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
@@ -54,8 +54,8 @@ jobs:
           fi
           [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] || { echo "::error::Missing access token"; exit 1; }
           [ -n "${SUPABASE_DB_PASSWORD:-}" ] || { echo "::error::Missing staging DB password"; exit 1; }
-          [ -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ] || { echo "::error::Missing staging anon key"; exit 1; }
-          [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ] || { echo "::error::Missing staging service role key"; exit 1; }
+          [ -n "${STAGING_SUPABASE_ANON_KEY:-}" ] || { echo "::error::Missing staging anon key"; exit 1; }
+          [ -n "${STAGING_SUPABASE_SERVICE_ROLE_KEY:-}" ] || { echo "::error::Missing staging service role key"; exit 1; }
           if ! [[ "${SUPABASE_PROJECT_REF:-}" =~ ^[a-z0-9]{12,32}$ ]]; then
             echo "::error::Configure STAGING_SUPABASE_PROJECT_REF as an Actions Variable/Secret."
             exit 1
@@ -64,12 +64,12 @@ jobs:
             echo "::error::Typed ref differs from configured staging ref; refusing writes."
             exit 1
           fi
-          if [[ -n "${PRODUCTION_PROJECT_REF:-}" && "$SUPABASE_PROJECT_REF" == "$PRODUCTION_PROJECT_REF" ]]; then
+          if [[ -z "${PRODUCTION_PROJECT_REF:-}" || "$SUPABASE_PROJECT_REF" == "$PRODUCTION_PROJECT_REF" || "$SUPABASE_PROJECT_REF" == "ywopsafppyykhwrejliz" ]]; then
             echo "::error::Staging ref matches configured production ref; refusing writes."
             exit 1
           fi
           # Validate the independently configured staging URL before writes.
-          if [[ "${NEXT_PUBLIC_SUPABASE_URL%/}" != "https://${SUPABASE_PROJECT_REF}.supabase.co" ]]; then
+          if [[ "${STAGING_SUPABASE_URL%/}" != "https://${SUPABASE_PROJECT_REF}.supabase.co" ]]; then
             echo "::error::Staging URL and project ref mismatch; refusing writes."
             exit 1
           fi
