@@ -1,159 +1,101 @@
 // @vitest-environment node
-//
-// src/lib/auth/record-auth-failure.test.ts
-//
-// Phase 18 — test that recordAuthFailure now uses the
-// write_audit_event SECURITY DEFINER RPC (Phase 18 C-4 fix) instead
-// of bypassing it with a direct service-role INSERT into audit_events.
-//
-// The previous version used the service-role client to INSERT
-// directly into audit_events. This bypassed the SECURITY DEFINER
-// function's actor_id = auth.uid() guarantee (the service role can
-// set actor_id to an arbitrary value). The new version uses the
-// SSR client + the RPC, so the function's guarantee holds.
-//
-// The test mocks the SSR client's `rpc` method and verifies it's
-// called with the correct arguments (action='auth_failed' lowercase,
-// metadata={email}).
+// Real login failures happen before authentication, so the server must
+// use privileged audit access for counting and recording failed attempts.
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-
-const { mockRpc, mockRequireServerUser, mockCreateClient, mockHeaders } = vi.hoisted(() => ({
-  mockRpc: vi.fn(),
-  mockRequireServerUser: vi.fn(),
-  mockCreateClient: vi.fn(),
-  mockHeaders: vi.fn(),
+const mocks = vi.hoisted(() => ({
+  createClient: vi.fn(),
+  from: vi.fn(),
+  insert: vi.fn(),
+  gte: vi.fn(),
+  signInWithPassword: vi.fn(),
+  headers: vi.fn(),
 }));
 
+vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createClient }));
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
-    rpc: mockRpc,
-    auth: { getUser: vi.fn() },
+    auth: { signInWithPassword: mocks.signInWithPassword },
   }),
-  requireServerUser: mockRequireServerUser,
 }));
-
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: mockCreateClient,
-}));
-
 vi.mock("@/lib/supabase/env", () => ({
   isSupabaseConfigured: () => true,
   supabaseUrl: () => "https://test.supabase.co",
-  serviceRoleKey: () => "test-service-role-key",
+  serviceRoleKey: () => "server-only-test-key",
 }));
+vi.mock("next/headers", () => ({ headers: mocks.headers }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 
-vi.mock("next/headers", () => ({
-  headers: mockHeaders,
-}));
+import { signInAction } from "./actions";
 
-// Import AFTER the mocks.
-import { signInAction } from "@/lib/auth/actions";
+function loginForm() {
+  const form = new FormData();
+  form.set("email", "Tester@Example.com");
+  form.set("password", "wrong-password");
+  return form;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockRequireServerUser.mockResolvedValue({ id: "user-1" });
-  mockHeaders.mockResolvedValue(new Headers({
-    "x-forwarded-for": "1.2.3.4",
-    "user-agent": "test-ua",
+  delete process.env.LOGIN_RATE_LIMIT_PER_HOUR;
+  mocks.gte.mockResolvedValue({ count: 0, error: null });
+  mocks.insert.mockResolvedValue({ error: null });
+  const query = {
+    in: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    gte: mocks.gte,
+  };
+  mocks.from.mockImplementation(() => ({
+    select: vi.fn().mockReturnValue(query),
+    insert: mocks.insert,
   }));
-  // signInAction calls supabase.auth.signInWithPassword; we mock the
-  // auth client to return a failure so recordAuthFailure runs.
-  mockRpc.mockImplementation(async (fnName: string, args: Record<string, unknown>) => {
-    if (fnName === "write_audit_event") {
-      // The RPC inserts an audit row; return a fake id.
-      return { data: "audit-id-1", error: null };
-    }
-    return { data: null, error: { message: "not mocked" } };
+  mocks.createClient.mockImplementation(() => ({ from: mocks.from }));
+  mocks.signInWithPassword.mockResolvedValue({ error: { message: "Invalid credentials" } });
+  mocks.headers.mockResolvedValue(new Headers({
+    "x-forwarded-for": "192.0.2.1, 198.51.100.1",
+    "user-agent": "test-browser",
+  }));
+});
+
+describe("pre-authentication login protection", () => {
+  it("queries the admin-only audit table through the trusted server client", async () => {
+    await signInAction(loginForm());
+    expect(mocks.createClient).toHaveBeenCalledWith(
+      "https://test.supabase.co",
+      "server-only-test-key",
+      expect.objectContaining({
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+    );
+    expect(mocks.from).toHaveBeenCalledWith("audit_events");
+    expect(mocks.gte).toHaveBeenCalledOnce();
   });
-  // The signInAction uses createSupabaseServerClient's auth.signInWithPassword.
-  // We need to mock the auth client too. Actually signInAction uses
-  // the SSR client's auth, not a separate client. Let me patch the
-  // createSupabaseServerClient mock to include an auth.signInWithPassword
-  // that returns an error.
-});
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
-describe("recordAuthFailure (Phase 18 C-4 fix)", () => {
-  it("calls write_audit_event RPC with lowercase action + email metadata (NOT a direct INSERT)", async () => {
-    // Re-mock the SSR client to include auth.signInWithPassword that
-    // returns an error (so recordAuthFailure is called).
-    vi.resetModules();
-    vi.doMock("@/lib/supabase/server", () => ({
-      createSupabaseServerClient: async () => ({
-        rpc: mockRpc,
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-          signInWithPassword: vi.fn().mockResolvedValue({
-            error: { message: "Invalid credentials" },
-          }),
-          signOut: vi.fn(),
-        },
-      }),
-      requireServerUser: mockRequireServerUser,
-    }));
-    const { signInAction: freshSignIn } = await import("@/lib/auth/actions");
-
-    const formData = new FormData();
-    formData.set("email", "attacker@evil.com");
-    formData.set("password", "wrong");
-    formData.set("callbackUrl", "/dashboard");
-    await freshSignIn(formData);
-
-    // Verify write_audit_event was called with the correct args.
-    expect(mockRpc).toHaveBeenCalledWith("write_audit_event", expect.objectContaining({
-      p_action: "auth_failed",  // lowercase (canonical form)
-      p_metadata: { email: "attacker@evil.com" },
-      p_target_id: null,
-      p_target_type: null,
-      p_ip: "1.2.3.4",  // leftmost IP from x-forwarded-for
-      p_user_agent: "test-ua",
+  it("records invalid logins with a fixed action and null actor_id", async () => {
+    const result = await signInAction(loginForm());
+    expect(result?.error).toContain("Invalid email or password");
+    expect(mocks.insert).toHaveBeenCalledWith(expect.objectContaining({
+      action: "auth_failed",
+      actor_id: null,
+      metadata: { email: "tester@example.com" },
+      ip: "192.0.2.1",
+      user_agent: "test-browser",
     }));
   });
 
-  it("does NOT use the service-role client to INSERT directly into audit_events", async () => {
-    // The previous version called createClient(supabaseUrl, serviceRoleKey)
-    // and then serviceClient.from("audit_events").insert(...). The new
-    // version uses the SSR client + rpc. Verify the service-role
-    // createClient is NOT called during recordAuthFailure.
-    mockCreateClient.mockClear();
-    vi.resetModules();
-    vi.doMock("@/lib/supabase/server", () => ({
-      createSupabaseServerClient: async () => ({
-        rpc: mockRpc,
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-          signInWithPassword: vi.fn().mockResolvedValue({
-            error: { message: "Invalid credentials" },
-          }),
-          signOut: vi.fn(),
-        },
-      }),
-      requireServerUser: mockRequireServerUser,
-    }));
-    const { signInAction: freshSignIn } = await import("@/lib/auth/actions");
+  it("blocks repeated failures before attempting authentication", async () => {
+    mocks.gte.mockResolvedValue({ count: 10, error: null });
+    const result = await signInAction(loginForm());
+    expect(result?.error).toContain("Too many failed login attempts");
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
 
-    const formData = new FormData();
-    formData.set("email", "attacker@evil.com");
-    formData.set("password", "wrong");
-    await freshSignIn(formData);
-
-    // The service-role createClient should NOT be called during
-    // a failed login (recordAuthFailure uses the SSR client + RPC,
-    // not the service-role client). Note: bootstrapFirstAdminAction
-    // DOES use createClient, but that's a different code path that's
-    // not exercised by signInAction.
-    // We allow createClient to be called by other code (e.g., the
-    // middleware), but during signInAction it should not be called
-    // for the audit write.
-    const createClientCalls = mockCreateClient.mock.calls.length;
-    // If createClient was called, the call sites that did so were
-    // NOT for the audit write (they would have been for the SSR
-    // cookie refresh, which is handled by @supabase/ssr, not
-    // @supabase/supabase-js createClient). So we expect 0 calls.
-    expect(createClientCalls).toBe(0);
+  it("fails closed instead of bypassing the limiter when the audit query fails", async () => {
+    mocks.gte.mockResolvedValue({ count: null, error: { message: "permission denied" } });
+    const result = await signInAction(loginForm());
+    expect(result?.error).toContain("temporarily unavailable");
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled();
   });
 });

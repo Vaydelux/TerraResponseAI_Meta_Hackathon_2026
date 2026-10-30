@@ -41,94 +41,85 @@ function getLoginRateLimit(): number {
 }
 
 /**
- * Check if the login rate limit has been exceeded for this email.
- * Counts auth_failed audit events in the last hour. Fail-open on
- * error (a DB hiccup shouldn't block a legitimate login).
- *
- * The action value is lowercase ('auth_failed') — the
- * trg_normalize_audit_action trigger (0006_security_fixes.sql §17)
- * lowercases the action on INSERT, so all NEW rows are lowercase.
- * Existing rows may have 'AUTH_FAILED' (uppercase, the legacy form
- * emitted by the prior app code). To count both, we use `.in(...)`
- * instead of `.eq(...)`. Once all legacy rows age out (after 1 hour,
- * since the rate-limit window is 1h), this can be simplified to
- * `.eq('action', 'auth_failed')`.
+ * Login is pre-authentication: authenticated-only RLS and RPC grants
+ * cannot be used to record or count failures. This client is strictly
+ * server-side, scoped to the two login-audit operations below.
+ * It never accepts caller-provided actor IDs or audit action names.
  */
-async function checkLoginRate(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, email: string): Promise<{ blocked: boolean; used: number; limit: number }> {
+function createTrustedLoginAuditClient() {
+  return createClient(supabaseUrl(), serviceRoleKey(), {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+/**
+ * Count failures through a server-only privileged client. Ordinary users
+ * cannot read audit_events due to its admin-only RLS policy.
+ * Fail closed if we cannot check: otherwise a DB outage disables the
+ * application-level brute-force protection.
+ */
+async function checkLoginRate(email: string): Promise<{
+  blocked: boolean;
+  used: number;
+  limit: number;
+  unavailable?: boolean;
+}> {
   const limit = getLoginRateLimit();
   try {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count, error } = await supabase
+    const { count, error } = await createTrustedLoginAuditClient()
       .from("audit_events")
       .select("id", { count: "exact", head: true })
       .in("action", ["auth_failed", "AUTH_FAILED"])
       .eq("metadata->>email", email)
       .gte("created_at", oneHourAgo);
 
-    if (error) {
-      // Fail-open: don't block on a DB error.
-      console.warn(`[auth] login rate check failed (allowing): ${error.message}`);
-      return { blocked: false, used: 0, limit };
+    if (error || count === null) {
+      console.error("[auth] Login rate-limit audit query unavailable.");
+      return { blocked: true, used: 0, limit, unavailable: true };
     }
-    const used = count ?? 0;
-    return { blocked: used >= limit, used, limit };
+    return { blocked: count >= limit, used: count, limit };
   } catch {
-    return { blocked: false, used: 0, limit };
+    console.error("[auth] Login rate-limit audit query failed.");
+    return { blocked: true, used: 0, limit, unavailable: true };
   }
 }
 
 /**
- * Record a failed login attempt in the audit_events table.
- * Fail-open: a failed insert doesn't block the error response.
+ * Record pre-authentication failures using tightly scoped, server-controlled
+ * data. Never expose the service key to browsers or allow user-supplied audit
+ * actors/actions. This is the deliberate system-event exception to the
+ * authenticated user's write_audit_event() pathway.
  */
-async function recordAuthFailure(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, email: string): Promise<void> {
+async function recordAuthFailure(email: string): Promise<void> {
   try {
     let ip: string | null = null;
     let userAgent: string | null = null;
     try {
       const h = await headers();
+      // Forwarded headers are not proof of client identity; recorded for
+      // diagnostics only, never treated as verified security evidence.
       const xff = h.get("x-forwarded-for");
-      // Leftmost IP only (not the chain) — the SSR can be behind a CDN
-      // or proxy; the originating client is the leftmost entry.
       ip = xff ? xff.split(",")[0].trim() : (h.get("x-real-ip") ?? null);
-      userAgent = h.get("user-agent") ?? null;
+      userAgent = h.get("user-agent")?.slice(0, 512) ?? null;
     } catch { /* not in request context */ }
 
-    // Use the SSR client (bound to the request cookies) to call the
-    // write_audit_event SECURITY DEFINER function — the canonical path.
-    // The function forces actor_id = auth.uid() (which is NULL during a
-    // failed login, before a session is established — the schema
-    // allows this). The function's CHECK constraint accepts both
-    // 'auth_failed' (lowercase — canonical) and 'AUTH_FAILED' (the
-    // legacy form, kept for back-compat with existing rows).
-    //
-    // The previous version of this code used the service-role client
-    // to INSERT directly into audit_events — bypassing the SECURITY
-    // DEFINER function. That was a security issue (the service role
-    // can set actor_id to an arbitrary value). The new version uses
-    // the SSR client + the RPC so the function's actor_id = auth.uid()
-    // guarantee holds.
-    //
-    // The trigger trg_normalize_audit_action (0006_security_fixes.sql
-    // §17) lowercases the action on INSERT, so the stored value is
-    // always 'auth_failed'.
-    const { error } = await supabase.rpc("write_audit_event", {
-      p_action: "auth_failed",
-      p_target_id: null,
-      p_target_type: null,
-      p_metadata: { email },
-      p_ip: ip,
-      p_user_agent: userAgent,
-    });
+    const { error } = await createTrustedLoginAuditClient()
+      .from("audit_events")
+      .insert({
+        actor_id: null,
+        action: "auth_failed",
+        target_id: null,
+        target_type: null,
+        metadata: { email },
+        ip,
+        user_agent: userAgent,
+      });
     if (error) {
-      // The CHECK constraint or the function may reject — log but
-      // don't throw (a failed audit write must not break the login
-      // error response). The brief: "no silent failures" — we log
-      // here so the operator sees it in the platform logs.
-      console.warn(`[auth] write_audit_event('auth_failed') failed: ${error.message}`);
+      console.error("[auth] Failed to record pre-auth login attempt.");
     }
-  } catch (err) {
-    console.warn(`[auth] failed to record auth_failed: ${err instanceof Error ? err.message : String(err)}`);
+  } catch {
+    console.error("[auth] Pre-auth login audit write unavailable.");
   }
 }
 
@@ -155,7 +146,10 @@ export async function signInAction(formData: FormData): Promise<SignInState> {
   const supabase = await createSupabaseServerClient();
 
   // 1. Check login rate limit (brute-force protection).
-  const rate = await checkLoginRate(supabase, email);
+  const rate = await checkLoginRate(email);
+  if (rate.unavailable) {
+    return { error: "Login is temporarily unavailable. Please try again later." };
+  }
   if (rate.blocked) {
     return { error: `Too many failed login attempts (${rate.used}/${rate.limit} in the last hour). Please try again later.` };
   }
@@ -164,7 +158,7 @@ export async function signInAction(formData: FormData): Promise<SignInState> {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     // 3. Record the failed attempt for rate-limiting.
-    await recordAuthFailure(supabase, email);
+    await recordAuthFailure(email);
     return { error: "Invalid email or password. Please try again." };
   }
 
