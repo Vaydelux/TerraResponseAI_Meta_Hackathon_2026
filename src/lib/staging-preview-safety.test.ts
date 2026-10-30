@@ -6,6 +6,11 @@ const workflow = readFileSync(".github/workflows/supabase-staging-preview.yml", 
 describe("Supabase staging preview safety", () => {
   it("is manual-only, pinned, and uses the explicit linked staging target", () => {
     expect(workflow).toContain("workflow_dispatch:");
+    // A new commit on main provides a fresh run instead of replaying the
+    // original SHA through GitHub's "Re-run jobs" action.
+    expect(workflow).toContain("push:");
+    expect(workflow).toContain("branches: [main]");
+    expect(workflow).toContain("'.github/workflows/supabase-staging-preview.yml'");
     expect(workflow).toContain("version: 2.72.7");
     expect(workflow).toContain("github.ref == 'refs/heads/main'");
     expect(workflow).toContain("environment: staging");
