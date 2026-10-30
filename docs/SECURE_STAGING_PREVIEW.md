@@ -36,7 +36,7 @@ Do **not** create a plaintext `.env.local` file in the repo. Do not paste creden
 
 ## 3. Run the preview
 
-After this workflow is merged to `main`, visit **Actions → Supabase staging migration preview → Run workflow** on `main`.
+After this workflow is merged to `main`, visit **Actions → Supabase staging migration preview → Run workflow** on `main`. Select **Run workflow** to create a **new run**; **Re-run jobs** on an older failed run reuses the old commit/workflow. If the project ref variable/secret is still unavailable, fill the optional **project_ref** input with *only* the staging Supabase project reference (for example, the ID in the project's dashboard URL), not a URL. The input has precedence over GitHub Variables and Secrets and is validated before connecting. It is not a password and must never be used to point at the production database.
 
 The workflow:
 1. Verifies required variables exist, without logging their values.
