@@ -35,7 +35,11 @@ describe("staging SQL application guardrails", () => {
   it("requires separately confirmed staging URL and project identity", () => {
     expect(workflow).toContain('STAGING_SUPABASE_PROJECT_REF');
     expect(workflow).toContain('PRODUCTION_PROJECT_REF');
-    expect(workflow).toContain('NEXT_PUBLIC_SUPABASE_URL%/');
+    expect(workflow).toContain('STAGING_SUPABASE_URL%/');
+    expect(workflow).toContain('STAGING_SUPABASE_SERVICE_ROLE_KEY');
+    expect(workflow).toContain('"ywopsafppyykhwrejliz"');
+    expect(workflow).not.toContain('secrets.NEXT_PUBLIC_SUPABASE_URL');
+    expect(workflow).not.toContain('secrets.SUPABASE_SERVICE_ROLE_KEY');
     expect(workflow).toContain('supabase link --project-ref "$SUPABASE_PROJECT_REF"');
   });
   it("runs read-only history and dry run before the single explicit apply", () => {
