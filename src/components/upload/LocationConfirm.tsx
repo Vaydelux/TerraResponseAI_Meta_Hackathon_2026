@@ -86,11 +86,11 @@ export function LocationConfirm({ exif, onConfirm, className }: LocationConfirmP
           aria-label="Location choice"
           block
           options={options}
-          value={choice ?? "unknown"}
+          value={choice ?? ("" as LocationChoice)}
           onChange={(v) => setChoice(v)}
         />
         {choice === "manual" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--s-3)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: "var(--s-3)" }}>
             <Field label="Latitude" htmlFor="lc-lat">
               <Input
                 id="lc-lat"
