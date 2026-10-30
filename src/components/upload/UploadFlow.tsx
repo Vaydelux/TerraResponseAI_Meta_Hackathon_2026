@@ -58,13 +58,43 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
   const [locationChoice, setLocationChoice] = useState<LocationChoice | null>(null);
   const [locationCoords, setLocationCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [exif, setExif] = useState<{ lat: number; lon: number; capturedAt?: string | null } | null>(null);
+  const [readingExif, setReadingExif] = useState(false);
+  const fileSequenceRef = useRef(0);
   const [state, setState] = useState<UploadState>({ kind: "idle" });
   const xhrRef = useRef<XMLHttpRequest | null>(null);
 
   function handleFiles(next: File[]) {
-    setFiles(next);
-    setChecks(next.map((f) => ({ name: f.name, state: "wait" as const, size: f.size })));
+    const selected = next.slice(0, 1);
+    const sequence = ++fileSequenceRef.current;
+    setFiles(selected);
+    setChecks(selected.map((f) => ({ name: f.name, state: "wait" as const, size: f.size })));
+    setLocationChoice(null);
+    setLocationCoords(null);
+    setExif(null);
+    setReadingExif(selected.length > 0);
+    setState({ kind: "idle" });
     setStep(1);
+
+    // Extract optional EXIF locally for explicit user confirmation.
+    // This is advisory; the server independently reads and validates EXIF.
+    const chosenFile = selected[0];
+    if (chosenFile && chosenFile.size > 0 && chosenFile.size <= 10 * 1024 * 1024 &&
+        /^image\/(jpeg|png|webp)$/.test(chosenFile.type)) {
+      void import("exifr").then(async ({ default: exifr }) => {
+        const gps = await exifr.gps(chosenFile).catch(() => null);
+        if (sequence !== fileSequenceRef.current) return;
+        if (gps && Number.isFinite(gps.latitude) && Number.isFinite(gps.longitude) &&
+            Math.abs(gps.latitude) <= 90 && Math.abs(gps.longitude) <= 180) {
+          setExif({ lat: gps.latitude, lon: gps.longitude });
+        }
+      }).catch(() => {
+        // Malformed or absent EXIF is normal: manual and unknown remain available.
+      }).finally(() => {
+        if (sequence === fileSequenceRef.current) setReadingExif(false);
+      });
+    } else {
+      setReadingExif(false);
+    }
 
     // The server validates each file on the first upload attempt;
     // we don't claim a file is valid before that. We do a quick
@@ -73,13 +103,13 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
     setTimeout(() => {
       setChecks((prev) =>
         prev.map((c) => {
-          const f = next.find((f) => f.name === c.name);
+          const f = selected.find((f) => f.name === c.name);
           if (!f) return c;
-          if (f.size > 25 * 1024 * 1024) {
-            return { ...c, state: "fail" as const, message: "over 25 MB" };
+          if (f.size > 10 * 1024 * 1024) {
+            return { ...c, state: "fail" as const, message: "over 10 MB" };
           }
-          if (!/^image\/(jpeg|png)$/.test(f.type)) {
-            return { ...c, state: "fail" as const, message: "not JPEG or PNG" };
+          if (!/^image\/(jpeg|png|webp)$/.test(f.type)) {
+            return { ...c, state: "fail" as const, message: "not JPEG, PNG or WebP" };
           }
           return { ...c, state: "ok" as const, message: "valid image — final check on submit" };
         }),
@@ -88,7 +118,7 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
   }
 
   function canProceedToStep2(): boolean {
-    return files.length > 0 && checks.every((c) => c.state === "ok");
+    return files.length === 1 && !readingExif && checks.length === 1 && checks.every((c) => c.state === "ok");
   }
 
   function onConfirmLocation(choice: LocationChoice, coords?: { lat: number; lon: number }) {
@@ -110,7 +140,9 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
       meta.locationSource = "manual";
     } else if (locationChoice === "unknown") {
       meta.locationSource = "unknown";
-    } else if (locationChoice === "gps") {
+    } else if (locationChoice === "gps" && exif) {
+      meta.latitude = exif.lat;
+      meta.longitude = exif.lon;
       meta.locationSource = "gps";
     }
     if (linkToReportId) meta.linkToReportId = linkToReportId;
@@ -205,6 +237,7 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
         <div className="tr-stack">
           <Dropzone onFiles={handleFiles} disabled={state.kind === "uploading"} />
           {checks.length > 0 && <FileCheckList items={checks} />}
+          {readingExif && <p className="t-meta" role="status">Checking the photo for optional GPS metadata…</p>}
           <Field label="Title (optional)" htmlFor="up-title">
             <Input id="up-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Flooded road near Brgy San Roque" />
           </Field>
@@ -289,6 +322,8 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
                     setDescription("");
                     setLocationChoice(null);
                     setLocationCoords(null);
+                    setExif(null);
+                    fileSequenceRef.current += 1;
                   }}>Upload another</Button>
                 </div>
               </div>
