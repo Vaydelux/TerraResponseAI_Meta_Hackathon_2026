@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/supabase-staging-preview.yml'
+      - 'supabase/config.toml'
   workflow_dispatch:
     inputs:
       project_ref:
