@@ -51,7 +51,8 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pin for reproducible --linked semantics; do not drift with CLI latest.
+          version: 2.72.7
 
       - name: Link staging project (does not apply migrations)
         shell: bash
@@ -59,11 +60,22 @@ jobs:
           set -euo pipefail
           supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
+      - name: Warn on nonstandard local migration versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in supabase/migrations/*.sql; do
+            name="${file##*/}"
+            if ! [[ "$name" =~ ^[0-9]{14}_[a-zA-Z0-9_-]+\.sql$ ]]; then
+              echo "::warning file=$file::Nonstandard migration filename. Supabase expects YYYYMMDDHHmmss_name.sql. Do not rename an already applied migration without verifying remote migration history."
+            fi
+          done
+
       - name: Inspect applied and pending migration history
-        run: supabase migration list
+        run: supabase migration list --linked
 
       - name: Preview database migration changes (READ ONLY)
-        run: supabase db push --dry-run
+        run: supabase db push --dry-run --linked
 
       - name: Migration preview completed
         run: |
