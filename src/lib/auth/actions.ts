@@ -29,6 +29,7 @@ import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured, serviceRoleKey, supabaseUrl } from "@/lib/supabase/env";
 import { createClient } from "@supabase/supabase-js";
+import { safeAuthPath } from "@/lib/auth/safe-redirect";
 
 export type SignInState = { error?: string } | null;
 
@@ -163,9 +164,7 @@ export async function signInAction(formData: FormData): Promise<SignInState> {
   }
 
   // Safe redirect: same-origin, no protocol-relative.
-  const safe = callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
-    ? callbackUrl
-    : "/dashboard";
+  const safe = safeAuthPath(callbackUrl);
   revalidatePath("/", "layout");
   redirect(safe);
 }
