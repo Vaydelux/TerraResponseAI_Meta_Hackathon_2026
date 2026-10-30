@@ -20,7 +20,6 @@ extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [db]
-enabled = true
 port = 54322
 shadow_port = 54320
 major_version = 15
@@ -35,16 +34,13 @@ port = 54324
 
 [storage]
 enabled = true
-port = 54325
 file_size_limit = "50MiB"
 
 [auth]
 enabled = true
-port = 54326
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000/auth/callback"]
 jwt_expiry = 3600
-refresh_token_rotation_enabled = true
 refresh_token_reuse_interval = 10
 enable_signup = true
 enable_anonymous_sign_ins = false
@@ -58,8 +54,7 @@ enable_confirmations = true
 enable_signup = false
 enable_confirmations = false
 
-# The migrations directory. The CLI reads files from here in
-# alphabetical order (which is why they're prefixed with 0001_, 0002_, etc.).
+# The CLI uses the default supabase/migrations directory. Override keys
+# like `dir` are not supported by the pinned CLI.
 [db.migrations]
 enabled = true
-dir = "migrations"
