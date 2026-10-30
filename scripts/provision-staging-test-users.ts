@@ -28,7 +28,7 @@ async function main() {
 
   if (entries.some(x => !x.email || !x.password || x.password.length < 16) ||
       new Set(entries.map(x => x.email?.trim().toLowerCase())).size !== 3 ||
-      entries.some(x => !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(x.email!))) {
+      entries.some(x => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x.email!))) {
     throw new Error("Configure 3 unique valid emails and separate strong passwords of at least 16 chars in protected staging secrets.");
   }
 
