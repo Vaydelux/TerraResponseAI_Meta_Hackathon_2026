@@ -1,0 +1,119 @@
+# TerraResponse AI — opt-in STAGING-ONLY migration application.
+# This workflow writes to the remote STAGING database. It never targets
+# production and never runs automatically from pushes or PRs.
+name: Apply Supabase staging migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_project_ref:
+        description: "Re-enter the configured staging project reference (not a URL)"
+        required: true
+        type: string
+      confirmation:
+        description: "Type APPLY-STAGING-ONLY to authorize database writes"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraresponse-staging-db-writer
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.ref == 'refs/heads/main' && github.repository == 'Vaydelux/TerraResponseAI_Meta_Hackathon_2026'
+    name: Apply reviewed migrations only to configured STAGING
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF || secrets.STAGING_SUPABASE_PROJECT_REF }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      CONFIRM_PROJECT_REF: ${{ inputs.staging_project_ref }}
+      CONFIRM_ACTION: ${{ inputs.confirmation }}
+      PRODUCTION_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
+
+    steps:
+      - name: Checkout reviewed main
+        uses: actions/checkout@v4
+
+      - name: Confirm STAGING-only target and required configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIRM_ACTION" != "APPLY-STAGING-ONLY" ]]; then
+            echo "::error::Explicit APPLY-STAGING-ONLY confirmation required."
+            exit 1
+          fi
+          [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] || { echo "::error::Missing access token"; exit 1; }
+          [ -n "${SUPABASE_DB_PASSWORD:-}" ] || { echo "::error::Missing staging DB password"; exit 1; }
+          [ -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ] || { echo "::error::Missing staging anon key"; exit 1; }
+          [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ] || { echo "::error::Missing staging service role key"; exit 1; }
+          if ! [[ "${SUPABASE_PROJECT_REF:-}" =~ ^[a-z0-9]{12,32}$ ]]; then
+            echo "::error::Configure STAGING_SUPABASE_PROJECT_REF as an Actions Variable/Secret."
+            exit 1
+          fi
+          if [[ "$CONFIRM_PROJECT_REF" != "$SUPABASE_PROJECT_REF" ]]; then
+            echo "::error::Typed ref differs from configured staging ref; refusing writes."
+            exit 1
+          fi
+          if [[ -n "${PRODUCTION_PROJECT_REF:-}" && "$SUPABASE_PROJECT_REF" == "$PRODUCTION_PROJECT_REF" ]]; then
+            echo "::error::Staging ref matches configured production ref; refusing writes."
+            exit 1
+          fi
+          # Validate the independently configured staging URL before writes.
+          if [[ "${NEXT_PUBLIC_SUPABASE_URL%/}" != "https://${SUPABASE_PROJECT_REF}.supabase.co" ]]; then
+            echo "::error::Staging URL and project ref mismatch; refusing writes."
+            exit 1
+          fi
+          echo "Project ID, staging URL and manual confirmation match; values withheld."
+          echo "This manual workflow WILL apply pending SQL to the staging database."
+
+      - name: Install pinned Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.72.7
+
+      - name: Link configured staging project
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: List remote migration history (read-only)
+        run: supabase migration list --linked
+
+      - name: Preview pending SQL (read-only)
+        run: supabase db push --dry-run --linked
+
+      - name: Apply approved pending SQL to STAGING (writes)
+        run: supabase db push --linked
+
+      - name: Confirm remote versions
+        run: supabase migration list --linked
+
+      - name: Confirm no further pending SQL (read-only)
+        run: supabase db push --dry-run --linked
+
+      - name: Setup Bun for post-apply verification
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run post-apply read-only database verifier
+        run: bun run db:verify
+
+      - name: Post-apply status
+        run: |
+          echo "Staging SQL migration push finished; read-only verifier passed."
+          echo "Still REQUIRED: real RLS user-role tests, evidence storage access tests, and browser E2E."

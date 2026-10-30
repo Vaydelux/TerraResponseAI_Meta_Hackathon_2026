@@ -8,6 +8,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { safeAuthRedirect } from "@/lib/auth/safe-redirect";
 
 export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
@@ -28,7 +29,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Safe redirect: same-origin only.
-  const safe = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
-  return NextResponse.redirect(new URL(safe, request.url));
+  // Require a path-relative target and confirm the parsed URL remains on
+  // this origin. A naive startsWith("/") check allows "/\\evil.example"
+  // to be interpreted as a protocol-relative redirect by URL parsers.
+  return NextResponse.redirect(safeAuthRedirect(next, requestUrl));
 }
