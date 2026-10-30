@@ -73,7 +73,7 @@ export function DemoFlow() {
   ];
 
   return (
-    <section style={{ marginTop: "var(--s-6)" }}>
+    <section id="how-it-works" style={{ marginTop: "var(--s-6)" }}>
       <h2 style={{ fontSize: "var(--step-2)", marginBottom: "var(--s-2)" }}>
         How it works
       </h2>
