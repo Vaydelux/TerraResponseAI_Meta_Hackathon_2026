@@ -15,16 +15,16 @@
 import { describe, it, expect } from "vitest";
 import { analyzeImage } from "@/lib/ai/muse-spark";
 import sharp from "sharp";
+import { readFileSync } from "node:fs";
 
 const SKIP = !process.env.MODEL_API_KEY;
 
 describe.skipIf(SKIP)("muse-spark live smoke test", () => {
   it("produces valid stored JSON from a real photo", async () => {
-    // Generate a small test image (2x2 red JPEG).
-    const testImage = await sharp({
-      create: { width: 100, height: 100, channels: 3, background: { r: 128, g: 128, b: 128 } },
-    })
-      .jpeg()
+    // A real illustrative flood scene exercises actual vision behavior.
+    const testImage = await sharp(readFileSync("public/demo/flood-aerial.png"))
+      .resize({ width: 512, withoutEnlargement: true })
+      .jpeg({ quality: 72 })
       .toBuffer();
 
     const result = await analyzeImage({
@@ -34,11 +34,7 @@ describe.skipIf(SKIP)("muse-spark live smoke test", () => {
     });
 
     if (!result.ok) {
-      // If the API returns an error, that's acceptable for a smoke
-      // test (the API may be down, rate-limited, etc.) — but it must
-      // be a CLEAR error, not a fabricated fallback.
-      console.log(`[smoke] API returned ${result.kind}: ${result.error}`);
-      return;
+      throw new Error(`Muse Spark live smoke failed (${result.kind}): ${result.error}`);
     }
 
     // If the API succeeded, the observation must pass both validation
