@@ -21,7 +21,7 @@ export function MapPreview() {
   ];
 
   return (
-    <section style={{ marginTop: "var(--s-7)" }}>
+    <section id="incident-map-preview" style={{ marginTop: "var(--s-7)" }}>
       <div
         style={{
           display: "flex",
@@ -32,9 +32,9 @@ export function MapPreview() {
           gap: "var(--s-2)",
         }}
       >
-        <h2 style={{ fontSize: "var(--step-2)" }}>Live incident map</h2>
+        <h2 style={{ fontSize: "var(--step-2)" }}>Illustrative incident-map preview</h2>
         <span className="t-meta">
-          Solid pins are confirmed. Hatched pins are pending review. Pin size is constant — never implies triage.
+          Example pins only; no live incident data. Solid = example reviewed, hatched = example pending.
         </span>
       </div>
       <div
@@ -123,13 +123,13 @@ export function MapPreview() {
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12l5 5L20 7" />
               </svg>
-              Confirmed
+              Example: confirmed
             </div>
             <h3 style={{ fontSize: "var(--step-1)", marginBottom: "var(--s-1)" }}>
               Flooded road
             </h3>
             <p className="t-meta" style={{ marginBottom: "var(--s-2)" }}>
-              14.5995° N, 120.9842° E · Severity 4
+              Synthetic location · Example severity 4
             </p>
             <p className="t-meta">
               Road submerged by muddy water. Two vehicles stranded. Overland flow toward a culvert.
@@ -144,7 +144,7 @@ export function MapPreview() {
                 padding: "0 var(--s-3)",
               }}
             >
-              View on map
+              Open authenticated map
             </a>
           </div>
         </div>
