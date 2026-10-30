@@ -1,0 +1,44 @@
+name: Provision three staging-only QA users
+on:
+  workflow_dispatch:
+    inputs:
+      staging_project_ref:
+        description: "Type the approved, isolated STAGING project reference"
+        required: true
+        type: string
+      confirmation:
+        description: "Type CREATE-STAGING-TEST-USERS (NOT production)"
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: terraresponse-staging-db-writer
+  cancel-in-progress: false
+jobs:
+  provision:
+    if: github.ref == 'refs/heads/main' && github.repository == 'Vaydelux/TerraResponseAI_Meta_Hackathon_2026'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      STAGING_SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF || secrets.STAGING_SUPABASE_PROJECT_REF }}
+      PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
+      STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      TEST_REPORTER_EMAIL: ${{ secrets.TEST_REPORTER_EMAIL }}
+      TEST_REPORTER_PASSWORD: ${{ secrets.TEST_REPORTER_PASSWORD }}
+      TEST_REVIEWER_EMAIL: ${{ secrets.TEST_REVIEWER_EMAIL }}
+      TEST_REVIEWER_PASSWORD: ${{ secrets.TEST_REVIEWER_PASSWORD }}
+      TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+      TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+      CONFIRM_ACTION: ${{ inputs.confirmation }}
+      CONFIRM_PROJECT_REF: ${{ inputs.staging_project_ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Create and verify three accounts without confirmation email
+        run: bun run scripts/provision-staging-test-users.ts
