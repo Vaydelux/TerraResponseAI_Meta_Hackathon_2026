@@ -12,7 +12,7 @@ describe("privacy-preserving Supabase sign-up error explanations", () => {
     expect(signupFailure("email_provider_disabled", 400).message).toMatch(/disabled/);
     expect(signupFailure("signup_disabled", 403).message).toMatch(/disabled/);
     expect(signupFailure("email_address_not_authorized", 422).field).toBe("email");
-    expect(signupFailure("over_email_send_rate_limit", 429).message).toMatch(/too many/i);
+    expect(signupFailure("over_email_send_rate_limit", 429).message).toMatch(/email confirmation quota/);
     expect(signupFailure(undefined, 429).message).toMatch(/too many/i);
   });
   it("never discloses whether an account already exists", () => {
