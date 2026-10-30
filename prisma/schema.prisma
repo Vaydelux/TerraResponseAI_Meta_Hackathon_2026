@@ -1,0 +1,128 @@
+// TerraResponse AI — Prisma schema
+// Sandbox uses SQLite (file-based). Supabase/Postgres is replaced with Prisma+SQLite;
+// RLS-equivalent row filtering is enforced at the application layer (see src/lib/authz.ts).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Users & roles
+// ---------------------------------------------------------------------------
+// role values: "REPORTER" | "REVIEWER" | "ADMIN"
+// Stored as String (SQLite has no native enum), enforced via TS union type Role.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  role         String   @default("REPORTER") // union type Role
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reports      Report[]
+  reviewActions ReviewAction[]
+  auditLogs    AuditLog[]  @relation("AuditActor")
+}
+
+// ---------------------------------------------------------------------------
+// Reports (disaster photo submissions)
+// ---------------------------------------------------------------------------
+// status values: "UPLOADED" | "ANALYZING" | "ANALYZED" | "IN_REVIEW"
+//                 | "CONFIRMED" | "FLAGGED" | "REJECTED" | "RESOLVED"
+model Report {
+  id              String   @id @default(cuid())
+  reporterId      String
+  reporter        User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  status          String   @default("UPLOADED")
+  title           String?
+  description     String?
+  latitude        Float
+  longitude       Float
+  locationLabel   String?
+  locationAccuracy String  @default("unknown") // "high" | "medium" | "low" | "unknown"
+  imagePath       String   // server-side path under /home/z/my-project/uploads
+  imageMimeType   String
+  imageBytes      Int      @default(0)
+  imageThumbnailPath String?
+  capturedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Human-review priority (computed in code from severity + confidence + recency + location).
+  priorityScore   Int?     // 0-100
+
+  analysis        Analysis?
+  reviewActions   ReviewAction[]
+
+  @@index([reporterId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// AI analysis (1:1 with report for MVP)
+// ---------------------------------------------------------------------------
+model Analysis {
+  id                String   @id @default(cuid())
+  reportId          String   @unique
+  report            Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  modelId           String   // e.g., "zai-vlm-1" (Meta Muse Spark in production)
+  rawOutput         String   // raw model response (text/JSON)
+  caption           String   // short natural-language description
+  detectedCategories String  // JSON-encoded string[] e.g. ["flood","structural_damage"]
+  hazards           String   // JSON-encoded list of hazard objects
+  severityScore     Int      // 0-100
+  confidence        Float    // 0-1
+  peopleVisible     Boolean  @default(false)
+  schemaVersion     String   @default("v1")
+  createdAt         DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Human review actions (audit trail of reviewer decisions)
+// ---------------------------------------------------------------------------
+// action values: "CONFIRM" | "FLAG" | "REJECT" | "RESOLVE" | "ASSIGN" | "COMMENT"
+model ReviewAction {
+  id                  String   @id @default(cuid())
+  reportId            String
+  report              Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reviewerId          String
+  reviewer            User     @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  action              String
+  comment             String?
+  previousStatus      String?
+  newStatus           String?
+  priorityScoreOverride Int?
+  createdAt           DateTime @default(now())
+
+  @@index([reportId])
+  @@index([reviewerId])
+}
+
+// ---------------------------------------------------------------------------
+// Security & compliance audit log (append-only, never cascade-deleted)
+// ---------------------------------------------------------------------------
+// action values: "LOGIN" | "LOGOUT" | "AUTH_FAILED" | "UPLOAD" | "ANALYZE"
+//                | "REVIEW" | "DELETE" | "STATUS_CHANGE" | "PERMISSION_DENIED"
+//                | "REGISTER"
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?  // null for system-initiated actions
+  actor     User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action    String
+  targetId  String?  // report id, user id, etc.
+  metadata  String?  // JSON-encoded string
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+}

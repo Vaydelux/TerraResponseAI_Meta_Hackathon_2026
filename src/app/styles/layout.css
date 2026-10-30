@@ -1,0 +1,49 @@
+/* app/styles/layout.css
+ *
+ * Three shells share one top bar (docs/DESIGN.md §5):
+ *   - Public shell: landing, sign-in — single column with wide hero.
+ *   - Workbench shell: reports, review, admin — top bar + left filter
+ *     rail on desktop that collapses into a sheet on mobile.
+ *   - Map shell: full-bleed map + floating right panel (bottom sheet
+ *     on mobile).
+ */
+
+@layer layout {
+  .tr-shell {
+    min-height: 100dvh;
+    display: grid;
+    grid-template-rows: var(--nav-h) auto 1fr;
+  }
+  .tr-page {
+    width: 100%;
+    max-width: var(--content-max);
+    margin-inline: auto;
+    padding: var(--s-5) clamp(16px, 3vw, 40px);
+  }
+  .tr-workbench {
+    display: grid;
+    grid-template-columns: 1fr minmax(360px, 420px);
+    gap: var(--s-5);
+    align-items: start;
+  }
+  .tr-workbench__viewer {
+    position: sticky;
+    top: calc(var(--nav-h) + var(--s-4));
+  }
+  .tr-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+  .tr-cluster {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+  }
+  @media (max-width: 1099px) {
+    .tr-workbench { grid-template-columns: 1fr; }
+    .tr-workbench__viewer { position: static; }
+    .tr-page { padding-bottom: 112px; } /* clearance for fixed action bar */
+  }
+}

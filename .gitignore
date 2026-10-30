@@ -1,0 +1,88 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+local-*
+.claude
+.z-ai-config
+*.log
+dev.log
+dev.out.log
+test
+prompt
+
+server.log
+# Skills directory
+/skills/
+# TerraResponse AI — application-specific ignores
+# Local SQLite database (sandbox dev only; production uses Postgres).
+/db/*.db
+/db/*.db-journal
+
+# Uploaded disaster photos (PII; never commit).
+/uploads/
+
+# Local test artifacts and scratch.
+/tool-results/
+/tests/fixtures/images/*.jpg
+/tests/fixtures/images/*.png
+/tests/fixtures/ai-responses/*.local.json
+
+# Playwright E2E test artifacts (screenshots, traces, videos, HTML
+# report). These are generated on test runs and should not be
+# committed (they're regenerable + may contain screenshots of the
+# UI which could leak UI content).
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+
+# Removed scaffold/dirs (not part of the app)
+/.zscripts/
+/examples/
+/mini-services/
+/tool-results/
+/download/
+/Caddyfile
+
+# Development journal (not part of the product)
+/worklog.md

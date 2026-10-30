@@ -1,0 +1,116 @@
+/* app/styles/tokens.css
+ *
+ * TerraResponse AI — Design Tokens
+ *
+ * The Verification Seal is the keystone: amber hatch = AI-generated,
+ * not verified; solid = signed by a human. Every color, shape, and
+ * motion token below exists to reinforce that single idea.
+ *
+ * See docs/DESIGN.md §3 for the full token reference.
+ */
+
+:root {
+  /* Surfaces */
+  --paper:        #F2F4F1;   /* app background */
+  --sheet:        #FFFFFF;   /* panels */
+  --sheet-sunk:   #E8ECE8;   /* wells, table headers, inputs at rest */
+  --rule:         #D3D9D4;   /* 1px borders */
+  --rule-strong:  #AEB8B1;
+
+  /* Ink */
+  --ink:          #17232E;   /* primary text */
+  --ink-2:        #3E4C58;   /* secondary text */
+  --ink-3:        #66737E;   /* tertiary / helper (4.6:1 on paper) */
+  --ink-inverse:  #F2F4F1;
+
+  /* Action */
+  --tide:         #0B6574;
+  --tide-hover:   #084E5A;
+  --tide-press:   #063C45;
+  --tide-wash:    #DDEEF0;
+
+  /* Verification states — each means exactly one thing */
+  --amber:        #E8A317;   /* AI-generated, not verified (hatch + fills) */
+  --amber-ink:    #7A4F00;   /* text on amber washes (7.2:1 on --amber-wash) */
+  --amber-wash:   #FFF3D6;
+  --green:        #2F7D4F;   /* confirmed by a human */
+  --green-ink:    #1D5535;
+  --green-wash:   #DFF1E6;
+  --brick:        #B3382C;   /* rejected */
+  --brick-ink:    #8A241A;
+  --brick-wash:   #F9E1DD;
+  --flood:        #2B6CB0;   /* SAM mask overlay */
+  --graphite:     #7C8790;   /* inactive, failed, unavailable */
+
+  /* Severity ramp (sequential, colorblind-safe, light -> dark) */
+  --sev-1: #CFE3E6;
+  --sev-2: #8DBFC6;
+  --sev-3: #4A97A3;
+  --sev-4: #1F6E7C;
+  --sev-5: #0E3F4A;
+
+  /* Type */
+  --font-display: var(--font-bricolage), "Segoe UI", system-ui, sans-serif;
+  --font-ui:      var(--font-public), "Segoe UI", system-ui, sans-serif;
+
+  --step--1: clamp(0.78rem, 0.76rem + 0.1vw, 0.84rem);   /* 12.5–13.5 */
+  --step-0:  clamp(0.94rem, 0.92rem + 0.1vw, 1rem);      /* 15–16 body */
+  --step-1:  clamp(1.1rem, 1.05rem + 0.25vw, 1.25rem);
+  --step-2:  clamp(1.35rem, 1.2rem + 0.7vw, 1.75rem);
+  --step-3:  clamp(1.75rem, 1.4rem + 1.6vw, 2.6rem);
+  --step-4:  clamp(2.4rem, 1.6rem + 3.6vw, 4.5rem);      /* hero only */
+
+  /* Space (4px base) */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 72px;
+
+  /* Shape */
+  --r-viewer: 4px;
+  --r-ctl:    8px;
+  --r-panel:  14px;
+  --r-pill:   999px;
+
+  --lift: 0 8px 28px rgba(23, 35, 46, 0.16);
+  --focus: 0 0 0 2px var(--paper), 0 0 0 4px var(--tide);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 120ms;
+  --t-base: 200ms;
+  --t-seal: 640ms;
+
+  /* Layout */
+  --nav-h: 56px;
+  --rail-w: 360px;
+  --content-max: 1440px;
+}
+
+/* Night Ops: for reviewers on long shifts. Toggle via [data-theme="night"]
+ * or prefers-color-scheme (when [data-theme] is not "day"). */
+:root[data-theme="night"] {
+  --paper: #0F1A22;  --sheet: #17242E;  --sheet-sunk: #1E2E3A;
+  --rule: #2B3E4B;   --rule-strong: #3F566A;
+  --ink: #E8EEF0;    --ink-2: #B7C4CC;  --ink-3: #8C9BA6;
+  --tide: #4FB3C2;   --tide-hover: #72C6D3; --tide-press: #9AD8E2; --tide-wash: #123A44;
+  --amber: #F0B23A;  --amber-ink: #F6CE7A; --amber-wash: #3A2D0E;
+  --green: #52B87D;  --green-ink: #8FDBAE; --green-wash: #123525;
+  --brick: #E0675B;  --brick-ink: #F2A59C; --brick-wash: #3E1914;
+  --flood: #6FA8E6;  --graphite: #8C9BA6;
+  --lift: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --focus: 0 0 0 2px var(--paper), 0 0 0 4px var(--tide);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="day"]) {
+    --paper: #0F1A22;  --sheet: #17242E;  --sheet-sunk: #1E2E3A;
+    --rule: #2B3E4B;   --rule-strong: #3F566A;
+    --ink: #E8EEF0;    --ink-2: #B7C4CC;  --ink-3: #8C9BA6;
+    --tide: #4FB3C2;   --tide-hover: #72C6D3; --tide-press: #9AD8E2; --tide-wash: #123A44;
+    --amber: #F0B23A;  --amber-ink: #F6CE7A; --amber-wash: #3A2D0E;
+    --green: #52B87D;  --green-ink: #8FDBAE; --green-wash: #123525;
+    --brick: #E0675B;  --brick-ink: #F2A59C; --brick-wash: #3E1914;
+    --flood: #6FA8E6;  --graphite: #8C9BA6;
+    --lift: 0 8px 28px rgba(0, 0, 0, 0.5);
+    --focus: 0 0 0 2px var(--paper), 0 0 0 4px var(--tide);
+  }
+}

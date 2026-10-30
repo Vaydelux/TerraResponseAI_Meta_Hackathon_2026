@@ -1,0 +1,702 @@
+1. Design thesis
+
+TerraResponse is a decision-support tool whose entire credibility rests on one fact: the AI is not the authority, the reviewer is. The interface makes that fact visible instead of stating it in a footer. The single memorable idea is the Verification Seal: every AI observation renders in an amber hatched treatment, the visual language of an unfinished survey drawing, and only a human review action resolves the hatching into a solid, signed state. Unverified information is always visibly unfinished; verified information is always visibly signed. A judge should understand the trust model from the first screenshot without reading a word.
+
+Everything else is deliberately quiet: a cool survey-paper background, slate ink, one teal action color, and typography borrowed from civic and cartographic work rather than from startup dashboards. The one place boldness is spent is the Seal and its resolve animation. No gradients, no glow, no glass, no emoji, no alarm-red chrome. Emergency tools that shout look like toys; this one reads like an instrument.
+
+Audience and jobs: reviewers (desktop, fast decisions, long sessions), contributors (phones, in the field, poor connectivity, one-handed), and hackathon judges (30 seconds of attention, then a 3-minute demo). The primary job of the whole product is "look at the evidence, compare it to the AI's claim, make a signed decision."
+
+Principles
+Hatched means unverified, solid means signed. This rule has no exceptions anywhere in the product, including map pins, table rows, badges, and the priority score.
+Evidence first, AI second. In any view that shows both, the photo is larger, sits left or on top, and the AI observation is visually subordinate until acted on.
+Color carries state, never decoration. Amber, green, teal, red, and grey each mean exactly one thing (section 3).
+Show uncertainty as content. The model's uncertainties are a first-class list with the same weight as its findings.
+Humans own the verbs. Buttons are "Confirm", "Correct", "Flag", "Reject". The AI never has a button that says it did something.
+Nothing dispatches. No component, label, or empty state may imply that help has been sent. Copy says "reviewed" and "prioritized for review", never "responding" or "dispatched".
+2. Visual identity
+
+Name the palette by what it is in the survey world: Paper (surface), Ink (text), Tide (action), Amber Hatch (unverified), Seal Green (confirmed), Brick (rejected), Flood (segmentation mask), Graphite (inactive). Type pairs Bricolage Grotesque (headings, numerals, the wordmark; a variable-width grotesque with character at large sizes) with Public Sans (all UI and body; designed for government interfaces, excellent legibility and tabular figures). There is no monospace face; coordinates and IDs use Public Sans with tabular-nums. Corners are not uniform: large containers use 14px, controls 8px, badges 999px, and the evidence viewer is 4px, so the photo reads as a document and not a card. Shadows are replaced by 1px borders and a single "lift" shadow reserved for popovers and the map card.
+
+3. Design tokens
+css
+/* app/styles/tokens.css */
+:root {
+  /* Surfaces */
+  --paper:        #F2F4F1;   /* app background */
+  --sheet:        #FFFFFF;   /* panels */
+  --sheet-sunk:   #E8ECE8;   /* wells, table headers, inputs at rest */
+  --rule:         #D3D9D4;   /* 1px borders */
+  --rule-strong:  #AEB8B1;
+
+  /* Ink */
+  --ink:          #17232E;   /* primary text */
+  --ink-2:        #3E4C58;   /* secondary text */
+  --ink-3:        #66737E;   /* tertiary / helper (4.6:1 on paper) */
+  --ink-inverse:  #F2F4F1;
+
+  /* Action */
+  --tide:         #0B6574;
+  --tide-hover:   #084E5A;
+  --tide-press:   #063C45;
+  --tide-wash:    #DDEEF0;
+
+  /* Verification states — each means exactly one thing */
+  --amber:        #E8A317;   /* AI-generated, not verified (hatch + fills) */
+  --amber-ink:    #7A4F00;   /* text on amber washes (7.2:1 on --amber-wash) */
+  --amber-wash:   #FFF3D6;
+  --green:        #2F7D4F;   /* confirmed by a human */
+  --green-ink:    #1D5535;
+  --green-wash:   #DFF1E6;
+  --brick:        #B3382C;   /* rejected */
+  --brick-ink:    #8A241A;
+  --brick-wash:   #F9E1DD;
+  --flood:        #2B6CB0;   /* SAM mask overlay */
+  --graphite:     #7C8790;   /* inactive, failed, unavailable */
+
+  /* Severity ramp (sequential, colorblind-safe, light -> dark) */
+  --sev-1: #CFE3E6;
+  --sev-2: #8DBFC6;
+  --sev-3: #4A97A3;
+  --sev-4: #1F6E7C;
+  --sev-5: #0E3F4A;
+
+  /* Type */
+  --font-display: var(--font-bricolage), "Segoe UI", system-ui, sans-serif;
+  --font-ui:      var(--font-public), "Segoe UI", system-ui, sans-serif;
+
+  --step--1: clamp(0.78rem, 0.76rem + 0.1vw, 0.84rem);   /* 12.5–13.5 */
+  --step-0:  clamp(0.94rem, 0.92rem + 0.1vw, 1rem);      /* 15–16 body */
+  --step-1:  clamp(1.1rem, 1.05rem + 0.25vw, 1.25rem);
+  --step-2:  clamp(1.35rem, 1.2rem + 0.7vw, 1.75rem);
+  --step-3:  clamp(1.75rem, 1.4rem + 1.6vw, 2.6rem);
+  --step-4:  clamp(2.4rem, 1.6rem + 3.6vw, 4.5rem);      /* hero only */
+
+  /* Space (4px base) */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 72px;
+
+  /* Shape */
+  --r-viewer: 4px;
+  --r-ctl:    8px;
+  --r-panel:  14px;
+  --r-pill:   999px;
+
+  --lift: 0 8px 28px rgba(23, 35, 46, 0.16);
+  --focus: 0 0 0 2px var(--paper), 0 0 0 4px var(--tide);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 120ms;
+  --t-base: 200ms;
+  --t-seal: 640ms;
+
+  /* Layout */
+  --nav-h: 56px;
+  --rail-w: 360px;
+  --content-max: 1440px;
+}
+
+/* Night Ops: for reviewers on long shifts. Toggle via [data-theme="night"] or prefers-color-scheme. */
+:root[data-theme="night"] {
+  --paper: #0F1A22;  --sheet: #17242E;  --sheet-sunk: #1E2E3A;
+  --rule: #2B3E4B;   --rule-strong: #3F566A;
+  --ink: #E8EEF0;    --ink-2: #B7C4CC;  --ink-3: #8C9BA6;
+  --tide: #4FB3C2;   --tide-hover: #72C6D3; --tide-press: #9AD8E2; --tide-wash: #123A44;
+  --amber: #F0B23A;  --amber-ink: #F6CE7A; --amber-wash: #3A2D0E;
+  --green: #52B87D;  --green-ink: #8FDBAE; --green-wash: #123525;
+  --brick: #E0675B;  --brick-ink: #F2A59C; --brick-wash: #3E1914;
+  --flood: #6FA8E6;  --graphite: #8C9BA6;
+  --lift: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --focus: 0 0 0 2px var(--paper), 0 0 0 4px var(--tide);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="day"]) { /* mirror the night block via a shared mixin or duplicate */ }
+}
+
+State vocabulary (never reused for anything else): amber hatch = AI-generated, not verified; green solid = confirmed; tide solid with a pencil mark = corrected by a reviewer; amber solid with a flag mark = flagged for a second reviewer; brick outline with strike = rejected; graphite dashed = analysis failed or unavailable; flood blue = SAM mask only.
+
+4. Typography
+tsx
+// app/layout.tsx
+import { Bricolage_Grotesque, Public_Sans } from "next/font/google";
+const bricolage = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", axes: ["opsz", "wdth"], display: "swap" });
+const publicSans = Public_Sans({ subsets: ["latin"], variable: "--font-public", display: "swap" });
+// <html className={`${bricolage.variable} ${publicSans.variable}`}>
+css
+/* app/styles/base.css */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; color-scheme: light; }
+  html[data-theme="night"] { color-scheme: dark; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 400 var(--step-0)/1.55 var(--font-ui);
+    font-feature-settings: "tnum" 1, "kern" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .t-display {
+    font-family: var(--font-display); color: var(--ink);
+    font-variation-settings: "opsz" 48, "wdth" 92;
+    letter-spacing: -0.015em; line-height: 1.08; margin: 0; text-wrap: balance;
+  }
+  h1 { font-size: var(--step-3); font-weight: 700; }
+  h2 { font-size: var(--step-2); font-weight: 650; }
+  h3 { font-size: var(--step-1); font-weight: 650; line-height: 1.2; }
+  p  { margin: 0; max-width: 68ch; text-wrap: pretty; }
+  a  { color: var(--tide); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  a:hover { color: var(--tide-hover); }
+  :focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-ctl); }
+  ::selection { background: var(--tide-wash); color: var(--ink); }
+  .num { font-variant-numeric: tabular-nums; }
+  .t-meta  { font-size: var(--step--1); color: var(--ink-3); }
+  .t-label { font-size: var(--step--1); font-weight: 600; color: var(--ink-2); }  /* sentence case, no tracking */
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+Rules: sentence case everywhere; no all-caps labels, no letter-spaced eyebrows. Hero numerals and the wordmark use --font-display at wdth 75–100. Body line length caps at 68ch. Coordinates display as 14.5995° N, 120.9842° E with tabular-nums.
+
+5. Layout and shells
+
+Three shells share one top bar. The Public shell (landing, sign-in) is a single column with a wide hero. The Workbench shell (reports, review, admin) is a top bar plus a left filter rail on desktop that collapses into a sheet on mobile. The Map shell is full-bleed map with a floating right panel and a bottom sheet on mobile.
+
+Top bar (56px) ──────────────────────────────────────────────────────────────
+│ TerraResponse        Reports  Map  Review queue (7)      [Event ▾] [Night] [Echo ▾]│
+├─ DemoBanner (only when DEMO_MODE=1, 32px, brick wash) ───────────────────────
+│
+Review workbench (>=1100px)
+┌───────────────────────────────────────────┬───────────────────────────────┐
+│ EvidenceViewer (flex 1, sticky)           │ ObservationPanel (360–420px)  │
+│  photo · mask toggle · zoom · location    │  VerificationSeal             │
+│                                           │  Incident type · Severity     │
+│                                           │  Evidence list                │
+│                                           │  Uncertainties                │
+│                                           │  PriorityBreakdown            │
+│                                           │  ─────────────────────────    │
+│                                           │  ReviewActionBar (sticky)     │
+└───────────────────────────────────────────┴───────────────────────────────┘
+Review workbench (<1100px): viewer on top (max 56vh), panel below, action bar fixed to bottom.
+
+Map shell
+┌──────────────────────────────────────────────┬───────────────┐
+│ MapLibre (full bleed)                        │ IncidentPanel │
+│  pins: solid = confirmed, hatched = pending  │ (selected pin)│
+│  legend bottom-left                          │               │
+└──────────────────────────────────────────────┴───────────────┘
+css
+@layer layout {
+  .tr-shell { min-height: 100dvh; display: grid; grid-template-rows: var(--nav-h) auto 1fr; }
+  .tr-page  { width: 100%; max-width: var(--content-max); margin-inline: auto; padding: var(--s-5) clamp(16px, 3vw, 40px); }
+  .tr-workbench { display: grid; grid-template-columns: 1fr minmax(360px, 420px); gap: var(--s-5); align-items: start; }
+  .tr-workbench__viewer { position: sticky; top: calc(var(--nav-h) + var(--s-4)); }
+  .tr-stack   { display: flex; flex-direction: column; gap: var(--s-4); }
+  .tr-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+  @media (max-width: 1099px) {
+    .tr-workbench { grid-template-columns: 1fr; }
+    .tr-workbench__viewer { position: static; }
+    .tr-page { padding-bottom: 112px; } /* clearance for fixed action bar */
+  }
+}
+6. Component architecture
+components/
+  layout/        AppShell · TopBar · DemoBanner · FilterRail · PageHeader · ThemeToggle · EventSwitcher
+  seal/          VerificationSeal · SealBadge · HatchSurface · ProvenanceLine
+  ui/            Button · IconButton · Field · Select · Segmented · Tabs · Tooltip · Popover · Dialog · Toast · EmptyState · Skeleton · Table
+  upload/        UploadFlow · Dropzone · FileCheckList · LocationConfirm · UploadProgress
+  report/        ReportList · ReportRow · ReportCard · StatusTimeline · SeverityMeter · PriorityBreakdown
+  review/        ReviewWorkbench · EvidenceViewer · MaskControl · ObservationPanel · EvidenceList · UncertaintyList · CorrectionForm · ReviewActionBar · ReviewerGuard
+  map/           IncidentMap · IncidentPin · MapLegend · IncidentPanel · ClusterPin
+  admin/         AuditLogTable · EventManager · EvidencePurgeDialog · PriorityOverride · SpendCeilings
+  landing/       Hero · TrustModelDiagram · BoundariesGrid · LiveFlowStrip
+lib/design/      status.ts (state -> seal variant map) · severity.ts · format.ts (coords, relative time)
+app/styles/      tokens.css · base.css · layout.css · seal.css · components.css · map.css
+
+Server and client split. Everything in layout/, report/ (except interactive controls), landing/, and the data-fetching halves of review/ are Server Components that take data as props and render static markup; interactivity is isolated into small client islands: EvidenceViewer (pan, zoom, mask toggle), CorrectionForm, ReviewActionBar, IncidentMap, Dropzone, ThemeToggle, and Dialog/Popover primitives. This keeps first paint fast on the contributor's phone and means the Seal, which is pure CSS, renders without hydration.
+
+VerificationSeal is the keystone component. It takes state: "pending" | "confirmed" | "corrected" | "flagged" | "rejected" | "failed", an optional reviewer (display name), and an optional at timestamp, and renders a SealBadge (icon, label, state color) plus a ProvenanceLine ("AI-generated by muse-spark-1.3, not verified" or "Confirmed by Maya R., 14:02"). HatchSurface is the wrapper that applies the hatch background to any region whose state is pending, and it removes it with the resolve animation when the state changes. Because the product's core safety claim is "AI observations are always labeled until a reviewer acts," the label text comes from status.ts and is not overridable by props, so no call site can accidentally show an unlabeled observation. Demo data renders with an additional model_id = demo-mock-v1 chip in the ProvenanceLine so mock observations are never mistaken for live Meta inference.
+
+ObservationPanel composes, in fixed order, VerificationSeal, the incident type heading, SeverityMeter (five segments on the --sev-* ramp with the numeric value and label as text, never color alone), EvidenceList (what the model saw, each item a short sentence with a leading check-style marker), UncertaintyList (what the model could not determine, set in a dashed-border well with a question marker, deliberately the same visual weight as the evidence list), PriorityBreakdown (a five-segment stacked bar where each segment's width is that factor's contribution, with the factor name, value, and a tooltip explaining its derivation, plus the fixed caption "Provisional review prioritization, not for triage or resource allocation"), and finally ReviewActionBar. The whole panel sits on HatchSurface header only (the top 6px band and the Seal), not the full panel, so text stays readable.
+
+EvidenceViewer renders the derivative image (never the original, never a public URL; it requests a 60-second signed URL from a route handler and refreshes it on visibilitychange and on image error), with wheel and pinch zoom, drag pan, a fit/100% toggle, a location chip that opens LocationConfirm for contributors, an EXIF-stripped notice for reviewers, and MaskControl which exposes SAM 3.1: a target text input ("floodwater", "road debris"), a "Request mask" button (explicit opt-in, shows spend ceiling remaining), a streaming progress state, and, when present, an overlay layer in --flood at 45% opacity with an opacity slider and a toggle. When SAM is unavailable the control collapses to a one-line graphite note and the rest of the report remains fully usable.
+
+ReviewActionBar holds the four verbs in this order: Confirm (primary, tide), Correct (opens CorrectionForm in a side drawer pre-filled with the AI values and a visible diff against them), Flag for second review (secondary), Reject (destructive outline, requires a short reason). It is sticky to the bottom of the panel on desktop and fixed to the viewport bottom on mobile. ReviewerGuard disables all four when the current user is the report's contributor and replaces the bar with the sentence "You uploaded this report. Another reviewer must act on it." Keyboard shortcuts: C confirm, E correct, F flag, R reject, J/K next/previous in queue, all shown in tooltips and disabled while typing in a field. Every action calls a Route Handler, writes a review_actions row, and on success triggers the Seal resolve animation before navigating to the next queue item.
+
+IncidentMap uses MapLibre with a light "survey" style (muted land 
+#E9EDE8, water 
+#CFE0E6, roads 
+#FFFFFF with 
+#C9D1CB casing, labels in Public Sans via a hosted glyph set). Pins are HTML markers for fewer than 300 incidents, GeoJSON circle layers with clustering beyond that. IncidentPin encodes three channels: shape fill is the verification state (solid for confirmed, hatched for pending), ring weight is the severity (1 to 5px), and size is fixed (never scaled by priority, to avoid implying triage). ClusterPin shows the count only. Selecting a pin opens IncidentPanel (floating right on desktop, bottom sheet on mobile) with the thumbnail via signed URL, the Seal, summary, and a link to the full review. Only confirmed incidents appear by default; a "Show pending review" toggle adds hatched pins so judges can see the whole pipeline on one screen.
+
+UploadFlow is a three-step flow with a persistent step indicator (this one is a real sequence): Choose photo, Confirm location, Submit. Dropzone accepts camera capture on mobile (capture="environment"), shows FileCheckList live as the server validates (file signature, decodes as an image, size, EXIF location found or missing), and never claims a file is valid before the server says so. LocationConfirm shows the EXIF coordinates on a small map with a draggable pin and an explicit "Use this location" confirmation; if no GPS is present it asks the contributor to place the pin. After submit, the screen shows the report's StatusTimeline (Uploaded, Checked, Analyzed, Waiting for review) and states plainly that nothing is sent to emergency services.
+
+Admin components reuse Table, Dialog, and Field. AuditLogTable is read-only, filterable by actor, action, and event, with relative and absolute timestamps. PriorityOverride requires a reason and displays the original score struck through beside the override. EvidencePurgeDialog states the 7-day retention rule and requires typing the report short ID to confirm. SpendCeilings shows per-user, per-event, and daily API spend as three horizontal gauges with the ceiling marked.
+
+State handling. Every list and panel has three designed states: skeleton (shape-matched, no shimmer, a static --sheet-sunk fill with a single 1.2s opacity pulse), empty (EmptyState: one sentence on what this is, one action), and error (what failed, what the user can do; no apologies). Analysis failure renders the failed seal and a "Review manually" path so a report is never stuck.
+
+7. Component CSS
+7.1 Hatch and Seal (the signature)
+css
+/* app/styles/seal.css */
+@layer components {
+  /* Hatch is the only decorative pattern in the product and it always means "unverified". */
+  .hatch {
+    --hatch-color: color-mix(in srgb, var(--amber) 55%, transparent);
+    --hatch-gap: 7px;
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--hatch-color) 0 1.5px,
+      transparent 1.5px var(--hatch-gap)
+    );
+    background-size: 200% 100%;
+  }
+  .hatch--band { height: 6px; border-radius: 3px; background-color: var(--amber-wash); }
+
+  .seal {
+    position: relative; display: inline-flex; align-items: center; gap: var(--s-2);
+    padding: 6px 12px 6px 8px; border-radius: var(--r-pill);
+    font: 600 var(--step--1)/1 var(--font-ui);
+    border: 1px solid transparent; isolation: isolate; overflow: hidden;
+    transition: background-color var(--t-seal) var(--ease-out),
+                color var(--t-seal) var(--ease-out),
+                border-color var(--t-seal) var(--ease-out);
+  }
+  .seal__icon { width: 18px; height: 18px; flex: none; }
+  .seal__hatch { position: absolute; inset: 0; z-index: -1; opacity: 1;
+    transition: opacity var(--t-seal) var(--ease-out), transform var(--t-seal) var(--ease-out); }
+
+  .seal--pending   { background: var(--amber-wash); color: var(--amber-ink); border-color: var(--amber); border-style: dashed; }
+  .seal--confirmed { background: var(--green);  color: #fff; }
+  .seal--corrected { background: var(--tide);   color: #fff; }
+  .seal--flagged   { background: var(--amber);  color: #2B1D00; }
+  .seal--rejected  { background: transparent; color: var(--brick-ink); border-color: var(--brick); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+  .seal--failed    { background: transparent; color: var(--ink-3); border: 1px dashed var(--graphite); }
+
+  /* The hatch only exists in the pending state; on resolve it wipes out left-to-right. */
+  .seal:not(.seal--pending) .seal__hatch { opacity: 0; transform: translateX(100%); }
+
+  /* Resolve moment: runs once when state changes from pending. */
+  .seal[data-resolving="true"] { animation: seal-stamp var(--t-seal) var(--ease-out); }
+  @keyframes seal-stamp {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+
+  .provenance { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: var(--step--1); color: var(--ink-2); }
+  .provenance__model { padding: 1px 8px; border-radius: var(--r-pill); background: var(--sheet-sunk); color: var(--ink-2); font-weight: 600; }
+  .provenance__model--demo { background: var(--brick-wash); color: var(--brick-ink); }
+
+  /* Any container holding unverified AI content gets a hatched top band. */
+  .pending-surface { position: relative; border-top: 0; }
+  .pending-surface::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 6px;
+    border-radius: var(--r-panel) var(--r-panel) 0 0;
+    background-color: var(--amber-wash);
+    background-image: repeating-linear-gradient(135deg, var(--amber) 0 2px, transparent 2px 8px);
+    transition: opacity var(--t-seal) var(--ease-out), height var(--t-seal) var(--ease-out);
+  }
+  .pending-surface[data-state="confirmed"]::before { background: var(--green); height: 3px; }
+  .pending-surface[data-state="corrected"]::before { background: var(--tide);  height: 3px; }
+  .pending-surface[data-state="flagged"]::before   { background: var(--amber); height: 3px; }
+  .pending-surface[data-state="rejected"]::before  { background: var(--brick); height: 3px; }
+  .pending-surface[data-state="failed"]::before    { background: repeating-linear-gradient(90deg, var(--graphite) 0 6px, transparent 6px 10px); height: 3px; }
+}
+7.2 Buttons and form controls
+css
+/* app/styles/components.css */
+@layer components {
+  .btn {
+    --btn-bg: var(--sheet); --btn-fg: var(--ink); --btn-bd: var(--rule-strong);
+    display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+    min-height: 40px; padding: 0 var(--s-4);
+    font: 600 var(--step-0)/1 var(--font-ui);
+    color: var(--btn-fg); background: var(--btn-bg);
+    border: 1px solid var(--btn-bd); border-radius: var(--r-ctl);
+    cursor: pointer; text-decoration: none; white-space: nowrap;
+    transition: background-color var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+  }
+  .btn:hover { --btn-bg: var(--sheet-sunk); }
+  .btn:active { transform: translateY(1px); }
+  .btn[disabled], .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; transform: none; }
+  .btn--primary   { --btn-bg: var(--tide); --btn-fg: #fff; --btn-bd: var(--tide); }
+  .btn--primary:hover { --btn-bg: var(--tide-hover); --btn-bd: var(--tide-hover); }
+  .btn--primary:active { --btn-bg: var(--tide-press); }
+  .btn--danger    { --btn-bg: transparent; --btn-fg: var(--brick-ink); --btn-bd: var(--brick); }
+  .btn--danger:hover { --btn-bg: var(--brick-wash); }
+  .btn--quiet     { --btn-bg: transparent; --btn-bd: transparent; }
+  .btn--lg        { min-height: 52px; padding: 0 var(--s-5); font-size: var(--step-1); }
+  .btn--block     { width: 100%; }
+  .btn__kbd { margin-left: var(--s-1); padding: 1px 6px; border-radius: 4px; background: rgb(0 0 0 / .12);
+    font-size: var(--step--1); font-weight: 600; }
+  .btn--primary .btn__kbd { background: rgb(255 255 255 / .2); }
+  .btn[aria-busy="true"] { pointer-events: none; }
+  .btn[aria-busy="true"]::after { content: ""; width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .icon-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: var(--r-ctl);
+    border: 1px solid transparent; background: transparent; color: var(--ink-2); cursor: pointer; }
+  .icon-btn:hover { background: var(--sheet-sunk); color: var(--ink); }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field__label { font-weight: 600; font-size: var(--step--1); color: var(--ink-2); }
+  .field__hint  { font-size: var(--step--1); color: var(--ink-3); }
+  .field__error { font-size: var(--step--1); color: var(--brick-ink); font-weight: 600; }
+  .input, .select, .textarea {
+    width: 100%; min-height: 44px; padding: 10px 12px;
+    font: 400 var(--step-0)/1.4 var(--font-ui); color: var(--ink);
+    background: var(--sheet); border: 1px solid var(--rule-strong); border-radius: var(--r-ctl);
+    transition: border-color var(--t-fast), box-shadow var(--t-fast);
+  }
+  .textarea { min-height: 96px; resize: vertical; }
+  .input:hover, .select:hover, .textarea:hover { border-color: var(--ink-3); }
+  .input:focus-visible, .select:focus-visible, .textarea:focus-visible { border-color: var(--tide); box-shadow: var(--focus); }
+  .input[aria-invalid="true"] { border-color: var(--brick); background: var(--brick-wash); }
+
+  .segmented { display: inline-grid; grid-auto-flow: column; padding: 3px; gap: 2px;
+    background: var(--sheet-sunk); border-radius: var(--r-ctl); }
+  .segmented__btn { min-height: 34px; padding: 0 var(--s-3); border: 0; border-radius: 6px; background: transparent;
+    font: 600 var(--step--1)/1 var(--font-ui); color: var(--ink-2); cursor: pointer; }
+  .segmented__btn[aria-pressed="true"] { background: var(--sheet); color: var(--ink); box-shadow: 0 0 0 1px var(--rule); }
+}
+7.3 Top bar, banner, panels
+css
+@layer components {
+  .topbar { position: sticky; top: 0; z-index: 40; height: var(--nav-h); display: flex; align-items: center; gap: var(--s-5);
+    padding-inline: clamp(16px, 3vw, 40px); background: var(--sheet); border-bottom: 1px solid var(--rule); }
+  .wordmark { font-family: var(--font-display); font-variation-settings: "opsz" 48, "wdth" 85; font-weight: 750;
+    font-size: 1.25rem; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; display: inline-flex; align-items: center; gap: 10px; }
+  .wordmark__mark { width: 24px; height: 24px; }  /* square survey-corner glyph, ink stroke, one amber hatch quadrant */
+  .nav { display: flex; gap: var(--s-1); }
+  .nav__link { position: relative; padding: 8px 12px; border-radius: var(--r-ctl); color: var(--ink-2); font-weight: 600; text-decoration: none; }
+  .nav__link:hover { background: var(--sheet-sunk); color: var(--ink); }
+  .nav__link[aria-current="page"] { color: var(--ink); }
+  .nav__link[aria-current="page"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: -9px; height: 2px; background: var(--tide); }
+  .nav__count { margin-left: 6px; padding: 1px 7px; border-radius: var(--r-pill); background: var(--amber-wash);
+    color: var(--amber-ink); border: 1px dashed var(--amber); font-size: var(--step--1); font-weight: 700; }
+  .topbar__spacer { flex: 1; }
+
+  .demo-banner { display: flex; justify-content: center; align-items: center; gap: var(--s-2); min-height: 32px; padding: 4px 16px;
+    background: var(--brick-wash); color: var(--brick-ink); border-bottom: 1px solid var(--brick);
+    font-size: var(--step--1); font-weight: 700; text-align: center; }
+
+  .panel { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r-panel); padding: var(--s-5); }
+  .panel--flush { padding: 0; overflow: hidden; }
+  .panel--sunk  { background: var(--sheet-sunk); border-color: transparent; }
+  .panel__head  { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-4); }
+
+  .well-uncertain { padding: var(--s-4); border: 1px dashed var(--rule-strong); border-radius: 10px; background: transparent; }
+  .well-uncertain__item { display: grid; grid-template-columns: 20px 1fr; gap: var(--s-2); padding: 6px 0; color: var(--ink-2); }
+}
+7.4 Evidence viewer and mask control
+css
+@layer components {
+  .viewer { position: relative; background: #0C1218; border-radius: var(--r-viewer); overflow: hidden;
+    aspect-ratio: 4 / 3; max-height: calc(100dvh - var(--nav-h) - 120px); touch-action: none; cursor: grab; }
+  .viewer:active { cursor: grabbing; }
+  .viewer__stage { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform; }
+  .viewer__img, .viewer__mask { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+  .viewer__mask { mix-blend-mode: normal; opacity: var(--mask-opacity, .45); filter: drop-shadow(0 0 0 var(--flood)); pointer-events: none;
+    transition: opacity var(--t-base); }
+  .viewer__mask[hidden] { display: none; }
+
+  .viewer__chrome { position: absolute; display: flex; gap: var(--s-2); z-index: 2; }
+  .viewer__chrome--tl { top: var(--s-3); left: var(--s-3); }
+  .viewer__chrome--tr { top: var(--s-3); right: var(--s-3); }
+  .viewer__chrome--bl { bottom: var(--s-3); left: var(--s-3); }
+  .viewer__chip { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border-radius: var(--r-pill);
+    background: rgb(12 18 24 / .78); color: #F2F4F1; font-size: var(--step--1); font-weight: 600;
+    backdrop-filter: none; border: 1px solid rgb(255 255 255 / .16); }
+  .viewer__chip--amber { background: var(--amber-wash); color: var(--amber-ink); border: 1px dashed var(--amber); }
+  .viewer__zoom { display: grid; background: rgb(12 18 24 / .78); border-radius: var(--r-ctl); border: 1px solid rgb(255 255 255 / .16); }
+  .viewer__zoom button { width: 36px; height: 36px; border: 0; background: transparent; color: #F2F4F1; cursor: pointer; font-size: 18px; }
+  .viewer__zoom button + button { border-top: 1px solid rgb(255 255 255 / .16); }
+  .viewer__loading { position: absolute; inset: 0; display: grid; place-items: center; color: #9FB0BC; font-size: var(--step--1); }
+
+  .mask-control { margin-top: var(--s-3); padding: var(--s-4); background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px;
+    display: grid; grid-template-columns: 1fr auto; gap: var(--s-3); align-items: end; }
+  .mask-control__swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--flood); display: inline-block; margin-right: 6px; }
+  .mask-control__status { grid-column: 1 / -1; font-size: var(--step--1); color: var(--ink-3); }
+  .mask-control[data-state="streaming"] .mask-control__bar { height: 3px; background: linear-gradient(90deg, var(--flood) 40%, transparent 40%) 0 0/200% 100%;
+    animation: mask-run 1.1s linear infinite; }
+  .mask-control[data-state="unavailable"] { background: transparent; border-style: dashed; color: var(--ink-3); grid-template-columns: 1fr; }
+  @keyframes mask-run { to { background-position: -200% 0; } }
+}
+7.5 Observation panel, severity, priority
+css
+@layer components {
+  .obs { position: relative; padding-top: calc(var(--s-5) + 6px); }
+  .obs__type { margin-top: var(--s-3); font-size: var(--step-2); }
+  .obs__summary { margin-top: var(--s-2); color: var(--ink-2); }
+  .obs__section { margin-top: var(--s-5); }
+  .obs__section-title { font-size: var(--step-0); font-family: var(--font-ui); font-weight: 700; margin-bottom: var(--s-2); letter-spacing: 0; }
+
+  .evidence-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .evidence-list__item { display: grid; grid-template-columns: 20px 1fr; gap: var(--s-2); padding: 8px 0; border-bottom: 1px solid var(--rule); }
+  .evidence-list__item:last-child { border-bottom: 0; }
+  .evidence-list__mark { color: var(--amber-ink); }                                   /* pending: amber */
+  [data-state="confirmed"] .evidence-list__mark,
+  [data-state="corrected"] .evidence-list__mark { color: var(--green); }              /* resolved: green */
+
+  /* Severity: five segments, value always printed as text */
+  .severity { display: grid; gap: 6px; }
+  .severity__row { display: flex; align-items: baseline; justify-content: space-between; }
+  .severity__value { font-family: var(--font-display); font-weight: 700; font-size: var(--step-1); }
+  .severity__bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+  .severity__seg { height: 10px; border-radius: 2px; background: var(--sheet-sunk); border: 1px solid var(--rule); }
+  .severity[data-level="1"] .severity__seg:nth-child(-n+1),
+  .severity[data-level="2"] .severity__seg:nth-child(-n+2),
+  .severity[data-level="3"] .severity__seg:nth-child(-n+3),
+  .severity[data-level="4"] .severity__seg:nth-child(-n+4),
+  .severity[data-level="5"] .severity__seg:nth-child(-n+5) { border-color: transparent; }
+  .severity__seg:nth-child(1) { --c: var(--sev-1); } .severity__seg:nth-child(2) { --c: var(--sev-2); }
+  .severity__seg:nth-child(3) { --c: var(--sev-3); } .severity__seg:nth-child(4) { --c: var(--sev-4); }
+  .severity__seg:nth-child(5) { --c: var(--sev-5); }
+  .severity[data-level="1"] .severity__seg:nth-child(-n+1),
+  .severity[data-level="2"] .severity__seg:nth-child(-n+2),
+  .severity[data-level="3"] .severity__seg:nth-child(-n+3),
+  .severity[data-level="4"] .severity__seg:nth-child(-n+4),
+  .severity[data-level="5"] .severity__seg:nth-child(-n+5) { background: var(--c); }
+  /* Pending severity is hatched on top of the ramp so even this number reads as unverified. */
+  .severity[data-state="pending"] .severity__seg { background-image: repeating-linear-gradient(135deg, rgb(255 255 255 / .55) 0 2px, transparent 2px 6px); }
+
+  /* Priority: five-factor stacked bar, widths set inline via --w */
+  .priority { display: grid; gap: var(--s-2); }
+  .priority__score { display: flex; align-items: baseline; gap: var(--s-2); }
+  .priority__score-num { font-family: var(--font-display); font-weight: 750; font-size: var(--step-3); line-height: 1; }
+  .priority__bar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; background: var(--sheet-sunk); border: 1px solid var(--rule); }
+  .priority__seg { width: calc(var(--w) * 1%); background: var(--c); border-right: 2px solid var(--sheet); min-width: 2px; transition: width var(--t-seal) var(--ease-out); }
+  .priority__seg:nth-child(1) { --c: var(--sev-5); } .priority__seg:nth-child(2) { --c: var(--sev-4); }
+  .priority__seg:nth-child(3) { --c: var(--sev-3); } .priority__seg:nth-child(4) { --c: var(--sev-2); }
+  .priority__seg:nth-child(5) { --c: var(--sev-1); }
+  .priority__legend { display: grid; grid-template-columns: 1fr auto; gap: 4px var(--s-3); font-size: var(--step--1); color: var(--ink-2); }
+  .priority__legend dt::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 2px; background: var(--c); }
+  .priority__caption { font-size: var(--step--1); color: var(--ink-3); padding-top: var(--s-2); border-top: 1px solid var(--rule); }
+}
+7.6 Review action bar and correction drawer
+css
+@layer components {
+  .actions { position: sticky; bottom: 0; margin: var(--s-5) calc(var(--s-5) * -1) calc(var(--s-5) * -1); padding: var(--s-4) var(--s-5);
+    display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--s-2); background: var(--sheet); border-top: 1px solid var(--rule);
+    border-radius: 0 0 var(--r-panel) var(--r-panel); }
+  .actions .btn { min-height: 48px; }
+  .actions__confirm { grid-column: 1 / -1; }
+  .actions__row { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); }
+  .actions__locked { grid-column: 1 / -1; padding: var(--s-3); background: var(--sheet-sunk); border-radius: var(--r-ctl); color: var(--ink-2); font-weight: 600; }
+  @media (max-width: 1099px) {
+    .actions { position: fixed; inset: auto 0 0 0; margin: 0; z-index: 30; border-radius: 0; padding-bottom: calc(var(--s-4) + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -1px 0 var(--rule); }
+  }
+
+  .drawer { position: fixed; inset: 0 0 0 auto; width: min(480px, 100vw); z-index: 60; background: var(--sheet); border-left: 1px solid var(--rule);
+    box-shadow: var(--lift); display: flex; flex-direction: column; transform: translateX(100%); transition: transform var(--t-base) var(--ease-out); }
+  .drawer[data-open="true"] { transform: none; }
+  .drawer__scrim { position: fixed; inset: 0; z-index: 55; background: rgb(15 26 34 / .45); opacity: 0; pointer-events: none; transition: opacity var(--t-base); }
+  .drawer[data-open="true"] + .drawer__scrim, .drawer__scrim[data-open="true"] { opacity: 1; pointer-events: auto; }
+  .drawer__body { flex: 1; overflow: auto; padding: var(--s-5); display: grid; gap: var(--s-4); align-content: start; }
+  .drawer__foot { padding: var(--s-4) var(--s-5); border-top: 1px solid var(--rule); display: flex; gap: var(--s-2); justify-content: flex-end; }
+
+  /* Correction diff: AI value struck in amber, reviewer value in tide */
+  .diff { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); font-size: var(--step--1); }
+  .diff__old { padding: 6px 8px; border-radius: 6px; background: var(--amber-wash); color: var(--amber-ink); text-decoration: line-through; }
+  .diff__new { padding: 6px 8px; border-radius: 6px; background: var(--tide-wash); color: var(--tide-hover); font-weight: 600; }
+}
+7.7 Map
+css
+/* app/styles/map.css */
+@layer components {
+  .map { position: relative; width: 100%; height: calc(100dvh - var(--nav-h)); background: #E9EDE8; }
+  .map-panel { position: absolute; top: var(--s-4); right: var(--s-4); bottom: var(--s-4); width: 380px; z-index: 5;
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r-panel); box-shadow: var(--lift);
+    display: flex; flex-direction: column; overflow: hidden; }
+  .map-panel__thumb { aspect-ratio: 16 / 10; object-fit: cover; background: var(--sheet-sunk); }
+  .map-panel__body { padding: var(--s-4); overflow: auto; display: grid; gap: var(--s-3); }
+
+  /* Pins: fill = verification, ring = severity, size constant (never implies triage order) */
+  .pin { --ring: 2px; width: 22px; height: 22px; border-radius: 50%; border: var(--ring) solid var(--ink); background: var(--green); cursor: pointer;
+    box-shadow: 0 0 0 2px var(--sheet); transition: transform var(--t-fast); }
+  .pin:hover { transform: scale(1.12); }
+  .pin[data-sev="1"] { --ring: 1px; } .pin[data-sev="2"] { --ring: 2px; } .pin[data-sev="3"] { --ring: 3px; }
+  .pin[data-sev="4"] { --ring: 4px; } .pin[data-sev="5"] { --ring: 5px; }
+  .pin[data-state="pending"] { background-color: var(--amber-wash);
+    background-image: repeating-linear-gradient(135deg, var(--amber) 0 2px, transparent 2px 5px); }
+  .pin[data-state="corrected"] { background: var(--tide); }
+  .pin[data-state="flagged"]   { background: var(--amber); }
+  .pin[aria-selected="true"] { outline: 3px solid var(--tide); outline-offset: 3px; }
+  .cluster { display: grid; place-items: center; min-width: 34px; height: 34px; padding: 0 8px; border-radius: var(--r-pill);
+    background: var(--ink); color: var(--ink-inverse); font-weight: 700; font-size: var(--step--1); box-shadow: 0 0 0 3px var(--sheet); }
+
+  .legend { position: absolute; left: var(--s-4); bottom: var(--s-4); z-index: 5; padding: var(--s-3) var(--s-4);
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; display: grid; gap: 6px; font-size: var(--step--1); }
+  .legend__row { display: flex; align-items: center; gap: var(--s-2); }
+  .map-toggle { position: absolute; top: var(--s-4); left: var(--s-4); z-index: 5; }
+
+  @media (max-width: 899px) {
+    .map-panel { inset: auto 0 0 0; width: auto; max-height: 62dvh; border-radius: var(--r-panel) var(--r-panel) 0 0; border-bottom: 0; }
+    .legend { bottom: auto; top: var(--s-4); left: auto; right: var(--s-4); }
+  }
+}
+
+MapLibre style tokens: land 
+#E9EDE8, water 
+#CFE0E6, parks 
+#DCE8DB, roads 
+#FFFFFF casing 
+#C9D1CB, boundaries 
+#9AA7A0 dashed, labels 
+#3E4C58 with 
+#F2F4F1 halo 1.5px. Night Ops variant: land 
+#16232C, water 
+#0F2F3C, roads 
+#2B3E4B, labels 
+#B7C4CC.
+
+7.8 Tables, report rows, timeline, upload
+css
+@layer components {
+  .table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r-panel); overflow: hidden; }
+  .table th { text-align: left; padding: 12px var(--s-4); background: var(--sheet-sunk); font-size: var(--step--1); font-weight: 700; color: var(--ink-2); border-bottom: 1px solid var(--rule); }
+  .table td { padding: 14px var(--s-4); border-bottom: 1px solid var(--rule); vertical-align: middle; }
+  .table tr:last-child td { border-bottom: 0; }
+  .table tbody tr:hover { background: color-mix(in srgb, var(--tide-wash) 50%, transparent); }
+  .table tr[data-state="pending"] td:first-child { box-shadow: inset 4px 0 0 var(--amber); }
+  .table tr[data-state="confirmed"] td:first-child { box-shadow: inset 4px 0 0 var(--green); }
+  .table tr[data-state="rejected"] td:first-child { box-shadow: inset 4px 0 0 var(--brick); }
+
+  .report-row { display: grid; grid-template-columns: 72px 1fr auto; gap: var(--s-4); align-items: center; padding: var(--s-3); border-radius: 10px; }
+  .report-row__thumb { width: 72px; height: 56px; object-fit: cover; border-radius: var(--r-viewer); background: var(--sheet-sunk); }
+
+  /* Status timeline is a real sequence, so steps are marked */
+  .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .timeline__step { position: relative; display: grid; grid-template-columns: 24px 1fr; gap: var(--s-3); padding-bottom: var(--s-4); }
+  .timeline__step::before { content: ""; position: absolute; left: 11px; top: 24px; bottom: 0; width: 2px; background: var(--rule); }
+  .timeline__step:last-child::before { display: none; }
+  .timeline__dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--rule-strong); background: var(--sheet); display: grid; place-items: center; }
+  .timeline__step[data-done="true"] .timeline__dot { background: var(--green); border-color: var(--green); color: #fff; }
+  .timeline__step[data-current="true"] .timeline__dot { border-color: var(--amber); background-color: var(--amber-wash);
+    background-image: repeating-linear-gradient(135deg, var(--amber) 0 2px, transparent 2px 6px); }
+
+  .dropzone { display: grid; place-items: center; gap: var(--s-3); min-height: 280px; padding: var(--s-6); text-align: center;
+    border: 2px dashed var(--rule-strong); border-radius: var(--r-panel); background: var(--sheet); cursor: pointer;
+    transition: border-color var(--t-fast), background-color var(--t-fast); }
+  .dropzone:hover, .dropzone[data-drag="true"] { border-color: var(--tide); background: var(--tide-wash); }
+  .filecheck { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+  .filecheck__item { display: grid; grid-template-columns: 22px 1fr auto; gap: var(--s-2); align-items: center; padding: 10px 12px; border-radius: var(--r-ctl); background: var(--sheet-sunk); }
+  .filecheck__item[data-s="ok"] .filecheck__icon { color: var(--green); }
+  .filecheck__item[data-s="fail"] { background: var(--brick-wash); color: var(--brick-ink); }
+  .filecheck__item[data-s="wait"] .filecheck__icon { color: var(--graphite); }
+
+  .steps { display: flex; gap: var(--s-2); counter-reset: s; }
+  .steps__item { flex: 1; display: grid; gap: 6px; font-size: var(--step--1); font-weight: 600; color: var(--ink-3); }
+  .steps__item::before { content: ""; height: 4px; border-radius: 2px; background: var(--rule); }
+  .steps__item[data-done="true"], .steps__item[aria-current="step"] { color: var(--ink); }
+  .steps__item[data-done="true"]::before { background: var(--tide); }
+  .steps__item[aria-current="step"]::before { background: linear-gradient(90deg, var(--tide) 50%, var(--rule) 50%); }
+}
+7.9 Toasts, dialogs, empty states, skeletons
+css
+@layer components {
+  .toast-region { position: fixed; right: var(--s-4); bottom: var(--s-4); z-index: 80; display: grid; gap: var(--s-2); width: min(380px, calc(100vw - 32px)); }
+  .toast { display: grid; grid-template-columns: 22px 1fr auto; gap: var(--s-3); align-items: start; padding: 12px 14px; border-radius: 10px;
+    background: var(--ink); color: var(--ink-inverse); box-shadow: var(--lift); animation: toast-in var(--t-base) var(--ease-out); }
+  .toast[data-kind="confirmed"] { border-left: 4px solid var(--green); }
+  .toast[data-kind="error"]     { border-left: 4px solid var(--brick); }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+
+  .dialog { width: min(520px, calc(100vw - 32px)); padding: var(--s-5); background: var(--sheet); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: var(--r-panel); box-shadow: var(--lift); }
+  .dialog::backdrop { background: rgb(15 26 34 / .5); }
+  .dialog__actions { display: flex; justify-content: flex-end; gap: var(--s-2); margin-top: var(--s-5); }
+
+  .empty { display: grid; justify-items: start; gap: var(--s-3); padding: var(--s-6); border: 1px dashed var(--rule-strong); border-radius: var(--r-panel); }
+  .skeleton { background: var(--sheet-sunk); border-radius: 6px; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+}
+7.10 Landing
+css
+@layer components {
+  .hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: var(--s-7); align-items: center; padding-block: var(--s-8) var(--s-7); }
+  .hero__title { font-size: var(--step-4); font-weight: 750; font-variation-settings: "opsz" 96, "wdth" 80; }
+  .hero__sub { margin-top: var(--s-4); font-size: var(--step-1); color: var(--ink-2); max-width: 46ch; }
+  .hero__cta { margin-top: var(--s-5); display: flex; gap: var(--s-3); flex-wrap: wrap; }
+  .hero__demo { /* A live, interactive miniature of the review workbench: photo + hatched observation that the visitor can Confirm. */
+    border: 1px solid var(--rule); border-radius: var(--r-panel); background: var(--sheet); overflow: hidden; }
+
+  .boundaries { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--s-4); }
+  .boundary { padding: var(--s-5); background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r-panel); }
+  .boundary:nth-child(3n+1) { border-radius: var(--r-panel) 4px var(--r-panel) 4px; }  /* varied shape, no identical-card wall */
+  @media (max-width: 899px) { .hero { grid-template-columns: 1fr; padding-block: var(--s-6); } }
+}
+8. Screen specifications
+
+Landing (/). The hero is not a stat wall. Left: the headline "Photos in. Human decisions out." with a one-sentence subhead ("AI reads the disaster photo. A reviewer decides what's true."), and two actions, "Try the live review" and "Upload a photo". Right: the interactive hero__demo, a real miniature of the review workbench rendered from seeded demo data with the amber-hatched observation and a working Confirm button; clicking Confirm plays the Seal resolve animation (hatch wipes out, amber becomes green, the provenance line rewrites to "Confirmed by you, just now"). That single interaction is the whole product thesis in four seconds and is the moment judges should remember. Below the hero, TrustModelDiagram is a horizontal three-lane sequence (Contributor uploads, AI observes, Reviewer decides) where the middle lane is hatched and the last lane is solid, followed by BoundariesGrid rendering the eight fixed safety limitations as short plain-language statements with varied corner shapes, and a LiveFlowStrip showing the seven pipeline steps as a real sequence with numbering. The demo banner is present whenever DEMO_MODE=1.
+
+Upload (/upload). Steps at top, Dropzone center, a FileCheckList that fills in as the server validates each check, then LocationConfirm, then Submit. On mobile the primary control is a full-width "Take photo" button above "Choose from library". Post-submit view is the StatusTimeline with the sentence "Your photo is waiting for a reviewer. Nothing has been sent to emergency services."
+
+Review queue (/review). A Table sorted by oldest-unreviewed first, with the left-edge state stripe, thumbnail, incident type (AI, hatched text-decoration none but with the amber dashed seal), severity segments, priority number, event, and age. J/K moves the row selection, Enter opens the workbench. A filter rail offers Event, Status, Severity, and "Only mine to review".
+
+Review workbench (/review/[id]). The layout in section 5. This is the hero screen of the demo and gets the most polish: the viewer is large and sticky, the ObservationPanel scrolls independently, the action bar never leaves the screen, and after any action the Seal resolves and the next queue item loads in place with a toast "Confirmed. Next report: 3 of 7."
+
+Map (/map). Section 6 and 7.7. Default shows confirmed only; toggling "Show pending review" animates hatched pins in with a single 200ms fade, which visually demonstrates the pipeline's backlog versus its verified output.
+
+Report detail (/reports/[id]). Contributor-facing: image, StatusTimeline, the Seal and the observation read-only, and a "Request evidence deletion" action with the 7-day retention statement.
+
+Admin (/admin). Tabs: Events, Audit log, Retention, Spend. Dense, table-first, no illustration.
+
+9. Motion
+
+Motion is reserved for three jobs: the Seal resolve (640ms, the only expressive animation in the product), state changes the user caused (drawer open 200ms, toast in 200ms, mask fade 200ms), and the single page-load sequence on the landing hero (the demo card's hatch drawing in once over 800ms, then idle). There are no entrance fades on sections, no hover lifts on cards, no parallax, and no looping decoration. The only loops are functional: spinner, skeleton pulse, and SAM streaming bar.
+
+css
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .seal__hatch { transition: none; }
+}
+tsx
+// Resolve choreography (ReviewActionBar -> VerificationSeal)
+// 1. optimistic: set data-resolving="true", state -> next, hatch wipes (CSS transitions)
+// 2. on server success: toast + prefetch next queue item, after 640ms router.replace(next)
+// 3. on server error: revert state, remove data-resolving, toast kind="error" with the reason and a Retry action
+10. Voice and copy
+
+Plain verbs, sentence case, active voice, same word for the same action everywhere. The interface never apologizes and never says "AI-powered" or "intelligent". Fixed strings (stored in lib/design/copy.ts, not editable per call site): pending label "AI-generated, not verified"; confirmed label "Confirmed by {name}"; corrected label "Corrected by {name}"; flagged label "Flagged for second review"; rejected label "Rejected by {name}"; failed label "Analysis unavailable"; priority caption "Provisional review prioritization, not for triage or resource allocation"; post-upload line "Nothing has been sent to emergency services." Empty review queue: "No reports waiting. New uploads appear here." Analysis failure: "The AI could not read this photo. Review it manually or request a new analysis." Signed URL expiry: "The photo link expired. Reloading it." Contributor viewing their own report as reviewer: "You uploaded this report. Another reviewer must act on it."
+
+Words to avoid anywhere in UI: dispatch, deploy, respond, alert, rescue, critical (use "severity 5"), verified (when referring to AI output), real-time (the system is review-gated).
+
+11. Accessibility and responsiveness
+
+Contrast: body ink on paper is 14:1; --ink-3 on paper is 4.6:1 and is used only for non-essential helper text at 13px or larger; amber text always uses --amber-ink on --amber-wash (7.2:1). State is never conveyed by color alone: every state has a text label plus a distinct icon, and the hatch adds a texture channel, so pending is distinguishable in monochrome and for color-blind users; severity prints its number; pins vary ring weight in addition to fill. All interactive targets are at least 40px (44px for form fields and mobile actions). Focus is a 2px offset ring in tide on every focusable element. The Seal announces changes through an aria-live="polite" region ("Report confirmed by Maya R."). The viewer is keyboard operable: arrow keys pan, +/- zoom, 0 fit, M toggles mask, and the image carries the AI's summary as alt text prefixed "Uploaded photo; unverified description:". The map offers a table view toggle for non-pointer users. Forms use native labels, aria-invalid, and aria-describedby for errors. Dialogs use the native <dialog> element for focus trapping.
+
+Breakpoints: 480 (single column, fixed action bar, bottom-sheet map panel), 900 (map panel becomes floating right, hero two-column), 1100 (workbench two-column), 1440 (content max). Touch: viewer supports pinch zoom and two-finger pan; swipe left/right on the review workbench moves through the queue only when the viewer is at fit zoom, to avoid conflicts.
+
+Performance budget for demo reliability: LCP image is the derivative thumbnail at 1280px max; fonts are display: swap with metric-matched fallbacks; the map bundle loads dynamically only on /map and the landing demo uses a static image, not MapLibre.
+
+12. What makes this win the demo
+
+The first screen already explains the safety model through the Seal. The interactive hero lets a judge perform the central human-in-the-loop action in under five seconds. The review workbench shows evidence, AI claim, uncertainty, and priority math on one screen with keyboard-driven speed, which signals a product built for reviewers and not a chat wrapper. The map's "show pending review" toggle makes the verified-versus-unverified distinction visible at the system level. Demo-mock observations carry the red demo-mock-v1 chip so nothing is falsely presented as live Meta inference, which turns a limitation into evidence of rigor. And the Meta models are visible in the interface where they matter: the model ID in every ProvenanceLine for Muse Spark 1.3, and the Mask control with its streaming state for SAM 3.1.
+
+Build order (fastest path to a polished demo)
+
+Tokens and base CSS, then VerificationSeal with its resolve animation (build and perfect this in isolation first), then AppShell and TopBar, then the review workbench with EvidenceViewer and ObservationPanel using seeded data, then ReviewActionBar wired to the real route handlers, then the landing hero reusing the workbench pieces, then IncidentMap, then upload flow, then admin tables, then Night Ops theme and the accessibility pass last.
+
+Tailwind v4 bridge
+
+Keep the CSS above as the source of truth and expose tokens to Tailwind utilities for one-off layout work:
+
+css
+/* app/globals.css */
+@import "tailwindcss";
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+@import "./styles/layout.css";
+@import "./styles/seal.css";
+@import "./styles/components.css";
+@import "./styles/map.css";
+
+@theme inline {
+  --color-paper: var(--paper);   --color-sheet: var(--sheet);   --color-ink: var(--ink);
+  --color-tide: var(--tide);     --color-amber: var(--amber);   --color-green: var(--green);
+  --color-brick: var(--brick);   --color-flood: var(--flood);   --color-rule: var(--rule);
+  --font-display: var(--font-display);  --font-sans: var(--font-ui);
+  --radius-panel: var(--r-panel);  --radius-ctl: var(--r-ctl);
+}
+
+Do not use Tailwind utilities for color or state on anything that has a class in section 7; those classes own the verification semantics, and mixing utilities in is how an unlabeled amber or green creeps into the UI.

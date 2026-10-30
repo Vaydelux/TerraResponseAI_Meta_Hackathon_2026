@@ -1,0 +1,65 @@
+# supabase/config.toml
+#
+# Supabase CLI configuration for TerraResponse AI.
+# Required by `supabase link` + `supabase db push` + `supabase db reset`.
+# See docs/DEPLOYMENT.md §1.2 for the full setup instructions.
+
+# The project ID is set by `supabase link --project-ref <ref>`. The
+# CLI stores it in .temp/ but this config file must exist for the
+# link command to work.
+project_id = ""
+
+# The API endpoint for the Supabase project. The CLI reads this to
+# know where to push migrations. The actual URL is set by
+# `supabase link` (the --project-ref flag resolves the URL).
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+enabled = true
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+port = 54325
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+port = 54326
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/callback"]
+jwt_expiry = 3600
+refresh_token_rotation_enabled = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+
+# The migrations directory. The CLI reads files from here in
+# alphabetical order (which is why they're prefixed with 0001_, 0002_, etc.).
+[db.migrations]
+enabled = true
+dir = "migrations"

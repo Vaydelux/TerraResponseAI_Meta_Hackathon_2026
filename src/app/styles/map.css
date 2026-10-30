@@ -1,0 +1,146 @@
+/* app/styles/map.css
+ *
+ * IncidentMap styles (docs/DESIGN.md §7.7). The map shell is a
+ * full-bleed MapLibre canvas with a floating right panel (bottom
+ * sheet on mobile).
+ *
+ * Pin encoding (three channels, never implies triage):
+ *   - shape fill  = verification state (solid = confirmed, hatched = pending)
+ *   - ring weight = severity (1 to 5px)
+ *   - size       = fixed (never scaled by priority, to avoid implying triage)
+ */
+
+@layer components {
+  .map {
+    position: relative;
+    width: 100%;
+    height: calc(100dvh - var(--nav-h));
+    background: #E9EDE8;
+  }
+  .map-panel {
+    position: absolute;
+    top: var(--s-4);
+    right: var(--s-4);
+    bottom: var(--s-4);
+    width: 380px;
+    z-index: 5;
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-panel);
+    box-shadow: var(--lift);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .map-panel__thumb {
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    background: var(--sheet-sunk);
+  }
+  .map-panel__body {
+    padding: var(--s-4);
+    overflow: auto;
+    display: grid;
+    gap: var(--s-3);
+  }
+
+  /* Pins: fill = verification, ring = severity, size constant. */
+  .pin {
+    --ring: 2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: var(--ring) solid var(--ink);
+    background: var(--green);
+    cursor: pointer;
+    box-shadow: 0 0 0 2px var(--sheet);
+    transition: transform var(--t-fast);
+  }
+  .pin:hover { transform: scale(1.12); }
+  .pin[data-sev="1"] { --ring: 1px; }
+  .pin[data-sev="2"] { --ring: 2px; }
+  .pin[data-sev="3"] { --ring: 3px; }
+  .pin[data-sev="4"] { --ring: 4px; }
+  .pin[data-sev="5"] { --ring: 5px; }
+  .pin[data-state="pending"] {
+    background-color: var(--amber-wash);
+    background-image: repeating-linear-gradient(135deg, var(--amber) 0 2px, transparent 2px 5px);
+  }
+  .pin[data-state="corrected"] { background: var(--tide); }
+  .pin[data-state="flagged"]   { background: var(--amber); }
+  .pin[aria-selected="true"] {
+    outline: 3px solid var(--tide);
+    outline-offset: 3px;
+  }
+  .cluster {
+    display: grid;
+    place-items: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 8px;
+    border-radius: var(--r-pill);
+    background: var(--ink);
+    color: var(--ink-inverse);
+    font-weight: 700;
+    font-size: var(--step--1);
+    box-shadow: 0 0 0 3px var(--sheet);
+  }
+
+  .legend {
+    position: absolute;
+    left: var(--s-4);
+    bottom: var(--s-4);
+    z-index: 5;
+    padding: var(--s-3) var(--s-4);
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    display: grid;
+    gap: 6px;
+    font-size: var(--step--1);
+  }
+  .legend__row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+  }
+  .map-toggle {
+    position: absolute;
+    top: var(--s-4);
+    left: var(--s-4);
+    z-index: 5;
+  }
+
+  @media (max-width: 899px) {
+    .map-panel {
+      inset: auto 0 0 0;
+      width: auto;
+      max-height: 62dvh;
+      border-radius: var(--r-panel) var(--r-panel) 0 0;
+      border-bottom: 0;
+    }
+    .legend {
+      bottom: auto;
+      top: var(--s-4);
+      left: auto;
+      right: var(--s-4);
+    }
+  }
+}
+
+/*
+ * MapLibre style tokens (applied in the style JSON, not as CSS):
+ *   land       #E9EDE8
+ *   water      #CFE0E6
+ *   parks      #DCE8DB
+ *   roads      #FFFFFF
+ *   casing     #C9D1CB
+ *   boundaries #9AA7A0 (dashed)
+ *   labels     #3E4C58 with #F2F4F1 halo 1.5px
+ *
+ * Night Ops variant:
+ *   land       #16232C
+ *   water      #0F2F3C
+ *   roads      #2B3E4B
+ *   labels     #B7C4CC
+ */

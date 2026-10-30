@@ -1,0 +1,386 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ============================================================================
+ * TerraResponse AI — Design System imports
+ *
+ * The Verification Seal is the keystone (see src/components/seal/). Hatch
+ * = unverified AI; solid = signed by a human. The CSS files below define
+ * the design language; the Tailwind bridge at the bottom exposes the
+ * tokens to Tailwind utilities for one-off layout work.
+ *
+ * Import order matters: tokens first (CSS variables), then base, then
+ * layout, then seal (keystone), then components, then map. Each layer
+ * is wrapped in @layer to keep specificity predictable.
+ * ============================================================================ */
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+@import "./styles/layout.css";
+@import "./styles/seal.css";
+@import "./styles/components.css";
+@import "./styles/map.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Tailwind v4 bridge — expose design tokens to Tailwind utilities for
+ * one-off layout work (per docs/DESIGN.md "Tailwind v4 bridge"). Do
+ * NOT use Tailwind utilities for color or state on anything that has
+ * a class in styles/components.css or styles/seal.css — those classes
+ * own the verification semantics, and mixing utilities in is how an
+ * unlabeled amber or green creeps into the UI. */
+@theme inline {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-ink: var(--ink);
+  --color-tide: var(--tide);
+  --color-amber: var(--amber);
+  --color-green: var(--green);
+  --color-brick: var(--brick);
+  --color-flood: var(--flood);
+  --color-rule: var(--rule);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-ui);
+  --radius-panel: var(--r-panel);
+  --radius-ctl: var(--r-ctl);
+
+  /* Preserve the existing shadcn tokens so legacy components still
+   * work while the migration to the new design system is in progress. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent)
+;
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  /* Smooth theme transitions (light ↔ dark) */
+  *,
+  *::before,
+  *::after {
+    transition: background-color 200ms ease, border-color 200ms ease, color 150ms ease;
+  }
+
+  /* Visible focus-visible for keyboard navigation (a11y) */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Skip-to-content link (a11y) */
+  .skip-link {
+    @apply sr-only;
+  }
+  .skip-link:focus {
+    @apply not-sr-only fixed left-4 top-4 z-50 rounded-lg bg-primary px-4 py-2 text-primary-foreground shadow-lg;
+  }
+}
+
+/* ============================================================================
+   Skeleton shimmer animation (loading states)
+   ============================================================================ */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.terra-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 25%,
+    var(--muted-foreground) 50%,
+    var(--muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+/* ============================================================================
+   Smooth card hover transitions
+   ============================================================================ */
+.terra-card-hover {
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+.terra-card-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+.dark .terra-card-hover:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================================
+   Improved scrollbar styling
+   ============================================================================ */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 3px;
+}
+
+/* ============================================================================
+   Reduced motion support (a11y)
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================================
+   ui-tr additions — minimal CSS for components whose class is not in
+   src/app/styles/*.css (Tooltip + Popover + a few small modifiers).
+   These are design-system tokens only; no state semantics here.
+   ============================================================================ */
+@layer components {
+  .btn--sm { min-height: 34px; padding: 0 var(--s-3); font-size: var(--step--1); }
+  .icon-btn--sm { width: 28px; height: 28px; }
+  .icon-btn--sm :where(svg) { width: 14px; height: 14px; }
+  .icon-btn:hover { color: var(--ink); }
+
+  /* Segmented full-width variant — each button takes equal share. */
+  .segmented--block { display: grid; grid-auto-flow: column; width: 100%; }
+  .segmented--block .segmented__btn { width: 100%; }
+  .segmented__btn--block { width: 100%; justify-content: center; }
+
+  /* Empty state typography. */
+  .empty__title { font-family: var(--font-display); font-size: var(--step-1); font-weight: 650; }
+  .empty__desc { color: var(--ink-2); }
+  .empty__action { margin-top: var(--s-2); }
+
+  /* Tooltip — CSS-only, no JS positioning. Appears above the target
+     on hover/focus. The tip is anchored to a span wrapping the target. */
+  .ui-tr-tooltip { position: relative; display: inline-flex; }
+  .ui-tr-tooltip__tip {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    padding: 6px 10px;
+    background: var(--ink);
+    color: var(--ink-inverse);
+    border-radius: var(--r-ctl);
+    font-size: var(--step--1);
+    line-height: 1.4;
+    max-width: 260px;
+    width: max-content;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--t-fast) var(--ease-out);
+  }
+  .ui-tr-tooltip__tip--top { bottom: calc(100% + 8px); }
+  .ui-tr-tooltip__tip--bottom { top: calc(100% + 8px); }
+  .ui-tr-tooltip:hover .ui-tr-tooltip__tip,
+  .ui-tr-tooltip:focus-within .ui-tr-tooltip__tip { opacity: 1; }
+
+  /* Popover — minimal floating panel triggered by a button. */
+  .ui-tr-popover { position: relative; display: inline-flex; }
+  .ui-tr-popover__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+    padding: 6px 10px;
+    min-height: 36px;
+    font: 600 var(--step--1)/1 var(--font-ui);
+    cursor: pointer;
+  }
+  .ui-tr-popover__trigger:hover { background: var(--sheet-sunk); }
+  .ui-tr-popover__body {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 6px);
+    min-width: 220px;
+    padding: var(--s-2);
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-ctl);
+    box-shadow: var(--lift);
+    display: grid;
+    gap: 2px;
+  }
+  .ui-tr-popover__body--bottom-right { right: 0; }
+  .ui-tr-popover__body--bottom-left { left: 0; }
+  .ui-tr-popover__item {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: 8px 10px;
+    border-radius: 6px;
+    color: var(--ink);
+    text-decoration: none;
+    font-size: var(--step-0);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+  }
+  .ui-tr-popover__item:hover { background: var(--sheet-sunk); }
+  .ui-tr-popover__item[aria-current="true"] {
+    background: var(--tide-wash);
+    color: var(--tide-hover);
+    font-weight: 700;
+  }
+  .ui-tr-popover__sep {
+    height: 1px;
+    background: var(--rule);
+    margin: 4px 0;
+  }
+
+  /* Toast: the kind-icon column inherits the kind color. */
+  .toast .filecheck__icon { color: var(--ink-inverse); }
+  .toast[data-kind="confirmed"] .filecheck__icon { color: var(--green); }
+  .toast[data-kind="error"] .filecheck__icon { color: var(--brick); }
+  .toast .btn--quiet {
+    min-height: 28px;
+    padding: 0 8px;
+    color: var(--ink-inverse);
+    border: 1px solid rgb(255 255 255 / 0.16);
+  }
+  .toast .icon-btn { color: var(--ink-inverse); width: 28px; height: 28px; }
+
+  /* Drawer (the CorrectionForm uses native <dialog> for focus trapping,
+     but the .drawer visual chrome is in components.css §7.6). */
+
+  /* Upload progress bar (used by UploadProgress). */
+  .upload-progress { display: grid; gap: 6px; }
+  .upload-progress__bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--sheet-sunk);
+    border: 1px solid var(--rule);
+    overflow: hidden;
+  }
+  .upload-progress__fill {
+    display: block;
+    height: 100%;
+    background: var(--tide);
+    transition: width var(--t-base) var(--ease-out);
+  }
+}

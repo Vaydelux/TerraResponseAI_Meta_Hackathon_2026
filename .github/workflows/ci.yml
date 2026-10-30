@@ -1,0 +1,49 @@
+# .github/workflows/ci.yml
+#
+# CI/CD pipeline for TerraResponse AI.
+# Runs on every push to main + every pull request.
+# Steps: lint → typecheck → unit tests → build.
+# E2E tests are NOT run in CI (they require a running dev server;
+# the workflow would need a webServer config + browser binaries —
+# added in a future enhancement).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-typecheck-test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Unit + integration tests
+        run: bun run test
+
+      - name: Production build
+        run: bun run build
+        env:
+          # The build doesn't need real secrets — the app renders a
+          # "Setup required" state when Supabase env vars are empty.
+          NODE_ENV: production
