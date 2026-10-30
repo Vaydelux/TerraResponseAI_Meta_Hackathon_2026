@@ -33,28 +33,41 @@ async function main() {
   }
 
   const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  for (const entry of entries) {
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: entry.email!.trim().toLowerCase(),
-      password: entry.password!,
-      email_confirm: true,
-      user_metadata: { name: `qa_${entry.role}`, username: `qa_${entry.role}` },
-    });
-    if (error || !data.user) {
-      throw new Error(`Auth Admin failed creating ${entry.role} test user, code: ${error?.code ?? "unknown"}.`);
+  const createdIds: string[] = [];
+  try {
+    for (const entry of entries) {
+      const { data, error } = await supabase.auth.admin.createUser({
+        email: entry.email!.trim().toLowerCase(),
+        password: entry.password!,
+        email_confirm: true,
+        user_metadata: { name: `qa_${entry.role}`, username: `qa_${entry.role}` },
+      });
+      if (error || !data.user) {
+        throw new Error(`Auth Admin failed creating ${entry.role} test user, code: ${error?.code ?? "unknown"}.`);
+      }
+      createdIds.push(data.user.id);
+      const { data: changed, error: profileError } = await supabase
+        .from("profiles")
+        .update({ role: entry.role, name: `qa_${entry.role}` })
+        .eq("id", data.user.id)
+        .select("id, role");
+      if (profileError || changed?.length !== 1 || changed[0]?.role !== entry.role) {
+        throw new Error(`Profile role verification failed for ${entry.role}.`);
+      }
+      console.log(`Created and verified staging ${entry.role} account (identifier withheld).`);
     }
-    // The profile-creation trigger must succeed and default role to reporter.
-    // Update an admin/reviewer role only via the service role; end users
-    // cannot grant themselves privileges. Verify affected row count.
-    const { data: changed, error: profileError } = await supabase
-      .from("profiles")
-      .update({ role: entry.role, name: `qa_${entry.role}` })
-      .eq("id", data.user.id)
-      .select("id, role");
-    if (profileError || changed?.length !== 1 || changed[0]?.role !== entry.role) {
-      throw new Error(`Profile role verification failed for ${entry.role}; investigate and remove partial test identity.`);
+  } catch (failure) {
+    // Compensate for partial provision. Never delete any existing account:
+    // only the IDs created in THIS invocation are eligible.
+    let cleanupFailed = false;
+    for (const id of createdIds.reverse()) {
+      const { error } = await supabase.auth.admin.deleteUser(id);
+      if (error) cleanupFailed = true;
     }
-    console.log(`Created and verified isolated staging ${entry.role} account (identifier withheld).`);
+    if (cleanupFailed) {
+      throw new Error("Staging provisioning failed and compensation was incomplete. Audit and remove the partial staging identities.");
+    }
+    throw failure;
   }
 }
 main().catch(error => {
