@@ -246,3 +246,86 @@ export async function bootstrapFirstAdminAction(email: string): Promise<{ ok: bo
   }
   return { ok: true };
 }
+
+/**
+ * New users may self-register as ordinary contributors/reporters only.
+ * Role assignment is exclusively performed by the DB trigger. Never
+ * accept role, event membership, or admin claims from registration.
+ */
+export type SignUpState =
+  | { status: "idle" }
+  | { status: "error"; message: string }
+  | { status: "success"; message: string };
+
+function registrationCallbackUrl(): string | undefined {
+  // The server controls this setting; never derive callback origins from
+  // untrusted form data or forwarded host headers.
+  const configured = process.env.NEXT_PUBLIC_SITE_URL ??
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : undefined);
+  if (!configured) return undefined; // Use Supabase Auth Site URL.
+  try {
+    const url = new URL(configured);
+    if (url.username || url.password || url.search || url.hash ||
+        (url.protocol !== "https:" &&
+          !(url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname)))) {
+      return undefined;
+    }
+    return new URL("/auth/callback", url.origin).href;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function signUpAction(formData: FormData): Promise<SignUpState> {
+  if (!isSupabaseConfigured()) {
+    return { status: "error", message: "Registration is not configured. Please contact the application administrator." };
+  }
+
+  const emailValue = formData.get("email");
+  const passwordValue = formData.get("password");
+  const confirmValue = formData.get("confirmPassword");
+  if (typeof emailValue !== "string" || typeof passwordValue !== "string" ||
+      typeof confirmValue !== "string") {
+    return { status: "error", message: "Email and both password fields are required." };
+  }
+
+  const email = emailValue.trim().toLowerCase();
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { status: "error", message: "Enter a valid email address." };
+  }
+  if (passwordValue.length < 12 || passwordValue.length > 72) {
+    return { status: "error", message: "Use a password between 12 and 72 characters." };
+  }
+  if (passwordValue !== confirmValue) {
+    return { status: "error", message: "The passwords do not match." };
+  }
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const emailRedirectTo = registrationCallbackUrl();
+    const { error } = await supabase.auth.signUp({
+      email,
+      password: passwordValue,
+      ...(emailRedirectTo ? { options: { emailRedirectTo } } : {}),
+    });
+
+    if (error) {
+      // Keep provider error details in protected server logs; do not
+      // reveal account existence or internal database failure messages.
+      console.error("[auth] Sign-up request failed", { status: error.status, code: error.code });
+      return {
+        status: "error",
+        message: "Registration could not be completed. Check that sign-ups are enabled, and try again later.",
+      };
+    }
+    return {
+      status: "success",
+      message: "Registration request received. Check your inbox for a confirmation link if email verification is enabled. Then sign in. If you already have an account, use the sign-in page.",
+    };
+  } catch {
+    console.error("[auth] Sign-up service unavailable");
+    return { status: "error", message: "Registration is temporarily unavailable. Please try again later." };
+  }
+}
