@@ -54,12 +54,14 @@ export function SignUpContent({ configured }: { configured: boolean }) {
                 )}
                 <Field label="Email" htmlFor="signup-email">
                   <Input id="signup-email" name="email" type="email" autoComplete="email"
-                    placeholder="you@example.com" maxLength={254} required disabled={pending} />
+                    placeholder="you@example.com" maxLength={254} required disabled={pending}
+                    invalid={state.status === "error" && state.field === "email"} />
                 </Field>
                 <Field label="Password" htmlFor="signup-password"
                   hint="Use 12–72 characters. Choose a unique password.">
                   <Input id="signup-password" name="password" type={showPassword ? "text" : "password"}
-                    autoComplete="new-password" minLength={12} maxLength={72} required disabled={pending} />
+                    autoComplete="new-password" minLength={12} maxLength={72} required disabled={pending}
+                    invalid={state.status === "error" && state.field === "password"} />
                 </Field>
                 <Field label="Confirm password" htmlFor="signup-confirm-password">
                   <Input id="signup-confirm-password" name="confirmPassword" type={showPassword ? "text" : "password"}
