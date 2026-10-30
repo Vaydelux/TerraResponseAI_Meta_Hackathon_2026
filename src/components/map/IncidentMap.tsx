@@ -31,6 +31,7 @@ import { IncidentPanel, type IncidentPanelData } from "./IncidentPanel";
 import { Segmented } from "@/components/ui-tr/Segmented";
 import { COPY } from "@/lib/design/copy";
 import { stateFromReport } from "@/lib/design/status";
+import { toSeverityLevel } from "@/lib/design/severity";
 import { cn } from "@/lib/utils";
 
 export interface IncidentMapReport {
@@ -101,11 +102,20 @@ export function IncidentMap({ eventId, reports, className }: IncidentMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
+  const fetchControllerRef = useRef<AbortController | null>(null);
   const [pendingMode, setPendingMode] = useState<PendingMode>("confirmed");
   const [selected, setSelected] = useState<IncidentMapReport | null>(null);
   const [liveReports, setLiveReports] = useState<IncidentMapReport[]>(reports);
 
-  // Initialize the map once.
+  // Clear selected incident and stale pins when the active event changes.
+  useEffect(() => {
+    queueMicrotask(() => {
+      setSelected(null);
+      setLiveReports(reports);
+    });
+  }, [eventId, reports]);
+
+  // Initialize the map once per active event.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = new maplibregl.Map({
@@ -124,6 +134,9 @@ export function IncidentMap({ eventId, reports, className }: IncidentMapProps) {
       if (moveTimer) clearTimeout(moveTimer);
       moveTimer = setTimeout(async () => {
         if (!eventId) return;
+        fetchControllerRef.current?.abort();
+        const controller = new AbortController();
+        fetchControllerRef.current = controller;
         const b = map.getBounds();
         const params = new URLSearchParams({
           event_id: eventId,
@@ -134,9 +147,10 @@ export function IncidentMap({ eventId, reports, className }: IncidentMapProps) {
           limit: "200",
         });
         try {
-          const res = await fetch(`/api/reports/viewport?${params}`);
+          const res = await fetch(`/api/reports/viewport?${params}`, { signal: controller.signal });
+          if (!res.ok) return;
           const body = await res.json();
-          if (body?.ok && Array.isArray(body.reports)) {
+          if (!controller.signal.aborted && body?.ok && Array.isArray(body.reports)) {
             setLiveReports(body.reports as IncidentMapReport[]);
           }
         } catch {
@@ -147,6 +161,7 @@ export function IncidentMap({ eventId, reports, className }: IncidentMapProps) {
     map.on("moveend", onMove);
     return () => {
       if (moveTimer) clearTimeout(moveTimer);
+      fetchControllerRef.current?.abort();
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
       map.remove();
@@ -163,7 +178,8 @@ export function IncidentMap({ eventId, reports, className }: IncidentMapProps) {
 
     const visible = liveReports.filter((r) => {
       if (r.retention_state && r.retention_state !== "active") return false;
-      if (r.latitude == null || r.longitude == null) return false;
+      if (!Number.isFinite(r.latitude) || !Number.isFinite(r.longitude) ||
+          Math.abs(r.latitude) > 90 || Math.abs(r.longitude) > 180) return false;
       if (pendingMode === "confirmed") {
         const state = stateFromReport({ status: r.status, reviewOutcome: r.review_outcome });
         return state === "confirmed" || state === "corrected";
@@ -176,12 +192,17 @@ export function IncidentMap({ eventId, reports, className }: IncidentMapProps) {
       el.style.position = "absolute";
       el.style.opacity = "0";
       el.style.transition = "opacity 200ms ease";
-      // Render the pin button via React's renderToString-equivalent.
-      // We use innerHTML to keep this SSR-friendly component light.
+      // Create DOM safely without interpolating API data into innerHTML.
       const state = stateFromReport({ status: r.status, reviewOutcome: r.review_outcome });
-      const sev = r.severity ?? 3;
-      el.innerHTML = `<button type="button" class="pin" data-state="${state}" data-sev="${sev}" aria-label="Incident ${state}, severity ${sev}"></button>`;
-      el.querySelector("button")?.addEventListener("click", () => setSelected(r));
+      const sev = toSeverityLevel(r.severity);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "pin";
+      button.dataset.state = state;
+      button.dataset.sev = String(sev);
+      button.setAttribute("aria-label", `${r.title || "Incident"}; ${state}; severity ${sev}`);
+      button.addEventListener("click", () => setSelected(r));
+      el.append(button);
       const marker = new maplibregl.Marker(el)
         .setLngLat([r.longitude, r.latitude])
         .addTo(map);
