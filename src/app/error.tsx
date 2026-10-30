@@ -34,8 +34,7 @@ export default function ErrorBoundary({
       <div className="text-center">
         <h2 className="text-lg font-semibold">Something went wrong</h2>
         <p className="mt-1 max-w-md text-sm text-muted-foreground">
-          An unexpected error occurred. You can try again — your data is safe.
-          If the problem persists, contact your administrator.
+          An unexpected page error occurred. Try again or contact an administrator if it persists. If you were submitting a report or review, check its status before retrying to avoid duplicates.
         </p>
         {error.digest && (
           <p className="mt-2 font-mono text-xs text-muted-foreground/70">

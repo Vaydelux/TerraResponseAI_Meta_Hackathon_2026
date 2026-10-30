@@ -33,8 +33,7 @@ export default function AppErrorBoundary({
       <div className="text-center">
         <h2 className="text-lg font-semibold">Page error</h2>
         <p className="mt-1 max-w-md text-sm text-muted-foreground">
-          This page encountered an error. You can try again or return to the dashboard.
-          Your data is safe — no reports or reviews were affected.
+          This page encountered an error. Try again or return to the dashboard. If you were submitting a report or review, verify whether it was saved before repeating the action.
         </p>
         {error.digest && (
           <p className="mt-2 font-mono text-xs text-muted-foreground/70">

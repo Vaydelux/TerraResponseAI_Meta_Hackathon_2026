@@ -85,6 +85,31 @@ describe("upload → authenticated analysis handoff", () => {
     expect(screen.getByText("Timeline: needs_review")).toBeTruthy();
   });
 
+  it("treats an exact-duplicate link as an existing report, never new inference", async () => {
+    class LinkedXMLHttpRequest extends FakeXMLHttpRequest {
+      responseText = JSON.stringify({
+        ok: true,
+        linkedTo: "c3333333-3333-4333-8333-333333333333",
+      });
+      status = 200;
+    }
+    const modelCall = vi.fn();
+    vi.stubGlobal("XMLHttpRequest", LinkedXMLHttpRequest);
+    vi.stubGlobal("fetch", modelCall);
+    render(<UploadFlow eventId="b2222222-2222-4222-8222-222222222222" />);
+    fireEvent.click(screen.getByRole("button", { name: "Choose test photo" }));
+    const continueButton = screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement;
+    await waitFor(() => expect(continueButton.disabled).toBe(false));
+    fireEvent.click(continueButton);
+    fireEvent.click(screen.getByRole("button", { name: "Use unknown location" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+    expect(await screen.findByText("Linked to existing report")).toBeTruthy();
+    expect(screen.getByText(/No additional report was created/i)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open existing report" }).getAttribute("href"))
+      .toBe("/reports/c3333333-3333-4333-8333-333333333333");
+    expect(modelCall).not.toHaveBeenCalled();
+  });
+
   it("retains the uploaded report and shows a real failure if the model is unavailable", async () => {
     vi.stubGlobal("XMLHttpRequest", FakeXMLHttpRequest);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({

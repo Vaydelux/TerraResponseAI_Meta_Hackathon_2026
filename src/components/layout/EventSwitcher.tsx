@@ -11,7 +11,8 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, CalendarDays, Check } from "lucide-react";
 import type { UserEventMembership } from "@/lib/auth/profile";
 
@@ -36,6 +37,9 @@ export interface EventSwitcherProps {
 }
 
 export function EventSwitcher({ events, onSelect }: EventSwitcherProps) {
+  const router = useRouter();
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -56,19 +60,45 @@ export function EventSwitcher({ events, onSelect }: EventSwitcherProps) {
     }
   }, [events]);
 
+  // Restore predictable dismiss behavior without trapping keyboard focus
+  // in this lightweight popover.
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: PointerEvent) {
+      if (event.target instanceof Node && !popoverRef.current?.contains(event.target)) setOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   // When the user picks an event, write the cookie + notify.
   function handleSelect(id: string) {
     setActiveId(id);
     writeCookie(id);
     setOpen(false);
     onSelect?.(id);
+    // Pages and server components read the active-event cookie; refresh
+    // to avoid showing a previous event\'s queue or map after switching.
+    router.refresh();
   }
 
   const active = events.find((e) => e.event_id === activeId) ?? null;
 
   return (
-    <div className="ui-tr-popover" data-open={open || undefined}>
+    <div ref={popoverRef} className="ui-tr-popover" data-open={open || undefined}>
       <button
+        ref={triggerRef}
         type="button"
         className="ui-tr-popover__trigger"
         aria-haspopup="dialog"
@@ -83,7 +113,7 @@ export function EventSwitcher({ events, onSelect }: EventSwitcherProps) {
         <ChevronDown size={14} aria-hidden="true" />
       </button>
       {open && (
-        <div className="ui-tr-popover__body ui-tr-popover__body--bottom-right" role="dialog">
+        <div className="ui-tr-popover__body ui-tr-popover__body--bottom-right" role="group" aria-label="Select active event">
           <div className="field__label" style={{ padding: "8px 10px 4px" }}>
             Your events
           </div>

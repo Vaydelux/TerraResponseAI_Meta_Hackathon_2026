@@ -19,7 +19,7 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui-tr/Table";
 import { SealBadge } from "@/components/seal/SealBadge";
 import { SeverityMeter } from "@/components/report/SeverityMeter";
 import { ReportThumb } from "@/components/report/ReportThumb";
-import { SkeletonRow, EmptyState } from "@/components/ui-tr";
+import { SkeletonRow, EmptyState, Button } from "@/components/ui-tr";
 import { COPY } from "@/lib/design/copy";
 import { stateFromReport } from "@/lib/design/status";
 import { toSeverityLevel } from "@/lib/design/severity";
@@ -60,56 +60,78 @@ export function ReviewQueueTable({ eventId, className }: ReviewQueueTableProps) 
   const [rows, setRows] = useState<ReviewQueueRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!eventId) return;
     const ctrl = new AbortController();
-    Promise.all([
-      fetch(`/api/reports?event_id=${eventId}&status=needs_review&limit=50&include_analysis=true`, { signal: ctrl.signal }).then((r) => r.json()),
-      fetch(`/api/reports?event_id=${eventId}&status=needs_manual_review&limit=50&include_analysis=true`, { signal: ctrl.signal }).then((r) => r.json()),
-    ])
-      .then(([pendingBody, manualBody]) => {
-        const all: ReviewQueueRow[] = [];
-        for (const body of [pendingBody, manualBody]) {
-          if (body?.ok && Array.isArray(body.reports)) all.push(...body.reports);
-        }
-        all.sort((a, b) => (b.priority_score ?? 0) - (a.priority_score ?? 0));
+    const load = async (status: "needs_review" | "needs_manual_review"): Promise<ReviewQueueRow[]> => {
+      const params = new URLSearchParams({
+        event_id: eventId, status, limit: "50", include_analysis: "true",
+      });
+      const response = await fetch(`/api/reports?${params.toString()}`, { signal: ctrl.signal });
+      if (!response.ok) throw new Error("Review queue could not be loaded.");
+      const body: unknown = await response.json();
+      if (!body || typeof body !== "object" || !("ok" in body) ||
+          (body as { ok?: unknown }).ok !== true || !("reports" in body) ||
+          !Array.isArray((body as { reports?: unknown }).reports)) {
+        throw new Error("Review queue returned an invalid response.");
+      }
+      return (body as { reports: ReviewQueueRow[] }).reports;
+    };
+    queueMicrotask(() => {
+      if (!ctrl.signal.aborted) {
+        setRows(null);
+        setError(null);
+      }
+    });
+    Promise.all([load("needs_review"), load("needs_manual_review")])
+      .then(([pending, manual]) => {
+        if (ctrl.signal.aborted) return;
+        // Duplicate IDs should never appear twice, even if an API returns
+        // overlapping states during concurrent state transitions.
+        const unique = new Map([...pending, ...manual].map((row) => [row.id, row]));
+        const all = [...unique.values()].sort((a, b) =>
+          (b.priority_score ?? 0) - (a.priority_score ?? 0));
         setRows(all);
         setActiveIdx(0);
         setError(null);
       })
       .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        setError("Network error.");
-        setRows([]);
+        if (ctrl.signal.aborted) return;
+        console.error("[review-queue] Failed to load event review queue", err instanceof Error ? err.message : "unknown");
+        setError("The review queue could not be loaded. Your reports have not been changed.");
+        setRows(null);
       });
     return () => ctrl.abort();
-  }, [eventId]);
+  }, [eventId, retryCount]);
 
-  // Keyboard navigation: J/K to move, Enter to open.
+  // J/K are optional convenience shortcuts. Leave Enter/Space and
+  // interactive elements to the browser so buttons and links work
+  // normally for keyboard and assistive-technology users.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const t = e.target as HTMLElement;
-      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
-      if (!rows || rows.length === 0) return;
-      if (e.key === "j" || e.key === "J") {
+      if (!rows?.length || e.defaultPrevented || e.repeat ||
+          e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const target = e.target;
+      if (target instanceof Element &&
+          (target.closest("input, textarea, select, button, a, [role='dialog'], [contenteditable='true']") ||
+           (target instanceof HTMLElement && target.isContentEditable))) return;
+      if (e.key.toLowerCase() === "j") {
         e.preventDefault();
         setActiveIdx((i) => Math.min(i + 1, rows.length - 1));
-      } else if (e.key === "k" || e.key === "K") {
+      } else if (e.key.toLowerCase() === "k") {
         e.preventDefault();
         setActiveIdx((i) => Math.max(i - 1, 0));
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        const r = rows[activeIdx];
-        if (r) router.push(`/review/${r.id}`);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [rows, activeIdx, router]);
+  }, [rows]);
 
   if (error) {
-    return <EmptyState title="Could not load the queue" description={error} />;
+    return <EmptyState title="Could not load the queue" description={error}
+      action={<Button variant="primary" onClick={() => setRetryCount((n) => n + 1)}>Retry loading queue</Button>} />;
   }
 
   if (rows === null) {
