@@ -57,3 +57,13 @@ Do not run remote `supabase db reset`, `supabase db push --include-seed`, or unr
 If no longer needed, delete a secret in the GitHub Actions settings and revoke the associated token/password on the provider side. Removing the GitHub secret does not revoke the token at Supabase or Meta. Rotate credentials if they were ever committed or disclosed; deleting a Git commit does not reliably undo exposure.
 
 GitHub workflows can use secrets, but the connected assistant cannot retrieve their values. This is intentional.
+
+
+## CLI version and migration filename safety
+
+The preview pins **Supabase CLI 2.72.7** so a new CLI release cannot silently change the meaning of a remote-target flag. The workflow uses explicit `--linked` flags after linking the designated staging project and only runs `db push --dry-run`. It cannot modify the remote database.
+
+The repository's historical migrations use four-digit names such as `0001_schema.sql`. The documented Supabase naming convention is `YYYYMMDDHHmmss_description.sql`; a short version may fail timestamp parsing or confuse migration history. The workflow warns about every nonstandard file.
+
+**Do not rename existing applied migrations without inspecting the real remote `supabase_migrations.schema_migrations` history**. Changing a previously applied migration version causes local/remote divergence and can lead to accidental replays. On a verified empty staging project, a coordinated one-time renaming can be reviewed separately. Never guess an applied version or use `supabase migration repair` as a workaround without evidence.
+
