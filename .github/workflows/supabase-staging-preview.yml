@@ -37,6 +37,7 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
       # Accept the project reference as a Variable or Secret.
       SUPABASE_PROJECT_REF: ${{ inputs.project_ref || vars.STAGING_SUPABASE_PROJECT_REF || secrets.STAGING_SUPABASE_PROJECT_REF }}
+      PRODUCTION_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
 
     steps:
       - name: Checkout reviewed main branch
@@ -56,7 +57,11 @@ jobs:
             echo "::error::Invalid staging project reference. Supply ONLY the lowercase reference id (not a URL or project name)."
             exit 1
           fi
-          echo "Required staging configuration is present (values are not printed)."
+          if [[ -z "${PRODUCTION_PROJECT_REF:-}" || "$SUPABASE_PROJECT_REF" == "$PRODUCTION_PROJECT_REF" || "$SUPABASE_PROJECT_REF" == "ywopsafppyykhwrejliz" ]]; then
+            echo "::error::Staging target is unverified or matches the known production project; refusing even to link."
+            exit 1
+          fi
+          echo "Required staging configuration and isolation are verified (values not printed)."
 
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
