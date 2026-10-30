@@ -1,3 +1,9 @@
+> [!WARNING]
+> **SECURITY RELEASE BLOCKER — [Issue #21](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/21).**
+> Temporary test-account email confirmation exceptions must be removed before launch.
+> Every new AI coding assistant should read [AGENTS.md](AGENTS.md) and ask the owner
+> if confirmation, SMTP and demo-account cleanup have been completed.
+
 # TerraResponse AI
 
 **Disaster-photo intelligence with human review — a decision-support prototype for emergency response teams.**
