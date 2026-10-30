@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-const sql = readFileSync("supabase/migrations/0009_atomic_review_actions.sql", "utf8");
+const sql = readFileSync("supabase/migrations/0010_atomic_review_actions.sql", "utf8");
 const route = readFileSync("src/app/api/reports/[id]/review/route.ts", "utf8");
 
 describe("atomic review database guardrails", () => {
