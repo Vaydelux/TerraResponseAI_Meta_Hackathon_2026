@@ -6,6 +6,7 @@
 // (Button, Field, Input) + the existing signInAction server action.
 
 import { useState, useActionState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button, Field, Input } from "@/components/ui-tr";
 import { Wordmark } from "@/components/layout/Wordmark";
@@ -91,6 +92,9 @@ export function LoginContent({ configured }: { configured: boolean }) {
                 {pending ? "Signing in…" : "Sign in"}
               </Button>
             </form>
+            <p className="t-meta" style={{ marginTop: "var(--s-4)", textAlign: "center" }}>
+              New to TerraResponse? <Link href="/signup" style={{ textDecoration: "underline" }}>Create an account</Link>
+            </p>
           </div>
         </div>
       </main>
