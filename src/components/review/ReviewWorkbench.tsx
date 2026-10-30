@@ -114,7 +114,7 @@ interface ReportBody {
 
 interface ReviewBody {
   ok?: boolean;
-  actions?: Array<{ reviewer_id: string; reviewer_name?: string; action: string; created_at: string }>;
+  actions?: Array<{ reviewer_id: string; reviewer_name?: string; action: string; created_at: string; new_observation?: Record<string, unknown> | null }>;
 }
 
 function readObservation(detail: ReportDetail): ObservationData {
@@ -145,6 +145,7 @@ export function ReviewWorkbench({
   const [error, setError] = useState<string | null>(null);
   const [reviewerName, setReviewerName] = useState<string | null>(null);
   const [reviewedAt, setReviewedAt] = useState<string | null>(null);
+  const [reviewWasCorrected, setReviewWasCorrected] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [priority, setPriority] = useState<{ score: number; factors: PriorityResponse["factors"] }>({
     score: 0,
@@ -163,6 +164,7 @@ export function ReviewWorkbench({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
     setDetail(null);
+    setReviewWasCorrected(false);
     // Core report data is required; priority, SAM and review history are
     // supplementary. A failed optional request must not blank the whole page.
     Promise.allSettled([
@@ -197,6 +199,7 @@ export function ReviewWorkbench({
           const latest = reviewBody.actions[0];
           setReviewerName(latest.reviewer_name ?? currentUserDisplayName ?? null);
           setReviewedAt(latest.created_at);
+          setReviewWasCorrected(latest.action === "comment" && latest.new_observation != null);
         } else if (reportBody.report.status === "reviewed") {
           setReviewerName(currentUserDisplayName ?? "a reviewer");
         }
@@ -232,7 +235,9 @@ export function ReviewWorkbench({
   }
 
   const observation = readObservation(detail);
-  const state: VerificationState = stateFromReport({ status: detail.status, reviewOutcome: detail.review_outcome });
+  const state: VerificationState = detail.status === "reviewed" && reviewWasCorrected
+    ? "corrected"
+    : stateFromReport({ status: detail.status, reviewOutcome: detail.review_outcome });
   const altText = `Uploaded photo; unverified description: ${observation.summary ?? "no AI summary available"}`;
   const isOwnReport = !!currentUserId && currentUserId === detail.creator_id;
   const isLastInQueue = queuePosition ? queuePosition.current >= queuePosition.total : false;

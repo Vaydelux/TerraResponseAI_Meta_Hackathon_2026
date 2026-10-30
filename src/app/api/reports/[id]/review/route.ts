@@ -24,16 +24,17 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 const reviewActionSchema = z.object({
-  action: z.enum(["confirm", "flag", "reject", "resolve", "request_info"]),
+  action: z.enum(["confirm", "flag", "reject", "resolve", "request_info", "correct", "comment"]),
+  requestId: z.string().uuid().optional(),
   comment: z.string().max(5000).optional(),
-  correctedIncidentType: z.string().optional(),
+  correctedIncidentType: z.enum(["flooding", "blocked_road", "debris", "visible_structural_damage", "other", "unclear"]).optional(),
   correctedSeverity: z.number().int().min(1).max(5).nullable().optional(),
-  correctedSummary: z.string().max(1000).optional(),
-  correctedSummaryTl: z.string().max(1000).optional(),
+  correctedSummary: z.string().min(1).max(1000).optional(),
+  correctedSummaryTl: z.string().min(1).max(1000).optional(),
   correctedUncertainties: z.array(z.string().max(300)).max(10).optional(),
   correctedVisibleEvidence: z.array(z.string().max(500)).max(20).optional(),
   reason: z.string().max(2000).optional(),
-});
+}).strict();
 
 export async function POST(
   request: NextRequest,
@@ -84,170 +85,72 @@ export async function POST(
     );
   }
 
+  // Serialize corrections as an allowlisted set of observation fields.
+  // The SECURITY DEFINER RPC validates the same fields and the actor
+  // again, so users cannot bypass route validation by calling PostgREST.
+  const corrections: Record<string, unknown> = {};
+  if (body.correctedIncidentType !== undefined) corrections.incident_type = body.correctedIncidentType;
+  if (body.correctedSeverity !== undefined) corrections.preliminary_severity = body.correctedSeverity;
+  if (body.correctedSummary !== undefined) corrections.summary_en = body.correctedSummary;
+  if (body.correctedSummaryTl !== undefined) corrections.summary_tl = body.correctedSummaryTl;
+  if (body.correctedUncertainties !== undefined) corrections.uncertainties = body.correctedUncertainties;
+  if (body.correctedVisibleEvidence !== undefined) corrections.visible_evidence = body.correctedVisibleEvidence;
+
+  const hasCorrections = Object.keys(corrections).length > 0;
+  const isCorrectionAction = body.action === "correct" || body.action === "comment";
+  if (hasCorrections !== isCorrectionAction) {
+    return NextResponse.json(
+      { error: { code: "BAD_REQUEST", message: "Use the correction action with one or more changed fields." } },
+      { status: 400 },
+    );
+  }
+  if ((isCorrectionAction || body.action === "reject") && !body.reason?.trim()) {
+    return NextResponse.json(
+      { error: { code: "BAD_REQUEST", message: "A reason is required for corrections and rejections." } },
+      { status: 400 },
+    );
+  }
+
+  // The database locks the report row and writes review_actions,
+  // report status and corrected observations in ONE transaction.
+  // If any part fails, the entire transaction rolls back.
+  // The request ID makes retries safe after a lost network response.
   const supabase = await createSupabaseServerClient();
-  const { data: report, error: reportErr } = await supabase
-    .from("reports")
-    .select("id, status, creator_id, event_id")
-    .eq("id", id)
-    .single();
-
-  if (reportErr || !report) {
-    return NextResponse.json(
-      { error: { code: "NOT_FOUND", message: "Report not found or access denied." } },
-      { status: 404 },
-    );
-  }
-
-  // Self-review check (non-admin).
-  if (report.creator_id === user.id && ctx.user.role !== "admin") {
-    return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "You cannot review your own report." } },
-      { status: 403 },
-    );
-  }
-
-  const reviewableStates = ["needs_review", "needs_manual_review", "reviewed"];
-  if (!reviewableStates.includes(report.status)) {
-    return NextResponse.json(
-      { error: { code: "INVALID_STATE", message: `Cannot review a report in state '${report.status}'.` } },
-      { status: 409 },
-    );
-  }
-
-  // Fetch current analysis for before/after.
-  const { data: analysis } = await supabase
-    .from("report_analyses")
-    .select("structured_observation, severity_score")
-    .eq("report_id", id)
-    .single();
-
-  const currentObservation = (analysis?.structured_observation as Record<string, unknown>) ?? {};
-  const currentSeverity = analysis?.severity_score ?? null;
-
-  // Map action → schema action + outcome.
-  const schemaAction = body.action === "request_info" ? "flag" : body.action;
-  const reviewOutcomeMap: Record<string, string> = {
-    confirm: "confirmed",
-    flag: "flagged",
-    reject: "rejected",
-    resolve: "resolved",
-    request_info: "flagged",
-  };
-  const reviewOutcome = reviewOutcomeMap[body.action] ?? "flagged";
-  const newStatus = "reviewed";
-
-  // Build corrected observation if corrections provided.
-  let newObservation: Record<string, unknown> | null = null;
-  let newSeverity: number | null | undefined = undefined;
-
-  const hasCorrections =
-    body.correctedIncidentType !== undefined ||
-    body.correctedSeverity !== undefined ||
-    body.correctedSummary !== undefined ||
-    body.correctedSummaryTl !== undefined ||
-    body.correctedUncertainties !== undefined ||
-    body.correctedVisibleEvidence !== undefined;
-
-  if (hasCorrections) {
-    if (!body.reason || body.reason.trim().length === 0) {
-      return NextResponse.json(
-        { error: { code: "BAD_REQUEST", message: "A reason is required when correcting fields." } },
-        { status: 400 },
-      );
-    }
-    newObservation = { ...currentObservation };
-    if (body.correctedIncidentType !== undefined) {
-      newObservation.incident_type = body.correctedIncidentType;
-      newObservation._incident_type_verified_by = user.id;
-      newObservation._incident_type_verified_at = new Date().toISOString();
-    }
-    if (body.correctedSeverity !== undefined) {
-      newObservation.preliminary_severity = body.correctedSeverity;
-      newObservation._severity_verified_by = user.id;
-      newObservation._severity_verified_at = new Date().toISOString();
-      newSeverity = body.correctedSeverity * 20;
-    }
-    if (body.correctedSummary !== undefined) {
-      newObservation.summary_en = body.correctedSummary;
-      newObservation._summary_en_verified_by = user.id;
-    }
-    if (body.correctedSummaryTl !== undefined) {
-      newObservation.summary_tl = body.correctedSummaryTl;
-      newObservation._summary_tl_verified_by = user.id;
-    }
-    if (body.correctedUncertainties !== undefined) {
-      newObservation.uncertainties = body.correctedUncertainties;
-    }
-    if (body.correctedVisibleEvidence !== undefined) {
-      newObservation.visible_evidence = body.correctedVisibleEvidence;
-    }
-  }
-
-  // Insert review_action (append-only — preserves before/after).
-  const { error: actionErr } = await supabase.from("review_actions").insert({
-    report_id: id,
-    reviewer_id: user.id,
-    action: schemaAction,
-    comment: body.comment ?? body.reason ?? null,
-    previous_status: report.status,
-    new_status: newStatus,
-    previous_observation: hasCorrections ? currentObservation : null,
-    new_observation: newObservation,
-    previous_severity: currentSeverity,
-    new_severity: newSeverity ?? null,
+  const { data, error } = await supabase.rpc("submit_review_atomic", {
+    p_report_id: id,
+    p_request_id: body.requestId ?? crypto.randomUUID(),
+    p_action: body.action,
+    p_comment: body.comment ?? null,
+    p_reason: body.reason ?? null,
+    p_corrections: corrections,
   });
 
-  if (actionErr) {
+  if (error) {
+    const code = error.code;
+    const status = code === "42501" ? 403
+      : code === "22023" ? 400
+      : code === "P0002" ? 404
+      : code === "P0001" ? 409
+      : 503;
+    const message = status === 403 ? "Review permission denied."
+      : status === 400 ? "Invalid review action or correction."
+      : status === 404 ? "Report unavailable."
+      : status === 409 ? "The report changed. Refresh before reviewing."
+      : "Review service is unavailable or its database migration is pending.";
+    console.error("[review] Atomic review RPC failed", { code: code ?? "unknown" });
     return NextResponse.json(
-      { error: { code: "INSERT_FAILED", message: actionErr.message } },
-      { status: 500 },
+      { error: { code: "REVIEW_FAILED", message } },
+      { status },
     );
   }
 
-  // Update report status + review_outcome.
-  const { error: updateErr } = await supabase
-    .from("reports")
-    .update({ status: newStatus, review_outcome: reviewOutcome })
-    .eq("id", id)
-    .in("status", reviewableStates);
-
-  if (updateErr) {
+  if (!data || typeof data !== "object" || (data as { ok?: unknown }).ok !== true) {
     return NextResponse.json(
-      { error: { code: "UPDATE_FAILED", message: updateErr.message } },
-      { status: 500 },
+      { error: { code: "REVIEW_FAILED", message: "Review result could not be confirmed." } },
+      { status: 503 },
     );
   }
-
-  // If corrections, update the analysis (preserving original model output).
-  if (hasCorrections && newObservation && analysis) {
-    const originalModelOutput =
-      (currentObservation._original_model_output as Record<string, unknown>) ?? currentObservation;
-    const updated = {
-      ...newObservation,
-      _original_model_output: originalModelOutput,
-      _corrected_by: user.id,
-      _corrected_at: new Date().toISOString(),
-      _correction_reason: body.reason,
-    };
-    await supabase
-      .from("report_analyses")
-      .update({
-        structured_observation: updated,
-        ...(newSeverity !== undefined ? { severity_score: newSeverity } : {}),
-      })
-      .eq("report_id", id);
-  }
-
-  return NextResponse.json({
-    ok: true,
-    reportId: id,
-    action: body.action,
-    newStatus,
-    reviewOutcome,
-    correctionsApplied: hasCorrections,
-    reviewerId: user.id,
-    reviewedAt: new Date().toISOString(),
-  });
+  return NextResponse.json(data);
 }
 
 /**
@@ -286,7 +189,7 @@ export async function GET(
     .from("review_actions")
     .select("id, reviewer_id, action, comment, previous_status, new_status, previous_observation, new_observation, previous_severity, new_severity, created_at")
     .eq("report_id", id)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false });
 
   if (error) {
     return NextResponse.json(
