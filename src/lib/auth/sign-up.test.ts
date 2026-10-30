@@ -22,6 +22,7 @@ import { signUpAction } from "./actions";
 
 function form(email = "first@example.com", password = "correct horse battery staple", confirm = password) {
   const data = new FormData();
+  data.set("username", "field_reporter");
   data.set("email", email);
   data.set("password", password);
   data.set("confirmPassword", confirm);
@@ -43,10 +44,11 @@ describe("contributor-only Supabase sign-up", () => {
     expect(mocks.signUp).toHaveBeenCalledWith({
       email: "first@example.com",
       password: "correct horse battery staple",
-      options: { emailRedirectTo: "https://terra-response-ai.vercel.app/auth/callback" },
+      options: { emailRedirectTo: "https://terra-response-ai.vercel.app/auth/callback", data: { name: "field_reporter", username: "field_reporter" } },
     });
     expect(JSON.stringify(mocks.signUp.mock.calls[0][0])).not.toContain("admin");
     expect(JSON.stringify(mocks.signUp.mock.calls[0][0])).not.toContain("reviewer");
+    expect(mocks.signUp.mock.calls[0][0].options.data).not.toHaveProperty("role");
   });
   it("validates email, matching passwords and minimum length before calling Supabase", async () => {
     expect((await signUpAction(form("bad", "correct horse battery staple"))).status).toBe("error");
@@ -87,6 +89,6 @@ describe("contributor-only Supabase sign-up", () => {
       email: "first@example.com",
       password: "correct horse battery staple",
     }));
-    expect(mocks.signUp.mock.calls[0][0]).not.toHaveProperty("options");
+    expect(mocks.signUp.mock.calls[0][0]).toEqual(expect.objectContaining({ options: { data: { name: "field_reporter", username: "field_reporter" } } }));
   });
 });
