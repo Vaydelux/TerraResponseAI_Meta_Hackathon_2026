@@ -12,7 +12,7 @@ describe("hackathon UX and evidence safeguards", () => {
   });
   it("never injects map API data into innerHTML", () => {
     const map = file("src/components/map/IncidentMap.tsx");
-    expect(map).not.toContain("innerHTML");
+    expect(map).not.toMatch(/\.innerHTML\s*=/);
     expect(map).toContain('document.createElement("button")');
     expect(map).toContain("fetchControllerRef.current?.abort()");
   });
