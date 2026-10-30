@@ -16,8 +16,8 @@
 
 export function MetaAIShowcase() {
   const findings = [
-    "Floodwater covering a two-lane road, approximately 60 cm deep",
-    "Multiple vehicles stranded mid-road, occupants appear to have exited",
+    "Floodwater visibly covers the roadway; depth is not confirmed",
+    "Vehicles appear stopped on the roadway; occupancy is unknown",
     "Residential structures on both sides partially submerged",
     "Downstream side shows active overland flow toward a culvert",
   ];
@@ -54,7 +54,7 @@ export function MetaAIShowcase() {
         How Meta AI powers this
       </h2>
       <p className="t-meta" style={{ marginBottom: "var(--s-5)", maxWidth: "60ch" }}>
-        Two Meta models work together on every uploaded photo. Muse Spark reads
+        Muse Spark analyzes uploaded photos, while SAM 3.1 can optionally segment regions. In this illustrated example, Muse Spark reads
         the image and produces structured findings. SAM 3.1 optionally segments
         the flood region for visual reference. A human reviewer verifies both.
       </p>
@@ -138,7 +138,7 @@ export function MetaAIShowcase() {
                   }}
                 />
                 <span className="t-label" style={{ color: "var(--amber-ink)" }}>
-                  2. Muse Spark 1.3 — AI-generated, not verified
+                  2. Example Muse Spark-style observations (illustrative)
                 </span>
               </div>
               <h3 style={{ fontSize: "var(--step-1)", marginBottom: "var(--s-1)" }}>
@@ -241,7 +241,7 @@ export function MetaAIShowcase() {
                 flex: "none",
               }}
             />
-            <span className="t-label">3. SAM 3.1 — segmentation overlay</span>
+            <span className="t-label">3. SAM 3.1 concept — illustrative overlay</span>
           </div>
           <div
             style={{
@@ -253,7 +253,7 @@ export function MetaAIShowcase() {
           >
             <img
               src="/demo/flood-aerial.png"
-              alt="Flood photo with SAM 3.1 segmentation mask overlay"
+              alt="Flood photo with a decorative overlay illustrating the concept of segmentation"
               style={{
                 position: "absolute",
                 inset: 0,
@@ -294,13 +294,13 @@ export function MetaAIShowcase() {
                 }}
               />
               <span className="t-meta" style={{ fontWeight: 600 }}>
-                Flood region mask
+                Illustrative region highlight
               </span>
             </div>
             <p className="t-meta">
-              SAM 3.1 segments the flood region on request (opt-in). The overlay
-              is for visual reference only — the reviewer&apos;s confirmed
-              observation is the source of truth.
+              SAM 3.1 can produce masks on request. This rectangle is only a visual
+              illustration, not model-generated segmentation. Reviewers must
+              independently verify any observation.
             </p>
           </div>
         </div>
@@ -324,7 +324,7 @@ export function MetaAIShowcase() {
         </h3>
         <p className="t-meta" style={{ marginBottom: "var(--s-3)" }}>
           When a reviewer corrects the AI&apos;s observation, the original is
-          preserved in the audit trail. The diff is visible:
+          preserved in the audit trail. The following illustrative diff shows the concept:
         </p>
         <div className="diff">
           <div className="diff__old">
@@ -333,7 +333,7 @@ export function MetaAIShowcase() {
           </div>
           <div className="diff__new">
             <div className="t-label" style={{ marginBottom: 4 }}>Reviewer correction</div>
-            Flooding — severity 5 (bridge approach compromised)
+            Flooding — example reviewer correction: bridge approach requires inspection
           </div>
         </div>
         <p
