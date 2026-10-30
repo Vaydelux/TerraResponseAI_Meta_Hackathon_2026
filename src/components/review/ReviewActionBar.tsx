@@ -74,13 +74,20 @@ export function ReviewActionBar({
   const [rejectReason, setRejectReason] = useState("");
   const [busy, setBusy] = useState(false);
   const rejectAbortRef = useRef<AbortController | null>(null);
+  const submittingRef = useRef(false);
+  const completedRef = useRef(false);
+  useEffect(() => {
+    completedRef.current = false;
+    submittingRef.current = false;
+  }, [reportId]);
 
   // Keyboard shortcuts: C/E/F/R for the verbs, J/K for next/previous.
   // Disabled while typing in a field or while a dialog is open.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement;
-      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable) return;
+      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable || t.closest("button, [role='dialog']")) return;
+      if (isOwnReport || busy || submittingRef.current || completedRef.current || e.repeat) return;
       if (drawerOpen || rejectOpen) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "c" || e.key === "C") { e.preventDefault(); void submitAction("confirm"); }
@@ -92,10 +99,11 @@ export function ReviewActionBar({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [drawerOpen, rejectOpen, nextHref, status, reviewOutcome]);
+  }, [drawerOpen, rejectOpen, nextHref, status, reviewOutcome, isOwnReport, busy]);
 
   async function submitAction(action: ReviewAction, reason?: string) {
-    if (busy) return;
+    if (busy || submittingRef.current || completedRef.current || isOwnReport) return;
+    submittingRef.current = true;
     setBusy(true);
     onResolvingChange?.(true);
     const ctrl = new AbortController();
@@ -111,7 +119,8 @@ export function ReviewActionBar({
         signal: ctrl.signal,
       });
       const body = await res.json();
-      if (body?.ok) {
+      if (res.ok && body?.ok) {
+        completedRef.current = true;
         // Success — show the toast, then navigate to the next item.
         const nextN = Math.min(queuePosition.current + 1, queuePosition.total);
         toast.success(
@@ -144,6 +153,7 @@ export function ReviewActionBar({
         onClick: () => void submitAction(action, reason),
       });
     } finally {
+      submittingRef.current = false;
       if (!ctrl.signal.aborted) setBusy(false);
     }
   }
