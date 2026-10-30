@@ -23,6 +23,8 @@ Create this **repository variable** (non-secret):
 |---|---|
 | `STAGING_SUPABASE_PROJECT_REF` | Supabase staging project reference ID |
 
+**Common setup error:** If the staging workflow reports `Missing STAGING_SUPABASE_PROJECT_REF`, create that exact name in **Settings → Secrets and variables → Actions → Variables**, or use **Secrets** with the same name. This updated workflow reads the Variables value first, then the Secrets value if the variable is empty. The value is the staging project reference from your Supabase project URL, not a Supabase URL, token, or database password. The staging environment must have access to the selected setting. Never paste credential values into workflow logs or messages.
+
 Create an environment named **staging** in **Settings → Environments**. Configure allowed branches and approval rules if your GitHub plan supports them. Environment secrets can be used instead of repository secrets when supported; the workflow reads either using the same `secrets.*` syntax. Note that GitHub Free private repositories may not support environment secrets.
 
 If you later add real integration testing, use separately scoped secrets such as:
