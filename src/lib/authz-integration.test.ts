@@ -534,7 +534,7 @@ describe("PostGIS RPC cross-event boundary (defense-in-depth)", () => {
   it("viewport_reports RPC enforces event membership INSIDE the function (SECURITY INVOKER + is_event_member check)", async () => {
     // The viewport route's app-layer check rejects Bob for Event B
     // (he's not a member). But even if that check were bypassed, the
-    // RPC itself raises "You are not a member of this event" because
+    // RPC itself raises a membership error (not exposed to clients) because
     // it's SECURITY INVOKER (runs as Bob's role) and calls
     // public.is_event_member(p_event_id) which queries event_members
     // under RLS (Bob's RLS hides Event B's members from him).
@@ -553,7 +553,8 @@ describe("PostGIS RPC cross-event boundary (defense-in-depth)", () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error.code).toBe("QUERY_FAILED");
-    expect(body.error.message).toContain("not a member");
+    expect(body.error.message).toBe("Unable to load map incidents. Please retry.");
+    expect(body.error.message).not.toContain("not a member");
   });
 });
 
