@@ -76,9 +76,11 @@ export function ReviewActionBar({
   const rejectAbortRef = useRef<AbortController | null>(null);
   const submittingRef = useRef(false);
   const completedRef = useRef(false);
+  const requestIdRef = useRef<{ action: ReviewAction; reason?: string; id: string } | null>(null);
   useEffect(() => {
     completedRef.current = false;
     submittingRef.current = false;
+    requestIdRef.current = null;
   }, [reportId]);
 
   // Keyboard shortcuts: C/E/F/R for the verbs, J/K for next/previous.
@@ -104,6 +106,9 @@ export function ReviewActionBar({
   async function submitAction(action: ReviewAction, reason?: string) {
     if (busy || submittingRef.current || completedRef.current || isOwnReport) return;
     submittingRef.current = true;
+    const requestId = requestIdRef.current?.action === action && requestIdRef.current?.reason === reason
+      ? requestIdRef.current.id : crypto.randomUUID();
+    requestIdRef.current = { action, reason, id: requestId };
     setBusy(true);
     onResolvingChange?.(true);
     const ctrl = new AbortController();
@@ -114,6 +119,7 @@ export function ReviewActionBar({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action,
+          requestId,
           reason: reason || undefined,
         }),
         signal: ctrl.signal,
@@ -121,6 +127,7 @@ export function ReviewActionBar({
       const body = await res.json();
       if (res.ok && body?.ok) {
         completedRef.current = true;
+        requestIdRef.current = null;
         // Success — show the toast, then navigate to the next item.
         const nextN = Math.min(queuePosition.current + 1, queuePosition.total);
         toast.success(
