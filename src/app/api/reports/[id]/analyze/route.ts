@@ -101,7 +101,7 @@ export async function POST(
     // Already analyzed — return the existing analysis.
     const { data: existing } = await supabase
       .from("report_analyses")
-      .select("*")
+      .select("model_id, prompt_version, schema_version, structured_observation, processing_status, completed_at")
       .eq("report_id", id)
       .single();
     if (existing) {
@@ -359,7 +359,7 @@ export async function POST(
         errorMessage: result.error,
       });
       return NextResponse.json(
-        { error: { code: "SCHEMA_INVALID", message: result.error, rawOutput: result.rawOutput } },
+        { error: { code: "SCHEMA_INVALID", message: "AI output did not pass validation. The report needs manual review." } },
         { status: 422 },
       );
     }
