@@ -159,6 +159,7 @@ export function IncidentMap({ eventId, reports, className }: IncidentMapProps) {
       }, 400);
     }
     map.on("moveend", onMove);
+    map.on("load", onMove);
     return () => {
       if (moveTimer) clearTimeout(moveTimer);
       fetchControllerRef.current?.abort();
@@ -247,7 +248,7 @@ export function IncidentMap({ eventId, reports, className }: IncidentMapProps) {
       </div>
       <MapLegend showPending={pendingMode === "all"} />
       {panelReport && (
-        <IncidentPanel report={panelReport} />
+        <IncidentPanel report={panelReport} onClose={() => setSelected(null)} />
       )}
     </div>
   );
