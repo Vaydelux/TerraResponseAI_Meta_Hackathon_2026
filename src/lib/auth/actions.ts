@@ -31,6 +31,7 @@ import { isSupabaseConfigured, serviceRoleKey, supabaseUrl } from "@/lib/supabas
 import { createClient } from "@supabase/supabase-js";
 import { safeAuthPath } from "@/lib/auth/safe-redirect";
 import { signupFailure } from "@/lib/auth/signup-error";
+import { normalizeUsername, validateRegistration } from "@/lib/auth/registration-policy";
 
 export type SignInState = { error?: string } | null;
 
@@ -72,17 +73,17 @@ async function checkLoginRate(email: string): Promise<{
     const { count, error } = await createTrustedLoginAuditClient()
       .from("audit_events")
       .select("id", { count: "exact", head: true })
-      .in("action", ["auth_failed", "AUTH_FAILED"])
-      .eq("metadata->>email", email)
+      .eq("action", "auth_failed")
+      .contains("metadata", { email })
       .gte("created_at", oneHourAgo);
 
     if (error || count === null) {
-      console.error("[auth] Login rate-limit audit query unavailable.");
+      console.error("[auth] Login rate-limit audit query unavailable", { code: error?.code ?? "no_count", status: error?.code === "PGRST301" ? "auth_denied" : "query_failed" });
       return { blocked: true, used: 0, limit, unavailable: true };
     }
     return { blocked: count >= limit, used: count, limit };
   } catch {
-    console.error("[auth] Login rate-limit audit query failed.");
+    console.error("[auth] Login rate-limit audit query failed (network or client error).");
     return { blocked: true, used: 0, limit, unavailable: true };
   }
 }
@@ -118,7 +119,7 @@ async function recordAuthFailure(email: string): Promise<void> {
         user_agent: userAgent,
       });
     if (error) {
-      console.error("[auth] Failed to record pre-auth login attempt.");
+      console.error("[auth] Failed to record pre-auth login attempt.", { code: error.code });
     }
   } catch {
     console.error("[auth] Pre-auth login audit write unavailable.");
@@ -255,7 +256,7 @@ export async function bootstrapFirstAdminAction(email: string): Promise<{ ok: bo
  */
 export type SignUpState =
   | { status: "idle" }
-  | { status: "error"; message: string; field?: "email" | "password" }
+  | { status: "error"; message: string; field?: "username" | "email" | "password" | "confirmPassword" }
   | { status: "success"; message: string };
 
 function registrationCallbackUrl(): string | undefined {
@@ -284,24 +285,19 @@ export async function signUpAction(formData: FormData): Promise<SignUpState> {
     return { status: "error", message: "Registration is not configured. Please contact the application administrator." };
   }
 
+  const usernameValue = formData.get("username");
   const emailValue = formData.get("email");
   const passwordValue = formData.get("password");
   const confirmValue = formData.get("confirmPassword");
-  if (typeof emailValue !== "string" || typeof passwordValue !== "string" ||
+  if (typeof usernameValue !== "string" || typeof emailValue !== "string" || typeof passwordValue !== "string" ||
       typeof confirmValue !== "string") {
     return { status: "error", message: "Email and both password fields are required." };
   }
 
   const email = emailValue.trim().toLowerCase();
-  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { status: "error", message: "Enter a valid email address." };
-  }
-  if (passwordValue.length < 12 || passwordValue.length > 72) {
-    return { status: "error", message: "Use a password between 12 and 72 characters." };
-  }
-  if (passwordValue !== confirmValue) {
-    return { status: "error", message: "The passwords do not match." };
-  }
+  const username = normalizeUsername(usernameValue);
+  const issue = validateRegistration({ username, email, password: passwordValue, confirmation: confirmValue });
+  if (issue) return { status: "error", message: issue.message, field: issue.field };
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -309,7 +305,11 @@ export async function signUpAction(formData: FormData): Promise<SignUpState> {
     const { error } = await supabase.auth.signUp({
       email,
       password: passwordValue,
-      ...(emailRedirectTo ? { options: { emailRedirectTo } } : {}),
+      options: {
+        ...(emailRedirectTo ? { emailRedirectTo } : {}),
+        // Only a display name; DB controls role/membership.
+        data: { name: username, username },
+      },
     });
 
     if (error) {
