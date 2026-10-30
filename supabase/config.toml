@@ -4,10 +4,11 @@
 # Required by `supabase link` + `supabase db push` + `supabase db reset`.
 # See docs/DEPLOYMENT.md §1.2 for the full setup instructions.
 
-# The project ID is set by `supabase link --project-ref <ref>`. The
-# CLI stores it in .temp/ but this config file must exist for the
-# link command to work.
-project_id = ""
+# The local CLI project_id is a stable, nonempty identifier. The remote
+# Supabase project reference is supplied separately by `supabase link
+# --project-ref <ref>` and is stored by the CLI under supabase/.temp/.
+# Never infer the remote target from the local project_id.
+project_id = "terraresponse-ai"
 
 # The API endpoint for the Supabase project. The CLI reads this to
 # know where to push migrations. The actual URL is set by
