@@ -28,7 +28,24 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Safe redirect: same-origin only.
-  const safe = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
-  return NextResponse.redirect(new URL(safe, request.url));
+  // Require a path-relative target and confirm the parsed URL remains on
+  // this origin. A naive startsWith("/") check allows "/\\evil.example"
+  // to be interpreted as a protocol-relative redirect by URL parsers.
+  return NextResponse.redirect(safeAuthRedirect(next, requestUrl));
+}
+
+/** Defend against protocol-relative, backslash and control-character redirects. */
+export function safeAuthRedirect(next: string, requestUrl: URL): URL {
+  const fallback = new URL("/dashboard", requestUrl.origin);
+  if (!next.startsWith("/") || next.startsWith("//") || next.includes("\\") ||
+      /[\\u0000-\\u001F\\u007F]/.test(next)) return fallback;
+  try {
+    const target = new URL(next, requestUrl.origin);
+    if (target.origin !== requestUrl.origin || !["http:", "https:"].includes(target.protocol)) {
+      return fallback;
+    }
+    return target;
+  } catch {
+    return fallback;
+  }
 }
