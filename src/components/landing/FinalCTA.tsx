@@ -1,7 +1,7 @@
 // src/components/landing/FinalCTA.tsx
 //
 // Final call-to-action section at the bottom of the landing page.
-// Three buttons: Watch 90-sec demo, Explore sample incident, View GitHub.
+// Three buttons: See how it works, View example map, View GitHub.
 //
 // Server component.
 
@@ -43,8 +43,8 @@ export function FinalCTA() {
             See it in action
           </h2>
           <p style={{ color: "#B7C4CC", fontSize: "var(--step-1)", maxWidth: "52ch" }}>
-            Watch a 90-second walkthrough of the full upload-to-map workflow,
-            explore a sample incident, or read the source code on GitHub.
+            Explore the illustrated upload-to-map workflow, see the incident-map preview,
+            or inspect the project repository on GitHub.
           </p>
         </div>
         <div
@@ -57,14 +57,14 @@ export function FinalCTA() {
         >
           <a
             className="btn btn--primary btn--lg"
-            href="/review"
+            href="#how-it-works"
             style={{ whiteSpace: "nowrap" }}
           >
             Watch 90-sec demo
           </a>
           <a
             className="btn btn--lg"
-            href="/map"
+            href="#incident-map-preview"
             style={{
               whiteSpace: "nowrap",
               background: "rgba(255,255,255,0.08)",
@@ -76,7 +76,7 @@ export function FinalCTA() {
           </a>
           <a
             className="btn btn--lg"
-            href="https://github.com"
+            href="https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026"
             target="_blank"
             rel="noopener noreferrer"
             style={{
