@@ -101,6 +101,7 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
     // client-side sanity check (size limit) so the user gets early
     // feedback, but the official verdict is server-side.
     setTimeout(() => {
+      if (sequence !== fileSequenceRef.current) return;
       setChecks((prev) =>
         prev.map((c) => {
           const f = selected.find((f) => f.name === c.name);
@@ -111,7 +112,7 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
           if (!/^image\/(jpeg|png|webp)$/.test(f.type)) {
             return { ...c, state: "fail" as const, message: "not JPEG, PNG or WebP" };
           }
-          return { ...c, state: "ok" as const, message: "valid image — final check on submit" };
+          return { ...c, state: "ok" as const, message: "Size/type check passed; server verifies image data" };
         }),
       );
     }, 250);
