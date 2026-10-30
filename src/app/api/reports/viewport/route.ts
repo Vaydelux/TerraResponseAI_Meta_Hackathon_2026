@@ -55,14 +55,26 @@ export async function GET(request: NextRequest) {
 
   const url = new URL(request.url);
   const eventId = url.searchParams.get("event_id");
-  const swLat = Number(url.searchParams.get("sw_lat") ?? "");
-  const swLon = Number(url.searchParams.get("sw_lon") ?? "");
-  const neLat = Number(url.searchParams.get("ne_lat") ?? "");
-  const neLon = Number(url.searchParams.get("ne_lon") ?? "");
-  const limit = Math.min(
-    Math.max(Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT), 1),
-    MAX_LIMIT,
-  );
+  const requiredCoords = ["sw_lat", "sw_lon", "ne_lat", "ne_lon"] as const;
+  if (requiredCoords.some((key) => !url.searchParams.has(key) || !url.searchParams.get(key)?.trim())) {
+    return NextResponse.json(
+      { error: { code: "BAD_REQUEST", message: "All southwest and northeast bounds are required." } },
+      { status: 400 },
+    );
+  }
+  const swLat = Number(url.searchParams.get("sw_lat"));
+  const swLon = Number(url.searchParams.get("sw_lon"));
+  const neLat = Number(url.searchParams.get("ne_lat"));
+  const neLon = Number(url.searchParams.get("ne_lon"));
+  const rawLimit = url.searchParams.get("limit");
+  const parsedLimit = rawLimit === null ? DEFAULT_LIMIT : Number(rawLimit);
+  if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > MAX_LIMIT) {
+    return NextResponse.json(
+      { error: { code: "BAD_REQUEST", message: "limit must be an integer from 1 to 500." } },
+      { status: 400 },
+    );
+  }
+  const limit = parsedLimit;
 
   // Validate required params
   if (!eventId) {
@@ -123,7 +135,7 @@ export async function GET(request: NextRequest) {
   if (rpcErr) {
     console.error(`[viewport] RPC failed: ${rpcErr.message}`);
     return NextResponse.json(
-      { error: { code: "QUERY_FAILED", message: rpcErr.message } },
+      { error: { code: "QUERY_FAILED", message: "Unable to load map incidents. Please retry." } },
       { status: 500 },
     );
   }
