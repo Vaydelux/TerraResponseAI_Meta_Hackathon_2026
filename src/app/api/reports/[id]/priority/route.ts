@@ -50,7 +50,7 @@ export async function GET(
   // Fetch the report (RLS-enforced).
   const { data: report, error: reportErr } = await supabase
     .from("reports")
-    .select("id, status, sha256, captured_at, uploaded_at, priority_score")
+    .select("id, event_id, status, sha256, captured_at, uploaded_at, priority_score")
     .eq("id", id)
     .single();
 
@@ -107,6 +107,7 @@ export async function GET(
   const { data: otherReports } = await supabase
     .from("reports")
     .select("sha256")
+    .eq("event_id", report.event_id)
     .neq("id", id)
     .limit(100);
 
