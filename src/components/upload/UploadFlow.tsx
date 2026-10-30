@@ -26,7 +26,7 @@ import { UploadProgress } from "./UploadProgress";
 import { StatusTimeline } from "@/components/report/StatusTimeline";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Field, Input, Textarea, Button, toast } from "@/components/ui-tr";
-import { COPY } from "@/lib/design/copy";
+
 import { interpretAnalysisResponse, type AnalysisProgress } from "@/lib/analysis-client-state";
 
 type Step = 1 | 2 | 3;
@@ -346,7 +346,7 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
             <div className="tr-stack">
               <div className="panel">
                 <h3 style={{ fontSize: "var(--step-2)" }}>Upload received</h3>
-                <p style={{ marginTop: "var(--s-2)" }}>{COPY.postUpload}</p>
+                <p style={{ marginTop: "var(--s-2)" }}>Your photo was saved privately. Nothing was sent to emergency services. AI observations require human verification before becoming confirmed findings.</p>
                 <p role="status" aria-live="polite" className="t-meta" style={{ marginTop: "var(--s-2)" }}>{state.analysis.message}</p>
                 <div className="tr-cluster" style={{ marginTop: "var(--s-3)" }}>
                   <Link className="btn btn--primary" href={`/reports/${state.reportId}`}>Open the report</Link>
