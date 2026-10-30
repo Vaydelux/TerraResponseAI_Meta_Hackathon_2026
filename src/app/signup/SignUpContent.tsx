@@ -114,7 +114,7 @@ export function SignUpContent({ configured }: { configured: boolean }) {
                 </p>
               </form>
               </>
-            )
+            )}
             <p className="t-meta" style={{ marginTop: "var(--s-4)", textAlign: "center" }}>
               Already registered? <Link href="/login" style={{ textDecoration: "underline" }}>Sign in</Link>
             </p>
