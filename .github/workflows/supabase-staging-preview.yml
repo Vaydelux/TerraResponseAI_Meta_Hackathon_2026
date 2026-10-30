@@ -3,6 +3,12 @@
 name: Supabase staging migration preview
 
 on:
+  # A workflow-file change on main triggers a fresh, current-commit preview.
+  # This prevents accidentally rerunning an obsolete workflow revision.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/supabase-staging-preview.yml'
   workflow_dispatch:
     inputs:
       project_ref:
@@ -41,7 +47,10 @@ jobs:
           set -euo pipefail
           [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] || { echo "::error::Missing SUPABASE_ACCESS_TOKEN secret"; exit 1; }
           [ -n "${SUPABASE_DB_PASSWORD:-}" ] || { echo "::error::Missing STAGING_SUPABASE_DB_PASSWORD secret"; exit 1; }
-          [ -n "${SUPABASE_PROJECT_REF:-}" ] || { echo "::error::Missing STAGING_SUPABASE_PROJECT_REF. Set it in GitHub Actions Variables or Secrets, or the staging environment."; exit 1; }
+          if [ -z "${SUPABASE_PROJECT_REF:-}" ]; then
+            echo "::error::No staging project reference found. For automatic runs configure STAGING_SUPABASE_PROJECT_REF as a GitHub Actions Variable or Secret; for manually started NEW runs you can instead fill the project_ref input. Re-run jobs of an older run will never load these fixes."
+            exit 1
+          fi
           if ! [[ "$SUPABASE_PROJECT_REF" =~ ^[a-z0-9]{12,32}$ ]]; then
             echo "::error::Invalid staging project reference. Supply ONLY the lowercase reference id (not a URL or project name)."
             exit 1
