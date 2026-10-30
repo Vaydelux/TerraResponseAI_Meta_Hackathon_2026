@@ -13,8 +13,8 @@
 //     eligible (no forecast for unknown locations).
 //   - The coordinates are passed to Open-Meteo as fixed params (no
 //     user-supplied URLs).
-//   - The response is cached server-side for 10 minutes per the
-//     reportId (the `revalidate` option on Next.js fetch).
+//   - Public provider forecasts are cached for 10 minutes by coordinates;
+//     private report lookup is performed on every authorized request.
 //
 // The browser receives the validated + shaped WeatherForecast JSON.
 
@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireServerUser, createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { fetchWeatherForecast, type WeatherForecast } from "@/lib/weather/open-meteo";
+import { z } from "zod";
 
 export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
@@ -44,9 +45,9 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const reportId = url.searchParams.get("reportId");
 
-  if (!reportId) {
+  if (!reportId || !z.string().uuid().safeParse(reportId).success) {
     return NextResponse.json(
-      { error: { code: "BAD_REQUEST", message: "reportId is required." } },
+      { error: { code: "BAD_REQUEST", message: "A valid reportId is required." } },
       { status: 400 },
     );
   }
