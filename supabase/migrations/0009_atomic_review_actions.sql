@@ -55,17 +55,17 @@ begin
   if p_report_id is null or p_request_id is null then
     raise exception 'Report and request IDs are required' using errcode = '22023';
   end if;
-  if p_action not in ('confirm', 'flag', 'reject', 'resolve', 'request_info', 'correct', 'comment') then
+  if p_action is null or p_action not in ('confirm', 'flag', 'reject', 'resolve', 'request_info', 'correct', 'comment') then
     raise exception 'Invalid review action' using errcode = '22023';
   end if;
   if p_corrections is null or pg_catalog.jsonb_typeof(p_corrections) <> 'object' then
     raise exception 'Corrections must be an object' using errcode = '22023';
   end if;
-  if pg_catalog.length(pg_catalog.coalesce(p_comment, '')) > 5000 or
-     pg_catalog.length(pg_catalog.coalesce(p_reason, '')) > 2000 then
+  if pg_catalog.length(coalesce(p_comment, '')) > 5000 or
+     pg_catalog.length(coalesce(p_reason, '')) > 2000 then
     raise exception 'Review comment or reason too long' using errcode = '22023';
   end if;
-  if p_action = 'reject' and pg_catalog.length(pg_catalog.btrim(pg_catalog.coalesce(p_reason, ''))) = 0 then
+  if p_action = 'reject' and pg_catalog.length(pg_catalog.btrim(coalesce(p_reason, ''))) = 0 then
     raise exception 'Rejecting a report requires a reason' using errcode = '22023';
   end if;
 
@@ -114,7 +114,7 @@ begin
   if (p_action not in ('correct', 'comment')) and v_has_corrections then
     raise exception 'Corrections require the correct action' using errcode = '22023';
   end if;
-  if v_has_corrections and pg_catalog.length(pg_catalog.btrim(pg_catalog.coalesce(p_reason, ''))) = 0 then
+  if v_has_corrections and pg_catalog.length(pg_catalog.btrim(coalesce(p_reason, ''))) = 0 then
     raise exception 'A reason is required for corrections' using errcode = '22023';
   end if;
 
@@ -177,12 +177,12 @@ begin
   if v_has_corrections and not found then
     raise exception 'No analysis exists to correct' using errcode = 'P0001';
   end if;
-  v_before := pg_catalog.coalesce(v_analysis.structured_observation, '{}'::jsonb);
+  v_before := coalesce(v_analysis.structured_observation, '{}'::jsonb);
   v_after := null;
   v_severity := null;
 
   if v_has_corrections then
-    v_original := pg_catalog.coalesce(
+    v_original := coalesce(
       v_before -> '_original_model_output', v_before
     );
     v_after := v_before || p_corrections ||
@@ -223,7 +223,7 @@ begin
     previous_observation, new_observation, previous_severity, new_severity
   ) values (
     p_request_id, p_report_id, v_actor, v_action,
-    pg_catalog.coalesce(p_comment, p_reason),
+    coalesce(p_comment, p_reason),
     v_report.status, 'reviewed',
     case when v_has_corrections then v_before else null end,
     v_after, v_analysis.severity_score,
