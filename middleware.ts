@@ -18,7 +18,7 @@ import { refreshSupabaseSession } from "@/lib/supabase/middleware-client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 // Routes that don't require authentication. Everything else does.
-const PUBLIC_ROUTES = ["/login", "/auth/callback"];
+const PUBLIC_ROUTES = ["/login", "/signup", "/auth/callback"];
 
 function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));

@@ -56,7 +56,11 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "TerraResponse Team" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32", type: "image/x-icon" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.ico",
   },
   openGraph: {
     title: "TerraResponse AI",
