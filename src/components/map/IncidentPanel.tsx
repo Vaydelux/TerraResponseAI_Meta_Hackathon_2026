@@ -38,6 +38,7 @@ export interface IncidentPanelData {
 export interface IncidentPanelProps {
   report: IncidentPanelData;
   reviewerName?: string | null;
+  onClose?: () => void;
   className?: string;
 }
 
@@ -50,7 +51,7 @@ const INCIDENT_LABEL: Record<string, string> = {
   unclear: "Unclear",
 };
 
-export function IncidentPanel({ report, reviewerName, className }: IncidentPanelProps) {
+export function IncidentPanel({ report, reviewerName, onClose, className }: IncidentPanelProps) {
   const state = stateFromReport({ status: report.status, reviewOutcome: report.review_outcome });
   const sev = toSeverityLevel(report.severity);
   const title = report.incidentType
@@ -59,6 +60,14 @@ export function IncidentPanel({ report, reviewerName, className }: IncidentPanel
 
   return (
     <aside className={cn("map-panel", className)} aria-label="Selected incident">
+      {onClose && (
+        <button type="button" onClick={onClose} aria-label="Close incident details"
+          style={{ position: "absolute", right: "var(--s-2)", top: "var(--s-2)",
+            zIndex: 2, minWidth: 44, minHeight: 44, borderRadius: "50%",
+            background: "var(--sheet)", border: "1px solid var(--rule)", cursor: "pointer" }}>
+          ×
+        </button>
+      )}
       <ReportThumb reportId={report.id} state={state} alt={title} className="map-panel__thumb" />
       <div className="map-panel__body">
         <SealBadge state={state} reviewerName={reviewerName} />
@@ -73,7 +82,7 @@ export function IncidentPanel({ report, reviewerName, className }: IncidentPanel
           className="btn btn--primary"
           style={{ marginTop: "var(--s-2)", justifySelf: "start" }}
         >
-          Open full review
+          View full report
         </Link>
       </div>
     </aside>
