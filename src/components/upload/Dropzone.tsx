@@ -5,7 +5,7 @@
 // library" — the brief's "On mobile, the primary control is a
 // full-width 'Take photo' button above 'Choose from library'".
 //
-// Files are accepted as `image/jpeg` and `image/png` with
+// Files are accepted as JPEG, PNG and WebP with
 // `capture="environment"` for the camera. The drag-over state sets
 // `data-drag="true"` (the CSS dims the border + tints the bg).
 //
@@ -63,15 +63,8 @@ export function Dropzone({ onFiles, disabled, hint = "JPG, PNG or WebP · one ph
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       aria-disabled={disabled || undefined}
-      role="button"
-      tabIndex={disabled ? -1 : 0}
-      onClick={() => !disabled && inputRef.current?.click()}
-      onKeyDown={(e) => {
-        if (!disabled && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          inputRef.current?.click();
-        }
-      }}
+      role="group"
+      aria-label="Select disaster photo"
     >
       <input
         ref={inputRef}
