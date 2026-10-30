@@ -1,0 +1,110 @@
+# TerraResponse AI — opt-in, non-destructive staging verification.
+# No migrations, database writes, seeded records or deployment actions.
+name: Staging integration verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_ref:
+        description: "Staging Supabase project ref (optional; overrides configured value)"
+        required: false
+        type: string
+      run_muse_spark:
+        description: "Call the real Muse Spark API (incurs API usage/cost)"
+        required: true
+        type: boolean
+        default: false
+      run_sam:
+        description: "Call the real SAM model API (incurs API usage/cost)"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terra-staging-verification
+  cancel-in-progress: false
+
+jobs:
+  database_read_only:
+    if: github.ref == 'refs/heads/main'
+    name: Verify staging database access (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      EXPECTED_PROJECT_REF: ${{ inputs.project_ref || vars.STAGING_SUPABASE_PROJECT_REF || secrets.STAGING_SUPABASE_PROJECT_REF }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Verify staging target matches configured credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "${EXPECTED_PROJECT_REF:-}" ] || { echo "::error::Missing staging project ref"; exit 1; }
+          [ -n "${NEXT_PUBLIC_SUPABASE_URL:-}" ] || { echo "::error::Missing NEXT_PUBLIC_SUPABASE_URL secret"; exit 1; }
+          [ -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ] || { echo "::error::Missing NEXT_PUBLIC_SUPABASE_ANON_KEY secret"; exit 1; }
+          [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ] || { echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY secret"; exit 1; }
+          if ! [[ "$EXPECTED_PROJECT_REF" =~ ^[a-z0-9]{12,32}$ ]]; then
+            echo "::error::Staging project ref must be a lowercase ID, not a URL."
+            exit 1
+          fi
+          if ! [[ "$NEXT_PUBLIC_SUPABASE_URL" =~ ^https://([a-z0-9]{12,32})\.supabase\.co/?$ ]]; then
+            echo "::error::Staging URL must use a standard https://<project-ref>.supabase.co origin."
+            exit 1
+          fi
+          if [[ "${BASH_REMATCH[1]}" != "$EXPECTED_PROJECT_REF" ]]; then
+            echo "::error::Supabase URL does not match the explicitly selected staging project. Aborting."
+            exit 1
+          fi
+          echo "Verified staging project reference matches the Supabase URL; values not printed."
+      - name: Install frozen dependencies
+        run: bun install --frozen-lockfile
+      - name: Read-only Supabase verification
+        run: bun run db:verify
+
+  live_model_smoke:
+    if: github.ref == 'refs/heads/main' && (inputs.run_muse_spark || inputs.run_sam)
+    needs: database_read_only
+    name: Optional live model smoke (uses actual API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: staging
+    env:
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+      SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install frozen dependencies
+        run: bun install --frozen-lockfile
+      - name: Check selected provider credentials
+        shell: bash
+        env:
+          RUN_MUSE: ${{ inputs.run_muse_spark }}
+          RUN_SAM: ${{ inputs.run_sam }}
+        run: |
+          set -euo pipefail
+          if [[ "$RUN_MUSE" == "true" ]] && [[ -z "${MODEL_API_KEY:-}" ]]; then
+            echo "::error::MODEL_API_KEY is missing; cannot claim live Muse Spark verification."
+            exit 1
+          fi
+          if [[ "$RUN_SAM" == "true" ]] && [[ -z "${SAM_API_KEY:-}" ]]; then
+            echo "::error::SAM_API_KEY is missing; cannot claim live SAM verification."
+            exit 1
+          fi
+      - name: Muse Spark — real inference
+        if: inputs.run_muse_spark
+        run: bun x vitest run src/lib/ai/muse-spark.smoke.test.ts
+      - name: SAM — real inference
+        if: inputs.run_sam
+        run: bun x vitest run src/lib/ai/sam.smoke.test.ts

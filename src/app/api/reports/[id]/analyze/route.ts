@@ -101,7 +101,7 @@ export async function POST(
     // Already analyzed — return the existing analysis.
     const { data: existing } = await supabase
       .from("report_analyses")
-      .select("*")
+      .select("model_id, prompt_version, schema_version, structured_observation, processing_status, completed_at")
       .eq("report_id", id)
       .single();
     if (existing) {
@@ -219,12 +219,13 @@ export async function POST(
         errorMessage: "cache hit (no model call)",
       });
       if (cacheInsertErr) {
-        // The transition already happened; the upsert failed but the
-        // report is in needs_review. A subsequent GET will return the
-        // report without an analysis row (the UI shows "no analysis").
-        // The operator can re-analyze; the rate-limit ceilings apply.
-        console.error(
-          `[analyze] cache-hit upsert failed for ${id}: ${cacheInsertErr.message}`,
+        // Do not claim an analysis succeeded if its observation could
+        // not be persisted. Route it to human review instead.
+        console.error(`[analyze] cache-hit upsert failed for ${id}: ${cacheInsertErr.message}`);
+        await markAsManualReview(id, "Cached analysis could not be stored.");
+        return NextResponse.json(
+          { error: { code: "CACHE_SAVE_FAILED", message: "Analysis could not be saved. A reviewer must inspect the report." } },
+          { status: 500 },
         );
       }
       return NextResponse.json({
@@ -359,7 +360,7 @@ export async function POST(
         errorMessage: result.error,
       });
       return NextResponse.json(
-        { error: { code: "SCHEMA_INVALID", message: result.error, rawOutput: result.rawOutput } },
+        { error: { code: "SCHEMA_INVALID", message: "AI output did not pass validation. The report needs manual review." } },
         { status: 422 },
       );
     }
@@ -442,15 +443,22 @@ export async function POST(
   }
 
   // 10. Transition to needs_review.
-  const { error: finalTransitionErr } = await supabase
+  const { data: finalTransition, error: finalTransitionErr } = await supabase
     .from("reports")
     .update({ status: "needs_review" })
     .eq("id", id)
-    .eq("status", "analyzing"); // CAS: only if still analyzing
+    .eq("status", "analyzing")
+    .select("id")
+    .maybeSingle();
 
-  if (finalTransitionErr) {
-    // Non-fatal — the analysis is stored; a cron can reconcile.
-    console.error(`[analyze] final transition failed for ${id}: ${finalTransitionErr.message}`);
+  if (finalTransitionErr || !finalTransition) {
+    // Inference may have succeeded but review status was not advanced.
+    // Never return ok:true here; that would mislead the contributor.
+    console.error(`[analyze] final review transition not confirmed for ${id}`);
+    return NextResponse.json(
+      { error: { code: "REVIEW_TRANSITION_PENDING", message: "AI observations were stored, but review status could not be finalized. Please check the report." } },
+      { status: 503 },
+    );
   }
 
   // 11. Log the successful AI call (cost + token counts + latency).

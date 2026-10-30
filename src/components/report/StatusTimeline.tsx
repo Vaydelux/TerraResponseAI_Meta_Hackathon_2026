@@ -30,7 +30,7 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { label: "Uploaded", description: "Photo received, signed URL minted" },
+  { label: "Uploaded", description: "Photo stored privately; evidence links require authorization" },
   { label: "Checked", description: "File validated, EXIF read, derivatives stored" },
   { label: "Analyzed", description: "AI observation produced, schema validated" },
   { label: "Waiting for review", description: "A reviewer decides what's true" },

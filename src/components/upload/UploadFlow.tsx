@@ -26,7 +26,8 @@ import { UploadProgress } from "./UploadProgress";
 import { StatusTimeline } from "@/components/report/StatusTimeline";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Field, Input, Textarea, Button, toast } from "@/components/ui-tr";
-import { COPY } from "@/lib/design/copy";
+
+import { interpretAnalysisResponse, type AnalysisProgress } from "@/lib/analysis-client-state";
 
 type Step = 1 | 2 | 3;
 
@@ -34,7 +35,7 @@ type UploadState =
   | { kind: "idle" }
   | { kind: "uploading"; progress: number }
   | { kind: "duplicate"; existingReportId: string }
-  | { kind: "success"; reportId: string }
+  | { kind: "success"; reportId: string; analysis: AnalysisProgress }
   | { kind: "error"; message: string };
 
 function readCookie(name: string): string | null {
@@ -62,6 +63,8 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
   const fileSequenceRef = useRef(0);
   const [state, setState] = useState<UploadState>({ kind: "idle" });
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const uploadInFlightRef = useRef(false);
+  const analysisInFlightRef = useRef<string | null>(null);
 
   function handleFiles(next: File[]) {
     const selected = next.slice(0, 1);
@@ -151,8 +154,10 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
   }
 
   async function doUpload(linkToReportId?: string) {
+    if (uploadInFlightRef.current) return;
     const file = files[0];
     if (!file) return;
+    uploadInFlightRef.current = true;
     const fd = new FormData();
     fd.append("file", file);
     fd.append("meta", JSON.stringify(buildMeta(linkToReportId)));
@@ -187,8 +192,15 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
         });
         return;
       }
-      setState({ kind: "success", reportId: body.reportId });
-      toast.success("Upload complete. The AI is now reading your photo.");
+      if (typeof body?.reportId !== "string" || !body.reportId) {
+        throw new Error("Server did not return a report ID.");
+      }
+      const newReportId: string = body.reportId;
+      setState({ kind: "success", reportId: newReportId, analysis: { kind: "requesting", message: "Requesting automated analysis…" } });
+      toast.success("Photo and private report saved.");
+      // Analysis is a distinct authenticated, idempotent operation.
+      // A model failure must never turn a successful upload into an upload error.
+      void startAnalysis(newReportId);
     } catch (err: unknown) {
       if (err instanceof Error && err.message === "aborted") {
         setState({ kind: "idle" });
@@ -198,6 +210,29 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
       toast.error("Network error during upload.");
     } finally {
       xhrRef.current = null;
+      uploadInFlightRef.current = false;
+    }
+  }
+
+  async function startAnalysis(reportId: string) {
+    if (analysisInFlightRef.current === reportId) return;
+    analysisInFlightRef.current = reportId;
+    try {
+      const response = await fetch(`/api/reports/${encodeURIComponent(reportId)}/analyze`, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      const body: unknown = await response.json().catch(() => null);
+      const analysis = interpretAnalysisResponse(response.status, body);
+      setState((previous) => previous.kind === "success" && previous.reportId === reportId
+        ? { ...previous, analysis }
+        : previous);
+    } catch {
+      setState((previous) => previous.kind === "success" && previous.reportId === reportId
+        ? { ...previous, analysis: { kind: "unavailable", message: "The report was saved, but the analysis request could not finish. Open the report to inspect its current state." } }
+        : previous);
+    } finally {
+      if (analysisInFlightRef.current === reportId) analysisInFlightRef.current = null;
     }
   }
 
@@ -311,7 +346,8 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
             <div className="tr-stack">
               <div className="panel">
                 <h3 style={{ fontSize: "var(--step-2)" }}>Upload received</h3>
-                <p style={{ marginTop: "var(--s-2)" }}>{COPY.postUpload}</p>
+                <p style={{ marginTop: "var(--s-2)" }}>Your photo was saved privately. Nothing was sent to emergency services. AI observations require human verification before becoming confirmed findings.</p>
+                <p role="status" aria-live="polite" className="t-meta" style={{ marginTop: "var(--s-2)" }}>{state.analysis.message}</p>
                 <div className="tr-cluster" style={{ marginTop: "var(--s-3)" }}>
                   <Link className="btn btn--primary" href={`/reports/${state.reportId}`}>Open the report</Link>
                   <Button variant="quiet" onClick={() => {
@@ -328,7 +364,7 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
                   }}>Upload another</Button>
                 </div>
               </div>
-              <StatusTimeline status="uploaded" />
+              <StatusTimeline status={state.analysis.kind === "review_ready" ? "needs_review" : state.analysis.kind === "manual_review" ? "needs_manual_review" : state.analysis.kind === "requesting" ? "analyzing" : "uploaded"} />
             </div>
           )}
         </div>
