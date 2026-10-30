@@ -9,10 +9,10 @@ describe("live login deployment safety", () => {
     expect(client).not.toContain("isSupabaseConfigured");
     // A setup-help label is harmless. Reject actual environment access
     // and importing server-only secret utilities into the browser bundle.
-    expect(client).not.toMatch(/process\\.env\\.SUPABASE_SERVICE_ROLE_KEY/);
-    expect(client).not.toMatch(/process\\.env\\[["']SUPABASE_SERVICE_ROLE_KEY["']\\]/);
-    expect(client).not.toMatch(/\\bserviceRoleKey\\s*\\(/);
-    expect(client).not.toMatch(/from\\s*["']@\\/lib\\/supabase\\/env["']/);
+    expect(client).not.toContain("process.env.SUPABASE_SERVICE_ROLE_KEY");
+    expect(client).not.toContain('process.env["SUPABASE_SERVICE_ROLE_KEY"]');
+    expect(client).not.toContain("serviceRoleKey(");
+    expect(client).not.toContain('from "@/lib/supabase/env"');
     expect(client).toContain("{ configured }: { configured: boolean }");
     expect(page).toContain("configured={isSupabaseConfigured()}");
   });
