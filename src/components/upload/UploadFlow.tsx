@@ -35,6 +35,7 @@ type UploadState =
   | { kind: "idle" }
   | { kind: "uploading"; progress: number }
   | { kind: "duplicate"; existingReportId: string }
+  | { kind: "linked"; existingReportId: string }
   | { kind: "success"; reportId: string; analysis: AnalysisProgress }
   | { kind: "error"; message: string };
 
@@ -192,6 +193,13 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
         });
         return;
       }
+      // Confirming an exact duplicate links to an existing report. The API
+      // deliberately does not create another report or run inference.
+      if (typeof body?.linkedTo === "string" && body.linkedTo) {
+        setState({ kind: "linked", existingReportId: body.linkedTo });
+        toast.success("Existing report linked; no duplicate evidence created.");
+        return;
+      }
       if (typeof body?.reportId !== "string" || !body.reportId) {
         throw new Error("Server did not return a report ID.");
       }
@@ -333,6 +341,17 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
                 <Link className="btn" href={`/reports/${state.existingReportId}`}>Open existing report</Link>
                 <Button variant="primary" onClick={() => void doUpload(state.existingReportId)}>Submit as linked</Button>
               </div>
+            </div>
+          )}
+          {state.kind === "linked" && (
+            <div className="panel" role="status">
+              <h3 style={{ fontSize: "var(--step-1)" }}>Linked to existing report</h3>
+              <p className="t-meta" style={{ marginTop: "var(--s-2)" }}>
+                The same photo was already submitted to this event. No additional report was created and no new AI analysis was requested.
+              </p>
+              <Link className="btn btn--primary" style={{ marginTop: "var(--s-3)" }} href={`/reports/${state.existingReportId}`}>
+                Open existing report
+              </Link>
             </div>
           )}
           {state.kind === "error" && (
