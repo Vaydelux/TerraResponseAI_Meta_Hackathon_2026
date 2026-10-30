@@ -13,6 +13,11 @@ function section(name: string): string {
 }
 
 describe("Supabase CLI 2.72.7 config compatibility", () => {
+  it("requires a nonempty local project_id that is NOT the remote staging reference", () => {
+    expect(config).toMatch(/^project_id\s*=\s*"terraresponse-ai"$/m);
+    expect(config).not.toMatch(/^project_id\s*=\s*""$/m);
+  });
+
   it("avoids settings rejected by the pinned CLI", () => {
     expect(section("db")).not.toMatch(/^enabled\s*=/m);
     expect(section("db.migrations")).not.toMatch(/^dir\s*=/m);
