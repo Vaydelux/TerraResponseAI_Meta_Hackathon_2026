@@ -60,6 +60,7 @@ interface ReportDetail {
   event_id: string;
   creator_id: string;
   status: string;
+  retention_state?: string | null;
   review_outcome: string | null;
   title: string | null;
   description: string | null;
@@ -277,7 +278,7 @@ export function ReviewWorkbench({
             imageWidth={detail.image_width ?? undefined}
             imageHeight={detail.image_height ?? undefined}
             altText={altText}
-            retentionState="active"
+            retentionState={detail.retention_state ?? "active"}
             isContributor={isOwnReport}
             status={detail.status}
             reviewOutcome={detail.review_outcome}
