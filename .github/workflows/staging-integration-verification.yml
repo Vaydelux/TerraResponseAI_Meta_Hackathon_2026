@@ -36,9 +36,10 @@ jobs:
     environment: staging
     env:
       EXPECTED_PROJECT_REF: ${{ inputs.project_ref || vars.STAGING_SUPABASE_PROJECT_REF || secrets.STAGING_SUPABASE_PROJECT_REF }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PRODUCTION_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -64,7 +65,11 @@ jobs:
             echo "::error::Supabase URL does not match the explicitly selected staging project. Aborting."
             exit 1
           fi
-          echo "Verified staging project reference matches the Supabase URL; values not printed."
+          if [[ -z "${PRODUCTION_PROJECT_REF:-}" || "$EXPECTED_PROJECT_REF" == "$PRODUCTION_PROJECT_REF" || "$EXPECTED_PROJECT_REF" == "ywopsafppyykhwrejliz" ]]; then
+            echo "::error::Refusing to verify an unseparated or production Supabase project."
+            exit 1
+          fi
+          echo "Verified isolated staging project reference matches URL; values not printed."
       - name: Install frozen dependencies
         run: bun install --frozen-lockfile
       - name: Read-only Supabase verification

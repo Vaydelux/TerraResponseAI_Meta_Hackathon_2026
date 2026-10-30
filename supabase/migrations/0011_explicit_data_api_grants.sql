@@ -16,7 +16,16 @@ grant usage on schema public to authenticated, service_role;
 grant select, insert, update, delete on public.profiles to authenticated;
 grant select, insert, update, delete on public.events to authenticated;
 grant select, insert, update, delete on public.event_members to authenticated;
-grant select, insert, update, delete on public.reports to authenticated;
+-- IMPORTANT: 0002/0006 intentionally restrict UPDATE to mutable columns.
+-- A table-level UPDATE grant here would silently undo those protections.
+revoke update on public.reports from authenticated;
+grant select, insert, delete on public.reports to authenticated;
+grant update (
+  status, review_outcome, priority_score,
+  retry_count, next_retry_at, last_error,
+  title, description,
+  latitude, longitude, location_source, location_label
+) on public.reports to authenticated;
 grant select, insert, update, delete on public.report_analyses to authenticated;
 grant select, insert on public.review_actions to authenticated;
 grant select, insert on public.priority_overrides to authenticated;
@@ -30,10 +39,9 @@ grant select, insert, update, delete on
   public.report_analyses, public.review_actions, public.priority_overrides,
   public.audit_events to service_role;
 
--- Current public tables use UUID keys. Grant sequence access defensively
--- for any existing identity/serial sequences in the public schema.
-grant usage, select on all sequences in schema public to service_role;
-grant usage, select on all sequences in schema public to authenticated;
+-- No broad sequence grants: these tables use UUID keys.
+-- Add explicit sequence privileges only if a verified application operation
+-- actually requires them. This avoids unnecessary data API capabilities.
 
 -- Confirm in staging before production:
 -- select has_table_privilege('service_role','public.audit_events','SELECT'),
