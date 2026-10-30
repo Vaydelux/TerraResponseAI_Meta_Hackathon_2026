@@ -61,7 +61,7 @@ export async function GET(
   const { data, error } = await supabase
     .from("reports")
     .select(
-      "id, event_id, creator_id, status, review_outcome, title, description, latitude, longitude, location_source, location_label, sha256, image_mime_type, image_bytes, image_width, image_height, captured_at, uploaded_at, priority_score, retry_count, last_error, created_at, updated_at, original_storage_key, derivative_storage_key, thumbnail_storage_key, report_analyses(model_id, prompt_version, schema_version, structured_observation, created_at)",
+      "id, event_id, creator_id, status, review_outcome, title, description, latitude, longitude, location_source, location_label, sha256, image_mime_type, image_bytes, image_width, image_height, captured_at, uploaded_at, priority_score, retention_state, retry_count, last_error, created_at, updated_at, original_storage_key, derivative_storage_key, thumbnail_storage_key, report_analyses(model_id, prompt_version, schema_version, structured_observation, created_at)",
     )
     .eq("id", id)
     .single();

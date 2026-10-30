@@ -38,15 +38,18 @@ export function LocationConfirm({ exif, onConfirm, className }: LocationConfirmP
   const [choice, setChoice] = useState<LocationChoice | null>(exif ? "gps" : null);
   const [manualLat, setManualLat] = useState<string>("");
   const [manualLon, setManualLon] = useState<string>("");
+  const latValue = manualLat.trim() === "" ? null : Number(manualLat);
+  const lonValue = manualLon.trim() === "" ? null : Number(manualLon);
+  const manualValid =
+    latValue !== null && lonValue !== null &&
+    Number.isFinite(latValue) && Number.isFinite(lonValue) &&
+    latValue >= -90 && latValue <= 90 &&
+    lonValue >= -180 && lonValue <= 180;
 
   function confirm() {
     if (choice === "manual") {
-      const lat = Number(manualLat);
-      const lon = Number(manualLon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-        return;
-      }
-      onConfirm("manual", { lat, lon });
+      if (!manualValid || latValue === null || lonValue === null) return;
+      onConfirm("manual", { lat: latValue, lon: lonValue });
     } else if (choice === "gps" && exif) {
       onConfirm("gps", { lat: exif.lat, lon: exif.lon });
     } else if (choice === "unknown") {
@@ -62,7 +65,7 @@ export function LocationConfirm({ exif, onConfirm, className }: LocationConfirmP
   const ready =
     choice === "unknown" ||
     (choice === "gps" && !!exif) ||
-    (choice === "manual" && Number.isFinite(Number(manualLat)) && Number.isFinite(Number(manualLon)));
+    (choice === "manual" && manualValid);
 
   return (
     <div className={cn("panel", className)}>
@@ -83,11 +86,11 @@ export function LocationConfirm({ exif, onConfirm, className }: LocationConfirmP
           aria-label="Location choice"
           block
           options={options}
-          value={choice ?? "unknown"}
+          value={choice ?? ("" as LocationChoice)}
           onChange={(v) => setChoice(v)}
         />
         {choice === "manual" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--s-3)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: "var(--s-3)" }}>
             <Field label="Latitude" htmlFor="lc-lat">
               <Input
                 id="lc-lat"
@@ -115,6 +118,9 @@ export function LocationConfirm({ exif, onConfirm, className }: LocationConfirmP
               />
             </Field>
           </div>
+        )}
+        {choice === "manual" && !manualValid && (
+          <p role="status" className="t-meta">Enter both coordinates: latitude −90 to 90 and longitude −180 to 180.</p>
         )}
       </div>
       <div style={{ marginTop: "var(--s-4)", display: "flex", justifyContent: "flex-end", gap: "var(--s-2)" }}>

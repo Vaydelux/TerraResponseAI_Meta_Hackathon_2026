@@ -5,7 +5,7 @@
 // library" — the brief's "On mobile, the primary control is a
 // full-width 'Take photo' button above 'Choose from library'".
 //
-// Files are accepted as `image/jpeg` and `image/png` with
+// Files are accepted as JPEG, PNG and WebP with
 // `capture="environment"` for the camera. The drag-over state sets
 // `data-drag="true"` (the CSS dims the border + tints the bg).
 //
@@ -27,7 +27,7 @@ export interface DropzoneProps {
   className?: string;
 }
 
-export function Dropzone({ onFiles, disabled, hint = "JPG or PNG, up to 25 MB", className }: DropzoneProps) {
+export function Dropzone({ onFiles, disabled, hint = "JPG, PNG or WebP · one photo · up to 10 MB by default", className }: DropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -37,7 +37,7 @@ export function Dropzone({ onFiles, disabled, hint = "JPG or PNG, up to 25 MB", 
     setDragOver(false);
     if (disabled) return;
     const files = Array.from(e.dataTransfer.files || []);
-    if (files.length > 0) onFiles(files);
+    if (files.length > 0) onFiles(files.slice(0, 1));
   }
 
   function handleDragOver(e: DragEvent) {
@@ -51,7 +51,7 @@ export function Dropzone({ onFiles, disabled, hint = "JPG or PNG, up to 25 MB", 
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
-    if (files.length > 0) onFiles(files);
+    if (files.length > 0) onFiles(files.slice(0, 1));
     e.target.value = ""; // reset so picking the same file again fires change
   }
 
@@ -63,21 +63,13 @@ export function Dropzone({ onFiles, disabled, hint = "JPG or PNG, up to 25 MB", 
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       aria-disabled={disabled || undefined}
-      role="button"
-      tabIndex={0}
-      onClick={() => !disabled && inputRef.current?.click()}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          inputRef.current?.click();
-        }
-      }}
+      role="group"
+      aria-label="Select disaster photo"
     >
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png"
-        multiple
+        accept="image/jpeg,image/png,image/webp"
         onChange={handleInputChange}
         style={{ display: "none" }}
         aria-label="Choose photos from your library"
