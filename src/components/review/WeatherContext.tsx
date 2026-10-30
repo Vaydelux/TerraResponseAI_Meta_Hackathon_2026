@@ -26,14 +26,14 @@ export function WeatherContext({ reportId, hasLocation }: WeatherContextProps) {
   const [weather, setWeather] = useState<WeatherForecast | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [noLocation, setNoLocation] = useState(!hasLocation);
+  const [unavailableReason, setUnavailableReason] = useState<"NO_LOCATION" | "RETENTION_BLOCKED" | null>(!hasLocation ? "NO_LOCATION" : null);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!hasLocation) {
       queueMicrotask(() => {
         setLoading(false);
-        setNoLocation(true);
+        setUnavailableReason("NO_LOCATION");
       });
       return;
     }
@@ -43,7 +43,7 @@ export function WeatherContext({ reportId, hasLocation }: WeatherContextProps) {
       if (!controller.signal.aborted) {
         setLoading(true);
         setError(null);
-        setNoLocation(false);
+        setUnavailableReason(null);
         setWeather(null);
       }
     });
@@ -58,7 +58,7 @@ export function WeatherContext({ reportId, hasLocation }: WeatherContextProps) {
           return;
         }
         if (body.weather === null) {
-          setNoLocation(true);
+          setUnavailableReason(body.reason === "RETENTION_BLOCKED" ? "RETENTION_BLOCKED" : "NO_LOCATION");
           setLoading(false);
           return;
         }
@@ -75,13 +75,14 @@ export function WeatherContext({ reportId, hasLocation }: WeatherContextProps) {
     return () => controller.abort();
   }, [reportId, hasLocation, retryCount]);
 
-  if (noLocation) {
+  if (unavailableReason) {
     return (
       <div className="panel panel--sunk" style={{ marginTop: "var(--s-4)" }}>
         <h3 className="obs__section-title">Weather context</h3>
         <p className="t-meta">
-          This report has no confirmed location. Weather context is unavailable
-          until GPS or a manual pin is provided.
+          {unavailableReason === "RETENTION_BLOCKED"
+            ? "Weather context is unavailable because this report is no longer active."
+            : "This report has no confirmed location. Weather context is unavailable until GPS or a manual pin is provided."}
         </p>
       </div>
     );
