@@ -60,6 +60,19 @@ describe("contributor-only Supabase sign-up", () => {
     expect(result.status).toBe("error");
     expect(mocks.signUp).not.toHaveBeenCalled();
   });
+  it("returns actionable email feedback for the exact live Supabase rejection", async () => {
+    mocks.signUp.mockResolvedValue({
+      data: null, error: { code: "email_address_invalid", status: 400,
+        message: "the entered address or internal validation details" },
+    });
+    const result = await signUpAction(form());
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.field).toBe("email");
+      expect(result.message).toMatch(/deliverable inbox/);
+      expect(result.message).not.toContain("internal validation details");
+    }
+  });
   it("does not disclose internal provider details or account existence", async () => {
     mocks.signUp.mockResolvedValue({ data: null, error: { code: "user_already_exists", status: 400, message: "registered user details" } });
     const result = await signUpAction(form());
