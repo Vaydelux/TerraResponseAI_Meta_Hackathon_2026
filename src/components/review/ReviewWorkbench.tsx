@@ -60,7 +60,7 @@ interface ReportDetail {
   event_id: string;
   creator_id: string;
   status: string;
-  retention_state?: string | null;
+  retention_state?: "active" | "soft_deleted" | "purged" | null;
   review_outcome: string | null;
   title: string | null;
   description: string | null;
