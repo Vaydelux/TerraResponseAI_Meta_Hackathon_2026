@@ -61,17 +61,13 @@ describe.skipIf(SKIP)("SAM 3.1 live smoke test", () => {
     });
 
     if (!result.ok) {
-      // The brief: "SAM failure" — the smoke test accepts a
-      // classified failure (transient/permanent/no_match/timeout)
-      // but it must NOT be an unclassified error.
-      console.log(`[sam smoke] API returned ${result.kind}: ${result.error}`);
-      expect(["transient", "permanent", "timeout", "no_match", "not_configured"]).toContain(result.kind);
-      return;
+      throw new Error(`SAM live smoke failed (${result.kind}): ${result.error}`);
     }
 
     // If the API succeeded, the mask must be a non-empty RLE string OR
     // a clearly-empty result (the model may classify the red square as
     // no_match if its threshold is conservative).
+    expect(result.rle.length).toBeGreaterThan(0);
     console.log("[sam smoke] mask RLE length:", result.rle.length);
     console.log("[sam smoke] score:", result.score);
     console.log("[sam smoke] modelId:", result.modelId);

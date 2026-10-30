@@ -19,16 +19,9 @@ import { requireServerUser } from "@/lib/supabase/server";
 import { getAuthContext } from "@/lib/auth/profile";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { z } from "zod";
+import { reportUpdateSchema, toReportColumns } from "@/lib/api-schemas/report-update";
 
-const reportUpdateSchema = z.object({
-  title: z.string().max(200).optional(),
-  description: z.string().max(5000).optional(),
-  locationSource: z.enum(["gps", "manual", "unknown"]).optional(),
-  latitude: z.number().min(-90).max(90).nullable().optional(),
-  longitude: z.number().min(-180).max(180).nullable().optional(),
-  locationLabel: z.string().max(200).optional(),
-});
+
 
 export async function GET(
   request: NextRequest,
@@ -126,17 +119,14 @@ export async function PATCH(
     );
   }
 
-  // Enforce the unknown ⇔ null coords invariant server-side.
-  if (body.locationSource === "unknown") {
-    body.latitude = null;
-    body.longitude = null;
-  } else if (body.locationSource && body.locationSource !== "unknown") {
-    if (body.latitude === null || body.longitude === null) {
-      return NextResponse.json(
-        { error: { code: "BAD_REQUEST", message: `${body.locationSource} location requires coordinates.` } },
-        { status: 400 },
-      );
-    }
+  let update;
+  try {
+    update = toReportColumns(body);
+  } catch (err) {
+    return NextResponse.json(
+      { error: { code: "BAD_REQUEST", message: err instanceof Error ? err.message : "Invalid update." } },
+      { status: 400 },
+    );
   }
 
   const supabase = await createSupabaseServerClient();
@@ -145,14 +135,14 @@ export async function PATCH(
   // the trusted evidence fields.
   const { data, error } = await supabase
     .from("reports")
-    .update(body)
+    .update(update)
     .eq("id", id)
     .select("id, status, latitude, longitude, location_source")
     .single();
 
   if (error || !data) {
     return NextResponse.json(
-      { error: { code: "UPDATE_FAILED", message: error?.message ?? "Access denied or report not found." } },
+      { error: { code: "UPDATE_FAILED", message: "Update failed or access denied." } },
       { status: error ? 500 : 403 },
     );
   }

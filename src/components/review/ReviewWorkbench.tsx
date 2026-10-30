@@ -162,19 +162,25 @@ export function ReviewWorkbench({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
     setDetail(null);
-    Promise.all([
+    // Core report data is required; priority, SAM and review history are
+    // supplementary. A failed optional request must not blank the whole page.
+    Promise.allSettled([
       fetch(`/api/reports/${reportId}`, { signal: ctrl.signal }).then((r) => r.json() as Promise<ReportBody>),
       fetch(`/api/reports/${reportId}/priority`, { signal: ctrl.signal }).then((r) => r.json() as Promise<PriorityResponse>),
       fetch(`/api/reports/${reportId}/segment`, { signal: ctrl.signal }).then((r) => r.json() as Promise<SegmentResponse>),
       fetch(`/api/reports/${reportId}/review`, { signal: ctrl.signal }).then((r) => r.json() as Promise<ReviewBody>),
     ])
-      .then(([reportBody, priorityBody, segmentBody, reviewBody]) => {
+      .then(([reportResult, priorityResult, segmentResult, reviewResult]) => {
+        if (ctrl.signal.aborted) return;
+        const reportBody = reportResult.status === "fulfilled" ? reportResult.value : null;
+        const priorityBody = priorityResult.status === "fulfilled" ? priorityResult.value : null;
+        const segmentBody = segmentResult.status === "fulfilled" ? segmentResult.value : null;
+        const reviewBody = reviewResult.status === "fulfilled" ? reviewResult.value : null;
         if (reportBody?.ok && reportBody.report) {
           setDetail(reportBody.report);
-        } else if (reportBody?.error) {
-          setError(reportBody.error.message ?? "Could not load report.");
         } else {
-          setError("Could not load report.");
+          setError(reportBody?.error?.message ?? "Could not load report.");
+          return;
         }
         if (priorityBody?.ok) {
           setPriority({
@@ -187,19 +193,16 @@ export function ReviewWorkbench({
           setOverlay(segmentBody.overlay ?? null);
         }
         if (reviewBody?.ok && Array.isArray(reviewBody.actions) && reviewBody.actions.length > 0) {
-          // The most recent review action's reviewer is the resolved
-          // reviewer; the timestamp is when the action happened.
           const latest = reviewBody.actions[0];
           setReviewerName(latest.reviewer_name ?? currentUserDisplayName ?? null);
           setReviewedAt(latest.created_at);
-        } else if (reportBody?.report?.status === "reviewed") {
-          // Fall back to the current user if the review history
-          // doesn't have the name.
+        } else if (reportBody.report.status === "reviewed") {
           setReviewerName(currentUserDisplayName ?? "a reviewer");
         }
       })
       .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (ctrl.signal.aborted) return;
+        console.error("[review-workbench] Failed to load report", err);
         setError("Network error while loading the report.");
       });
     return () => ctrl.abort();
