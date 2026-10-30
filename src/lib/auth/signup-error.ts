@@ -23,8 +23,9 @@ export function signupFailure(code?: string, status?: number): SignupFailure {
     case "weak_password":
       return { message: "Supabase rejected this password. Choose a stronger, unique password.", field: "password" };
     case "over_email_send_rate_limit":
+      return { message: "This project's email confirmation quota has been reached. Your account is not yet confirmed. Repeated attempts will not help. Contact the administrator to configure custom SMTP or wait for the provider quota to reset." };
     case "over_request_rate_limit":
-      return { message: "Too many registration or confirmation requests. Try again later." };
+      return { message: "Too many authentication attempts. Please stop retrying and try again after the provider's rate limit resets." };
     // Never confirm the presence of a specific email account.
     case "email_exists":
     case "user_already_exists":

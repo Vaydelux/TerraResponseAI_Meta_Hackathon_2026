@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button, Field, Input } from "@/components/ui-tr";
 import { Wordmark } from "@/components/layout/Wordmark";
+import { AuthLoadingBanner } from "@/components/auth/AuthLoadingBanner";
 import { safeAuthPath } from "@/lib/auth/safe-redirect";
 import { signInAction } from "@/lib/auth/actions";
 
@@ -48,7 +49,8 @@ export function LoginContent({ configured }: { configured: boolean }) {
             <p className="t-meta" style={{ marginTop: "var(--s-2)", marginBottom: "var(--s-4)" }}>
               Authenticate with your Supabase email and password.
             </p>
-            <form action={formAction} style={{ display: "grid", gap: "var(--s-3)" }}>
+            {pending && <AuthLoadingBanner mode="login" />}
+            <form action={formAction} aria-busy={pending} style={{ display: "grid", gap: "var(--s-3)" }}>
               {(state?.error || urlError) && (
                 <div role="alert" className="field__error" style={{ padding: "var(--s-2)", background: "var(--brick-wash)", borderRadius: "var(--r-ctl)" }}>
                   {state?.error ?? "Email verification failed. Please try signing in again."}
@@ -56,7 +58,7 @@ export function LoginContent({ configured }: { configured: boolean }) {
               )}
               <input type="hidden" name="callbackUrl" value={callbackUrl} />
               <Field label="Email" htmlFor="email">
-                <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required />
+                <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required disabled={pending} />
               </Field>
               <Field label="Password" htmlFor="password">
                 <div style={{ position: "relative" }}>
@@ -66,10 +68,12 @@ export function LoginContent({ configured }: { configured: boolean }) {
                     type={showPw ? "text" : "password"}
                     autoComplete="current-password"
                     required
+                    disabled={pending}
                     style={{ paddingRight: 48 }}
                   />
                   <button
                     type="button"
+                    disabled={pending}
                     onClick={() => setShowPw((s) => !s)}
                     aria-label={showPw ? "Hide password" : "Show password"}
                     style={{
@@ -88,7 +92,7 @@ export function LoginContent({ configured }: { configured: boolean }) {
                   </button>
                 </div>
               </Field>
-              <Button type="submit" variant="primary" block busy={pending}>
+              <Button type="submit" variant="primary" block busy={pending} disabled={pending}>
                 {pending ? "Signing in…" : "Sign in"}
               </Button>
             </form>

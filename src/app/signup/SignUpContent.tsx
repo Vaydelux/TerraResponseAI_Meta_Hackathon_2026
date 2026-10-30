@@ -4,12 +4,20 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import { Button, Field, Input } from "@/components/ui-tr";
 import { Wordmark } from "@/components/layout/Wordmark";
+import { AuthLoadingBanner } from "@/components/auth/AuthLoadingBanner";
+import { USERNAME_HINT, passwordChecklist } from "@/lib/auth/registration-policy";
 import { signUpAction, type SignUpState } from "@/lib/auth/actions";
 
 const initialState: SignUpState = { status: "idle" };
 
 export function SignUpContent({ configured }: { configured: boolean }) {
   const [showPassword, setShowPassword] = useState(false);
+  const [username, setUsername] = useState("");
+  const [usernameEdited, setUsernameEdited] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const rules = passwordChecklist(password, username, email);
   const [state, formAction, pending] = useActionState<SignUpState, FormData>(
     async (_previous, fields) => signUpAction(fields),
     initialState,
@@ -46,26 +54,51 @@ export function SignUpContent({ configured }: { configured: boolean }) {
                 </Link>
               </div>
             ) : (
-              <form action={formAction} style={{ display: "grid", gap: "var(--s-3)" }}>
+              <>
+              {pending && <AuthLoadingBanner mode="signup" />}
+              <form action={formAction} aria-busy={pending} style={{ display: "grid", gap: "var(--s-3)" }}>
                 {state.status === "error" && (
                   <div role="alert" className="field__error" style={{ padding: "var(--s-2)", borderRadius: "var(--r-ctl)" }}>
                     {state.message}
                   </div>
                 )}
-                <Field label="Email" htmlFor="signup-email">
+                <Field label="Username" htmlFor="signup-username" hint={`${USERNAME_HINT} Used as your display name, not your sign-in ID.`}>
+                  <Input id="signup-username" name="username" type="text" autoComplete="username"
+                    value={username} onChange={(event) => { setUsernameEdited(true); setUsername(event.target.value); }}
+                    minLength={3} maxLength={24} pattern="[A-Za-z][A-Za-z0-9_]{2,23}"
+                    placeholder="e.g. field_reporter" required disabled={pending}
+                    invalid={state.status === "error" && state.field === "username"} />
+                </Field>
+                <Field label="Email for account verification" htmlFor="signup-email">
                   <Input id="signup-email" name="email" type="email" autoComplete="email"
+                    value={email} onChange={(event) => {
+                      const value = event.target.value;
+                      setEmail(value);
+                      if (!usernameEdited) {
+                        const guess = value.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/^[^a-z]+/, "").slice(0, 24);
+                        if (guess) setUsername(guess);
+                      }
+                    }}
                     placeholder="you@example.com" maxLength={254} required disabled={pending}
                     invalid={state.status === "error" && state.field === "email"} />
                 </Field>
                 <Field label="Password" htmlFor="signup-password"
-                  hint="Use 12–72 characters. Choose a unique password.">
+                  hint="Use 12–72 characters. Longer unique passphrases are welcome; no arbitrary symbol requirement.">
                   <Input id="signup-password" name="password" type={showPassword ? "text" : "password"}
+                    value={password} onChange={(event) => setPassword(event.target.value)}
                     autoComplete="new-password" minLength={12} maxLength={72} required disabled={pending}
                     invalid={state.status === "error" && state.field === "password"} />
                 </Field>
+                <div className="t-meta" aria-live="polite" style={{ display: "grid", gap: 4 }}>
+                  <span>{rules.length ? "✓" : "○"} Between 12 and 72 characters</span>
+                  <span>{rules.distinct ? "✓" : "○"} Does not contain your username</span>
+                  <span>{rules.notEmail ? "✓" : "○"} Does not contain your email name</span>
+                </div>
                 <Field label="Confirm password" htmlFor="signup-confirm-password">
                   <Input id="signup-confirm-password" name="confirmPassword" type={showPassword ? "text" : "password"}
-                    autoComplete="new-password" minLength={12} maxLength={72} required disabled={pending} />
+                    value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)}
+                    autoComplete="new-password" minLength={12} maxLength={72} required disabled={pending}
+                    invalid={state.status === "error" && state.field === "confirmPassword"} />
                 </Field>
                 <label className="t-meta" style={{ display: "flex", alignItems: "center", gap: "var(--s-2)", cursor: "pointer" }}>
                   <input type="checkbox" checked={showPassword} disabled={pending}
@@ -76,10 +109,11 @@ export function SignUpContent({ configured }: { configured: boolean }) {
                   {pending ? "Creating account…" : "Create account"}
                 </Button>
                 <p className="t-meta">
-                  We may send an email verification link. Do not upload real incident evidence
+                  Confirmation emails are rate-limited. Submit once; if you receive an email quota error, wait for the provider limit to reset rather than retrying repeatedly. We may send an email verification link. Do not upload real incident evidence
                   until an authorized event has been assigned.
                 </p>
               </form>
+              </>
             )}
             <p className="t-meta" style={{ marginTop: "var(--s-4)", textAlign: "center" }}>
               Already registered? <Link href="/login" style={{ textDecoration: "underline" }}>Sign in</Link>

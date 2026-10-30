@@ -44,6 +44,7 @@ beforeEach(() => {
   const query = {
     in: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    contains: vi.fn().mockReturnThis(),
     gte: mocks.gte,
   };
   mocks.from.mockImplementation(() => ({
