@@ -9,19 +9,16 @@ import { useState, useActionState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, Field, Input } from "@/components/ui-tr";
 import { Wordmark } from "@/components/layout/Wordmark";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { safeAuthPath } from "@/lib/auth/safe-redirect";
 import { signInAction } from "@/lib/auth/actions";
 
-export function LoginContent() {
+export function LoginContent({ configured }: { configured: boolean }) {
   const params = useSearchParams();
-  const configured = isSupabaseConfigured();
+
   const [showPw, setShowPw] = useState(false);
 
   const cbParam = params.get("callbackUrl");
-  const callbackUrl =
-    cbParam && cbParam.startsWith("/") && !cbParam.startsWith("//")
-      ? cbParam
-      : "/dashboard";
+  const callbackUrl = safeAuthPath(cbParam ?? "/dashboard");
 
   const [state, formAction, pending] = useActionState<
     ReturnType<typeof signInAction> | null,

@@ -10,6 +10,7 @@
 
 import { Suspense } from "react";
 import { LoginContent } from "./LoginContent";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 export default function LoginPage() {
   return (
@@ -20,7 +21,7 @@ export default function LoginPage() {
         </div>
       }
     >
-      <LoginContent />
+      <LoginContent configured={isSupabaseConfigured()} />
     </Suspense>
   );
 }

@@ -1,20 +1,20 @@
-/**
- * Only accept same-origin path redirects following Supabase OAuth/email
- * callbacks. Never trust a user-supplied URL for a post-login redirect.
- */
-export function safeAuthRedirect(next: string, requestUrl: URL): URL {
-  const fallback = new URL("/dashboard", requestUrl.origin);
+/** Validate post-login paths without reading server-side secrets in client code. */
+export function safeAuthPath(next: string): string {
   if (!next.startsWith("/") || next.startsWith("//") || next.includes("\\") ||
-      Array.from(next).some((character) => {
-        const code = character.charCodeAt(0);
+      Array.from(next).some((char) => {
+        const code = char.charCodeAt(0);
         return code < 32 || code === 127;
-      })) return fallback;
+      })) return "/dashboard";
   try {
-    const target = new URL(next, requestUrl.origin);
-    if (target.origin !== requestUrl.origin ||
-        (target.protocol !== "http:" && target.protocol !== "https:")) return fallback;
-    return target;
-  } catch {
-    return fallback;
-  }
+    const origin = "https://terraresponse.invalid";
+    const url = new URL(next, origin);
+    if (url.origin !== origin || !["http:", "https:"].includes(url.protocol)) {
+      return "/dashboard";
+    }
+    return url.pathname + url.search + url.hash;
+  } catch { return "/dashboard"; }
+}
+
+export function safeAuthRedirect(next: string, requestUrl: URL): URL {
+  return new URL(safeAuthPath(next), requestUrl.origin);
 }
