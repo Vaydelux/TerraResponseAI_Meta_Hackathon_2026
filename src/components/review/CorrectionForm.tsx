@@ -61,6 +61,8 @@ export function CorrectionForm({
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef<string | null>(null);
+  const inFlightRef = useRef(false);
 
   // Reset when the drawer reopens with a new observation.
   useEffect(() => {
@@ -71,11 +73,19 @@ export function CorrectionForm({
     setEvidence(observation.visibleEvidence);
     setUncertainties(observation.uncertainties);
     setReason("");
+    requestIdRef.current = null;
   }, [open, observation]);
 
   async function handleSubmit() {
-    if (submitting) return;
+    if (submitting || inFlightRef.current) return;
+    if (!reason.trim()) {
+      toast.error("An audit reason is required for a correction.");
+      return;
+    }
+    inFlightRef.current = true;
     setSubmitting(true);
+    const requestId = requestIdRef.current ?? crypto.randomUUID();
+    requestIdRef.current = requestId;
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -84,8 +94,9 @@ export function CorrectionForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "comment",
-          reason: reason || "Reviewer correction",
+          action: "correct",
+          requestId,
+          reason: reason.trim(),
           correctedIncidentType: incidentType,
           correctedSeverity: severity,
           correctedSummary: summary,
@@ -95,7 +106,8 @@ export function CorrectionForm({
         signal: ctrl.signal,
       });
       const body = await res.json();
-      if (body?.ok) {
+      if (res.ok && body?.ok) {
+        requestIdRef.current = null;
         toast.success("Correction submitted. The Seal now reads Corrected by you.");
         onSubmitted?.({
           incidentType,
@@ -118,6 +130,7 @@ export function CorrectionForm({
         onClick: () => void handleSubmit(),
       });
     } finally {
+      inFlightRef.current = false;
       if (!ctrl.signal.aborted) setSubmitting(false);
     }
   }
