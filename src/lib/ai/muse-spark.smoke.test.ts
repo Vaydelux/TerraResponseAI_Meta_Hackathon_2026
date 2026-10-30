@@ -46,7 +46,7 @@ describe.skipIf(SKIP)("muse-spark live smoke test", () => {
     expect(result.promptVersion).toBe("v1");
     expect(result.schemaVersion).toBe("v1");
 
-    console.log("[smoke] observation:", JSON.stringify(result.observation, null, 2));
+    console.log("[smoke] Validated observation received (content withheld from CI logs).");
     console.log("[smoke] usage:", result.usageMetadata);
   }, 90_000); // 90s timeout for the live test
 });
