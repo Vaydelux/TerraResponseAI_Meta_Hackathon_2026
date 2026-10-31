@@ -43,8 +43,8 @@ describe("safe follow-on PostgreSQL permissions", () => {
     expect(grants).toMatch(/grant select on public\.ai_usage_log to authenticated/);
     expect(grants).toMatch(/revoke insert, update, delete on public\.ai_usage_log from public, anon, authenticated/);
     expect(grants).toMatch(/drop policy if exists ai_usage_log_insert_authenticated/);
-    expect(grants).toMatch(/grant select, insert on public\.evidence_signed_url_log to authenticated/);
-    expect(grants).toMatch(/grant select, insert on public\.report_retention to authenticated/);
+    expect(grants).toMatch(/grant insert \(user_id, report_id, kind, ttl_seconds\)\s+on public\.evidence_signed_url_log to authenticated/);
+    expect(grants).toMatch(/grant insert \(report_id, retention_state, retention_window_ends_at, reason, requested_by\)\s+on public\.report_retention to authenticated/);
     expect(grants).toMatch(/grant update \([\s\S]*?\) on public\.report_retention to authenticated/);
     expect(grants).not.toMatch(/grant select, insert, update, delete on public\.report_retention to authenticated/);
     expect(grants).toMatch(/public\.ai_usage_log, public\.evidence_signed_url_log, public\.report_retention\s+to service_role/);
