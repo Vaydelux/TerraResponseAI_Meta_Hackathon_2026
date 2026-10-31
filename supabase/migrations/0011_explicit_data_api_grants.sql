@@ -53,12 +53,17 @@ grant select on public.ai_usage_log to authenticated;
 -- A signed-URL audit row is associated with the authenticated caller and
 -- an accessible report by the 0004 INSERT RLS policy. Keep audit append-only.
 revoke update, delete on public.evidence_signed_url_log from public, anon, authenticated;
-grant select, insert on public.evidence_signed_url_log to authenticated;
+grant select on public.evidence_signed_url_log to authenticated;
+grant insert (user_id, report_id, kind, ttl_seconds)
+  on public.evidence_signed_url_log to authenticated;
 
 -- The retention route must read, insert and update state. Preserve immutable
 -- report linkage / creation timestamps / purge stamps through column grants.
 revoke update on public.report_retention from public, anon, authenticated;
-grant select, insert on public.report_retention to authenticated;
+revoke insert on public.report_retention from public, anon, authenticated;
+grant select on public.report_retention to authenticated;
+grant insert (report_id, retention_state, retention_window_ends_at, reason, requested_by)
+  on public.report_retention to authenticated;
 grant update (
   retention_state, retention_window_ends_at, reason, requested_by, updated_at
 ) on public.report_retention to authenticated;
