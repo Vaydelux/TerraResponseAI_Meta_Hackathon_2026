@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockFrom = vi.fn();
-const mockCreateClient = vi.fn(() => ({ from: mockFrom }));
+const mockCreateClient = vi.fn((..._args: unknown[]) => ({ from: mockFrom }));
 vi.mock("@supabase/supabase-js", () => ({
   createClient: (...args: unknown[]) => mockCreateClient(...args),
 }));
