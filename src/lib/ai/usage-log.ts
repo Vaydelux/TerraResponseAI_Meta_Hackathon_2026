@@ -37,7 +37,9 @@
 // raw error is logged via console.error (server-side only) for the
 // operator to read in the platform logs.
 
+import { createClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { supabaseUrl, serviceRoleKey } from "@/lib/supabase/env";
 import {
   estimateCost,
   readCostControlConfig,
@@ -139,7 +141,12 @@ export async function logUsage(entry: UsageLogEntry): Promise<void> {
   };
 
   try {
-    const supabase = await createSupabaseServerClient();
+    // Trusted telemetry cannot be inserted with a user JWT: otherwise a
+    // signed-in user could fabricate token costs and exhaust shared budgets.
+    // This function runs only on the server and never exposes the service key.
+    const supabase = createClient(supabaseUrl(), serviceRoleKey(), {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
     const { error } = await supabase.from("ai_usage_log").insert(row);
     if (error) {
       console.error(
