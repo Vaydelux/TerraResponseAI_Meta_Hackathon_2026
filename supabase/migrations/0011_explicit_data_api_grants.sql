@@ -39,6 +39,35 @@ grant select, insert, update, delete on
   public.report_analyses, public.review_actions, public.priority_overrides,
   public.audit_events to service_role;
 
+-- The three 0004 resilience tables are used by authenticated API routes,
+-- but PostgreSQL grants are independent from row-level security policies.
+-- Never grant client INSERT on AI cost telemetry: authenticated users could
+-- forge estimates and exhaust other users' shared AI budgets.
+drop policy if exists ai_usage_log_insert_authenticated on public.ai_usage_log;
+create policy ai_usage_log_insert_trusted_service
+  on public.ai_usage_log for insert
+  to service_role with check (true);
+revoke insert, update, delete on public.ai_usage_log from public, anon, authenticated;
+grant select on public.ai_usage_log to authenticated;
+
+-- A signed-URL audit row is associated with the authenticated caller and
+-- an accessible report by the 0004 INSERT RLS policy. Keep audit append-only.
+revoke update, delete on public.evidence_signed_url_log from public, anon, authenticated;
+grant select, insert on public.evidence_signed_url_log to authenticated;
+
+-- The retention route must read, insert and update state. Preserve immutable
+-- report linkage / creation timestamps / purge stamps through column grants.
+revoke update on public.report_retention from public, anon, authenticated;
+grant select, insert on public.report_retention to authenticated;
+grant update (
+  retention_state, retention_window_ends_at, reason, requested_by, updated_at
+) on public.report_retention to authenticated;
+
+-- Server-side tasks and admin operations require explicit privileges too.
+grant select, insert, update, delete on
+  public.ai_usage_log, public.evidence_signed_url_log, public.report_retention
+to service_role;
+
 -- No broad sequence grants: these tables use UUID keys.
 -- Add explicit sequence privileges only if a verified application operation
 -- actually requires them. This avoids unnecessary data API capabilities.
