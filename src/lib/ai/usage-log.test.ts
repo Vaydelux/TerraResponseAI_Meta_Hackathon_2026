@@ -16,6 +16,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockFrom = vi.fn();
+const mockCreateClient = vi.fn(() => ({ from: mockFrom }));
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: (...args: unknown[]) => mockCreateClient(...args),
+}));
+vi.mock("@/lib/supabase/env", () => ({
+  supabaseUrl: () => "https://staging.test.invalid",
+  serviceRoleKey: () => "fake-server-key-for-tests-only",
+}));
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({ from: mockFrom }),
 }));
@@ -24,6 +32,7 @@ import { logUsage, getDailyUsageSummary } from "@/lib/ai/usage-log";
 
 beforeEach(() => {
   mockFrom.mockReset();
+  mockCreateClient.mockClear();
 });
 
 /** A supabase-js-style builder. The `.insert(row)` returns a thenable
@@ -46,6 +55,16 @@ function makeSelectBuilder(result: { data: unknown; error: unknown }) {
 }
 
 describe("logUsage", () => {
+  it("uses a trusted service client, not a user-session client, for telemetry", async () => {
+    const builder = makeInsertBuilder({ data: null, error: null });
+    mockFrom.mockReturnValue(builder);
+    await logUsage({ reportId: "r1", eventId: "e1", userId: "u1", outcome: "succeeded" });
+    expect(mockCreateClient).toHaveBeenCalledWith(
+      "https://staging.test.invalid",
+      "fake-server-key-for-tests-only",
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
+  });
   it("inserts a row with the expected shape on success", async () => {
     const builder = makeInsertBuilder({ data: [{}], error: null });
     mockFrom.mockReturnValue(builder);
