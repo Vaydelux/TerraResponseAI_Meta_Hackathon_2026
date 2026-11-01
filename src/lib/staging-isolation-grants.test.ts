@@ -57,3 +57,29 @@ describe("safe follow-on PostgreSQL permissions", () => {
     expect(rpc).toContain("alter function public.set_updated_at()");
   });
 });
+
+describe("safe staging migration preflight", () => {
+  it("does not blindly drop provider-owned auth triggers", () => {
+    const sql = get("supabase/migrations/0007_fix_auth_trigger.sql");
+    expect(sql).toContain("legacy_function <> app_function");
+    expect(sql).toContain("desired_function <> app_function");
+    expect(sql).toContain("Refusing to drop auth.users.on_auth_user_created");
+    expect(sql).toContain("Refusing to replace auth.users.trg_handle_new_user");
+    expect(sql).not.toContain("drop trigger if exists on_auth_user_created on auth.users;");
+    expect(sql).not.toContain("drop trigger if exists trg_handle_new_user on auth.users;");
+  });
+
+  it("compares migration versions instead of full filenames", () => {
+    const verifier = get("scripts/verify-supabase.ts");
+    expect(verifier).toContain("migrationHistoryVerified");
+    expect(verifier).toContain("appliedSet.has(migrationVersion(f))");
+    expect(verifier).not.toContain("appliedSet.has(stem)");
+    expect(verifier).toContain('record("remote migration status", "UNVERIFIED", false');
+  });
+
+  it("reports Data API migration-history failures as unverified, never a fresh project", () => {
+    const verifier = get("scripts/verify-supabase.ts");
+    expect(verifier).toContain('record("applied-migrations table readable", "UNVERIFIED", false');
+    expect(verifier).not.toContain('supabase_migrations.schema_migrations not present yet (fresh project');
+  });
+});

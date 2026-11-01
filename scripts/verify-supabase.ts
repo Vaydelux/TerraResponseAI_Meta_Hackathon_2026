@@ -237,6 +237,7 @@ const localMigrations: string[] = existsSync(migrationsDir)
   : [];
 
 let appliedMigrations: { version: string; name: string | null }[] = [];
+let migrationHistoryVerified = false;
 if (haveCreds) {
   const { data: appliedRows, error: appliedErr } = await clients.service!
     .schema("supabase_migrations")
@@ -244,12 +245,15 @@ if (haveCreds) {
     .select("version, name")
     .order("version", { ascending: true });
   if (appliedErr) {
-    // The schema_migrations table doesn't exist on a fresh project
-    // with no applied migrations. Treat that as "none applied yet"
-    // (a LIVE-SQL observation, not an error).
-    record("applied-migrations table readable", "LIVE-SQL", true,
-      "supabase_migrations.schema_migrations not present yet (fresh project, no migrations applied)");
+    // PostgREST normally does not expose the supabase_migrations schema.
+    // A REST error is NEVER proof that the migration table is empty.
+    // Confirm true remote state via `supabase migration list --linked`
+    // from the staging-only GitHub workflow (uses separate DB access).
+    record("applied-migrations table readable", "UNVERIFIED", false,
+      "Migration history cannot be read via this API.",
+      "run supabase migration list --linked against the verified staging project");
   } else {
+    migrationHistoryVerified = true;
     appliedMigrations = (appliedRows as { version: string; name: string | null }[]) ?? [];
     record("applied-migrations table readable", "LIVE-SQL", true,
       `${appliedMigrations.length} migration(s) recorded as applied`);
@@ -266,18 +270,19 @@ if (haveCreds) {
 // recorded as applied even if a statement failed mid-application.
 // The verifier treats the migration-history check and the
 // object-existence check as SEPARATE signals.
-const appliedSet = new Set(appliedMigrations.map((m) => m.version ?? m.name ?? ""));
-const pending = localMigrations.filter((f) => {
-  const stem = f.replace(/\.sql$/, "");
-  return !appliedSet.has(stem);
-});
+const appliedSet = new Set(appliedMigrations.map((m) => m.version));
+// Supabase migration IDs are the digits BEFORE the first underscore.
+// Comparing "0001_schema" with remote "0001" reports false pending SQL.
+const migrationVersion = (filename: string) => filename.match(/^(\d+)_/)?.[1] ?? "";
+const pending = migrationHistoryVerified
+  ? localMigrations.filter((f) => !appliedSet.has(migrationVersion(f)))
+  : [];
 
 console.log("");
 console.log("Local migration files (STATIC — files on disk):");
 for (const f of localMigrations) {
-  const stem = f.replace(/\.sql$/, "");
-  const isApplied = appliedSet.has(stem);
-  console.log(`    ${isApplied ? "✓" : "·"} ${f}`);
+  const isApplied = migrationHistoryVerified && appliedSet.has(migrationVersion(f));
+  console.log(`    ${!migrationHistoryVerified ? "?" : (isApplied ? "✓" : "·")} ${f}`);
 }
 console.log("");
 if (appliedMigrations.length > 0) {
@@ -293,7 +298,11 @@ if (appliedMigrations.length > 0) {
   console.log("actual proof.");
   console.log("");
 }
-if (pending.length === 0 && appliedMigrations.length === localMigrations.length) {
+if (!migrationHistoryVerified) {
+  record("remote migration status", "UNVERIFIED", false,
+    "Cannot determine pending migrations from inaccessible migration history.",
+    "compare local filenames and supabase migration list --linked in the staging-only workflow");
+} else if (pending.length === 0 && appliedMigrations.length === localMigrations.length) {
   record("no pending migrations", "STATIC", true, "all local migration files are recorded as applied remotely");
 } else if (pending.length > 0) {
   // Pending migrations are INFORMATIONAL, not a failure. The
@@ -637,7 +646,7 @@ if (failCount > 0) {
   process.exit(2);
 } else {
   console.log("");
-  console.log("All live checks passed. UNVERIFIED checks require direct psql");
+  console.log("Available live checks passed; some checks remain UNVERIFIED. Use direct psql");
   console.log("access (catalog tables); run scripts/_run_sql_tests.ts to");
   console.log("exercise them against a real Postgres.");
   console.log("");
