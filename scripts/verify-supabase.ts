@@ -282,7 +282,7 @@ console.log("");
 console.log("Local migration files (STATIC — files on disk):");
 for (const f of localMigrations) {
   const isApplied = migrationHistoryVerified && appliedSet.has(migrationVersion(f));
-  console.log(`    ${isApplied ? "✓" : "·"} ${f}`);
+  console.log(`    ${!migrationHistoryVerified ? "?" : (isApplied ? "✓" : "·")} ${f}`);
 }
 console.log("");
 if (appliedMigrations.length > 0) {
