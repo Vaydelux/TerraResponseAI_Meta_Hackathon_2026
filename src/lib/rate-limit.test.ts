@@ -14,6 +14,13 @@ const mockFrom = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({ from: mockFrom }),
 }));
+vi.mock("@/lib/supabase/env", () => ({
+  supabaseUrl: () => "https://example.supabase.co",
+  serviceRoleKey: () => "trusted-test-key",
+}));
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: () => ({ from: mockFrom }),
+}));
 
 import {
   checkUserUploadRate,
@@ -111,10 +118,11 @@ describe("checkUserAiCallRate", () => {
     }
   });
 
-  it("fails OPEN on a count-query error", async () => {
+  it("fails CLOSED on a user AI count-query error", async () => {
     mockFrom.mockReturnValue(makeCountThenable(null, { message: "DB down" }));
     const r = await checkUserAiCallRate("user-1");
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe(COST_CONTROL_ERRORS.AI_BUDGET_UNAVAILABLE);
   });
 });
 
@@ -135,10 +143,11 @@ describe("checkEventAiBudget", () => {
     }
   });
 
-  it("fails OPEN on a count-query error", async () => {
+  it("fails CLOSED on a per-event AI count-query error", async () => {
     mockFrom.mockReturnValue(makeCountThenable(null, { message: "DB down" }));
     const r = await checkEventAiBudget("evt-1");
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe(COST_CONTROL_ERRORS.AI_BUDGET_UNAVAILABLE);
   });
 });
 
@@ -200,21 +209,33 @@ describe("checkDailySpendCeiling", () => {
     }
   });
 
-  it("skips rows with non-numeric estimated_cost_usd", async () => {
+  it("counts Postgres numeric strings toward daily spend", async () => {
     mockFrom.mockReturnValue(makeRowsThenable([
-      { estimated_cost_usd: 0.5 },
-      { estimated_cost_usd: "not-a-number" },
-      { estimated_cost_usd: null },
-      { estimated_cost_usd: 1.0 },
+      { estimated_cost_usd: "30.250000" },
+      { estimated_cost_usd: "20.000000" },
     ]));
     const r = await checkDailySpendCeiling();
-    expect(r.ok).toBe(true); // 0.5 + 1.0 = 1.5 < 50
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe(COST_CONTROL_ERRORS.DAILY_SPEND_EXCEEDED);
+      expect(r.used).toBeCloseTo(50.25);
+    }
   });
 
-  it("fails OPEN on a query error", async () => {
+  it("fails CLOSED on invalid accounting values", async () => {
+    mockFrom.mockReturnValue(makeRowsThenable([
+      { estimated_cost_usd: "not-a-number" },
+    ]));
+    const r = await checkDailySpendCeiling();
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe(COST_CONTROL_ERRORS.AI_BUDGET_UNAVAILABLE);
+  });
+
+  it("fails CLOSED when the daily spend query errors", async () => {
     mockFrom.mockReturnValue(makeRowsThenable([], { message: "DB down" }));
     const r = await checkDailySpendCeiling();
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe(COST_CONTROL_ERRORS.AI_BUDGET_UNAVAILABLE);
   });
 });
 
@@ -235,10 +256,11 @@ describe("checkDailyRequestCeiling", () => {
     }
   });
 
-  it("fails OPEN on a count-query error", async () => {
+  it("fails CLOSED on a daily request count-query error", async () => {
     mockFrom.mockReturnValue(makeCountThenable(null, { message: "DB down" }));
     const r = await checkDailyRequestCeiling();
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe(COST_CONTROL_ERRORS.AI_BUDGET_UNAVAILABLE);
   });
 });
 
