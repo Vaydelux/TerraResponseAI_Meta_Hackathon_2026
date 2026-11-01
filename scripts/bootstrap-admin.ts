@@ -1,37 +1,50 @@
 /**
- * Bootstrap the first TerraResponse AI administrator.
+ * First-administrator bootstrap. Run only from a trusted, owner-controlled CLI
+ * environment with SUPABASE_SERVICE_ROLE_KEY configured; NEVER expose this
+ * operation as a Next.js Server Action or API endpoint.
  *
- * Prerequisite: Supabase is configured (NEXT_PUBLIC_SUPABASE_URL,
- * NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY env vars
- * set) and the user with the given email has already signed up via
- * Supabase Auth (the handle_new_user trigger created their profile
- * with role='reporter').
+ * Usage: bun run scripts/bootstrap-admin.ts person@example.org
  *
- * Run:
- *   bun run scripts/bootstrap-admin.ts you@example.com
- *
- * The action refuses if any admin already exists (one-time gate).
- * See README §First admin.
+ * This one-time operation refuses to proceed if an administrator already exists.
+ * The database lookup and promotion are not atomic; execute only in a trusted,
+ * isolated maintenance window and verify the resulting role.
  */
-import { bootstrapFirstAdminAction } from "../src/lib/auth/actions";
+import { createClient } from "@supabase/supabase-js";
 
 async function main() {
-  const email = process.argv[2];
-  if (!email) {
-    console.error("Usage: bun run scripts/bootstrap-admin.ts <email>");
-    process.exit(1);
+  const email = process.argv[2]?.trim().toLowerCase();
+  if (!email || !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) {
+    console.error("Usage: bun run scripts/bootstrap-admin.ts <existing-account-email>");
+    process.exitCode = 1;
+    return;
   }
-  console.log(`[bootstrap] promoting ${email} to admin…`);
-  const result = await bootstrapFirstAdminAction(email);
-  if (result.ok) {
-    console.log("[bootstrap] success — the user is now an admin.");
-  } else {
-    console.error(`[bootstrap] failed: ${result.error}`);
-    process.exit(1);
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !secret) {
+    console.error("Missing Supabase URL or service-role configuration.");
+    process.exitCode = 1;
+    return;
   }
+
+  const supabase = createClient(url, secret, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: admins, error: readError } = await supabase
+    .from("profiles").select("id").eq("role", "admin").limit(1);
+  if (readError) throw new Error("Unable to verify administrator bootstrap precondition.");
+  if (admins?.length) throw new Error("An administrator already exists; bootstrap refused.");
+
+  const { data: promoted, error: writeError } = await supabase
+    .from("profiles").update({ role: "admin" }).eq("email", email).select("id, role");
+  if (writeError) throw new Error("Administrator bootstrap update failed.");
+  if (promoted?.length !== 1 || promoted[0].role !== "admin") {
+    throw new Error("Bootstrap could not verify exactly one promoted account.");
+  }
+  console.log("First administrator bootstrap completed. Verify role and audit records.");
 }
 
-main().catch((e) => {
-  console.error("[bootstrap] unexpected error:", e);
-  process.exit(1);
+main().catch((err: unknown) => {
+  console.error(err instanceof Error ? err.message : "Administrator bootstrap failed.");
+  process.exitCode = 1;
 });
