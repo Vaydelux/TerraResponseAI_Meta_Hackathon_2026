@@ -242,8 +242,8 @@ export async function POST(
   // 4d. Cost-control ceilings: per-user AI rate, per-event budget,
   //     global daily spend + requests. Returns the FIRST failure
   //     (or ok). The caller stops at the first failure. Each failure
-  //     returns a 4xx (the client should NOT retry — the ceiling is
-  //     exhausted for the period). The brief: "bounded daily API
+  //     returns 402/429 for exhausted ceilings or 503 when trusted
+  //     accounting is unavailable (no paid model call). The brief: "bounded daily API
   //     spend/request ceilings (configurable)" + "per-user and per-
   //     event server-enforced rate limits."
   const ceiling = await checkAllAiCallCeilings({
@@ -263,7 +263,8 @@ export async function POST(
     });
     return NextResponse.json(
       { error: { code: ceiling.code, message: ceiling.message, used: ceiling.used, limit: ceiling.limit } },
-      { status: ceiling.code === "EVENT_BUDGET_EXCEEDED" || ceiling.code === "DAILY_SPEND_EXCEEDED" || ceiling.code === "DAILY_REQUESTS_EXCEEDED" ? 402 : 429 },
+      { status: ceiling.code === "AI_BUDGET_UNAVAILABLE" ? 503
+        : ceiling.code === "EVENT_BUDGET_EXCEEDED" || ceiling.code === "DAILY_SPEND_EXCEEDED" || ceiling.code === "DAILY_REQUESTS_EXCEEDED" ? 402 : 429 },
     );
   }
 

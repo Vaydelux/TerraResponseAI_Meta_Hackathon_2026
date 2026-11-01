@@ -32,17 +32,14 @@
 // The counters are rolled up by a unique index on (user_id, occurred_at)
 // or (event_id, occurred_at) etc. — see 0004_resilience.sql.
 //
-// ON FAILURE TO COUNT: the limit is BYPASSED. Rationale: a failed
-// count query (e.g., DB unreachable) should NOT block a legitimate
-// upload. The ceiling is enforced when the count works; when it
-// doesn't, the user can still upload, and the next successful count
-// catches up. The brief explicitly says "no silent failures" —
-// failures are LOGGED via console.error so the admin sees them in
-// the platform logs, but they don't block the request. This is the
-// opposite of "fail-closed", which would turn a DB hiccup into a
-// full upload outage. Documented inline.
+// Upload counters retain their existing fail-open availability trade-off.
+// Paid AI inference counters and private evidence mints FAIL CLOSED when
+// usage cannot be verified, preventing uncontrolled provider spending
+// and unaccounted private-file access.
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
+import { supabaseUrl, serviceRoleKey } from "@/lib/supabase/env";
 import {
   readCostControlConfig,
   COST_CONTROL_ERRORS,
@@ -59,6 +56,30 @@ export type RateLimitDecision =
       used: number;
       limit: number;
     };
+
+
+/**
+ * AI cost ceilings are server-wide safeguards, not user-visible data.
+ * Do NOT use the request's RLS-scoped SSR client: it cannot see other
+ * users' event/global telemetry and can undercount paid model calls.
+ * Call only after route-level identity and report authorization.
+ */
+function trustedAiUsageClient() {
+  return createClient(supabaseUrl(), serviceRoleKey(), {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+function unavailableAiBudget(): RateLimitDecision {
+  console.error("[rate-limit] Trusted AI budget accounting is unavailable; blocking inference.");
+  return {
+    ok: false,
+    code: COST_CONTROL_ERRORS.AI_BUDGET_UNAVAILABLE,
+    message: "AI analysis is temporarily unavailable because usage limits cannot be verified. Manual review remains available.",
+    used: 0,
+    limit: 0,
+  };
+}
 
 /** Check the per-user upload rate (uploads in the last hour). */
 export async function checkUserUploadRate(
@@ -95,28 +116,24 @@ export async function checkUserUploadRate(
   return { ok: true };
 }
 
-/** Check the per-user AI call rate (calls in the last hour, including
- *  failures — so a retry loop can't bypass the cap by triggering
- *  transient errors). */
+/** Check the per-user AI call rate, counting trusted usage across all roles. */
 export async function checkUserAiCallRate(
   userId: string,
   config: CostControlConfig = readCostControlConfig(),
 ): Promise<RateLimitDecision> {
-  const supabase = await createSupabaseServerClient();
-  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count, error } = await supabase
-    .from("ai_usage_log")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .gte("occurred_at", since);
-
-  if (error) {
-    console.error(
-      `[rate-limit] checkUserAiCallRate failed (allowing): ${error.message}`,
-    );
-    return { ok: true };
+  let used: number;
+  try {
+    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count, error } = await trustedAiUsageClient()
+      .from("ai_usage_log")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("occurred_at", since);
+    if (error || count == null) return unavailableAiBudget();
+    used = count;
+  } catch {
+    return unavailableAiBudget();
   }
-  const used = count ?? 0;
   if (used >= config.perUserAiCallsPerHour) {
     return {
       ok: false,
@@ -129,26 +146,22 @@ export async function checkUserAiCallRate(
   return { ok: true };
 }
 
-/** Check the per-event AI call budget (all-time for the event).
- *  This is the existing AI_PER_EVENT_BUDGET — kept here so all the
- *  cost-control logic is in one place. */
+/** Check the per-event budget across ALL users, including worker-driven calls. */
 export async function checkEventAiBudget(
   eventId: string,
   config: CostControlConfig = readCostControlConfig(),
 ): Promise<RateLimitDecision> {
-  const supabase = await createSupabaseServerClient();
-  const { count, error } = await supabase
-    .from("ai_usage_log")
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", eventId);
-
-  if (error) {
-    console.error(
-      `[rate-limit] checkEventAiBudget failed (allowing): ${error.message}`,
-    );
-    return { ok: true };
+  let used: number;
+  try {
+    const { count, error } = await trustedAiUsageClient()
+      .from("ai_usage_log")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", eventId);
+    if (error || count == null) return unavailableAiBudget();
+    used = count;
+  } catch {
+    return unavailableAiBudget();
   }
-  const used = count ?? 0;
   if (used >= config.perEventBudget) {
     return {
       ok: false,
@@ -201,28 +214,34 @@ export async function checkSignedUrlRate(
   return { ok: true };
 }
 
-/** Check the global daily AI spend ceiling (sum of estimated_cost_usd
- *  for the current UTC day). */
+/** Check daily global AI spend across all users/events using trusted SQL access.
+ * PostgreSQL numeric amounts may be delivered as decimal strings.
+ * Invalid accounting values are blockers, not silently ignored costs.
+ */
 export async function checkDailySpendCeiling(
   config: CostControlConfig = readCostControlConfig(),
 ): Promise<RateLimitDecision> {
-  const supabase = await createSupabaseServerClient();
-  const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await supabase
-    .from("ai_usage_log")
-    .select("estimated_cost_usd")
-    .eq("utc_day", today);
-
-  if (error) {
-    console.error(
-      `[rate-limit] checkDailySpendCeiling failed (allowing): ${error.message}`,
-    );
-    return { ok: true };
+  let usedUsd = 0;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await trustedAiUsageClient()
+      .from("ai_usage_log")
+      .select("estimated_cost_usd")
+      .eq("utc_day", today);
+    if (error || !data) return unavailableAiBudget();
+    for (const row of data) {
+      const raw: unknown = row.estimated_cost_usd;
+      if (typeof raw !== "number" && typeof raw !== "string") return unavailableAiBudget();
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value < 0 || (typeof raw === "string" && raw.trim() === "")) {
+        return unavailableAiBudget();
+      }
+      usedUsd += value;
+    }
+    if (!Number.isFinite(usedUsd)) return unavailableAiBudget();
+  } catch {
+    return unavailableAiBudget();
   }
-  const usedUsd = (data ?? []).reduce(
-    (sum, row) => sum + (typeof row.estimated_cost_usd === "number" ? row.estimated_cost_usd : 0),
-    0,
-  );
   if (config.dailySpendCeilingUsd > 0 && usedUsd >= config.dailySpendCeilingUsd) {
     return {
       ok: false,
@@ -235,24 +254,22 @@ export async function checkDailySpendCeiling(
   return { ok: true };
 }
 
-/** Check the global daily AI request count ceiling. */
+/** Check daily global request count, including all event and user activity. */
 export async function checkDailyRequestCeiling(
   config: CostControlConfig = readCostControlConfig(),
 ): Promise<RateLimitDecision> {
-  const supabase = await createSupabaseServerClient();
-  const today = new Date().toISOString().slice(0, 10);
-  const { count, error } = await supabase
-    .from("ai_usage_log")
-    .select("id", { count: "exact", head: true })
-    .eq("utc_day", today);
-
-  if (error) {
-    console.error(
-      `[rate-limit] checkDailyRequestCeiling failed (allowing): ${error.message}`,
-    );
-    return { ok: true };
+  let used: number;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const { count, error } = await trustedAiUsageClient()
+      .from("ai_usage_log")
+      .select("id", { count: "exact", head: true })
+      .eq("utc_day", today);
+    if (error || count == null) return unavailableAiBudget();
+    used = count;
+  } catch {
+    return unavailableAiBudget();
   }
-  const used = count ?? 0;
   if (config.dailyRequestCeiling > 0 && used >= config.dailyRequestCeiling) {
     return {
       ok: false,
