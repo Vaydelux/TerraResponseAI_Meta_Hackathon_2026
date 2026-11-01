@@ -140,7 +140,7 @@ export async function GET(
   if (!rate.ok) {
     return NextResponse.json(
       { error: { code: rate.code, message: rate.message, used: rate.used, limit: rate.limit } },
-      { status: 429 },
+      { status: rate.code === "SIGNED_URL_RATE_UNAVAILABLE" ? 503 : 429 },
     );
   }
 
