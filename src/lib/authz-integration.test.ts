@@ -148,6 +148,9 @@ function makeSelectChain(result: { data: unknown; error: unknown }) {
     then: promise.then.bind(promise),
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
+    // Successful evidence grants must also record the URL audit insert.
+    // The route now fails closed if Supabase returns an INSERT error.
+    insert: vi.fn(async () => ({ data: null, error: null })),
     maybeSingle: vi.fn(() => promise),
     single: vi.fn(() => promise),
   };

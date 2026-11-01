@@ -69,10 +69,13 @@ export async function GET(
 
   const { id } = await params;
   const url = new URL(request.url);
-  const kind = (url.searchParams.get("kind") ?? "derivative") as
-    | "derivative"
-    | "thumbnail"
-    | "original";
+  const kind = url.searchParams.get("kind") ?? "derivative";
+  if (kind !== "derivative" && kind !== "thumbnail" && kind !== "original") {
+    return NextResponse.json(
+      { error: { code: "BAD_REQUEST", message: "Invalid evidence kind." } },
+      { status: 400 },
+    );
+  }
 
   // 1. Verify the user can access the report (RLS: creator or event
   //    reviewer+). The Supabase SSR client uses the user's cookies
@@ -94,7 +97,17 @@ export async function GET(
   // 1b. Retention gate: refuse to mint URLs for soft_deleted or purged
   //     reports. The evidence is no longer viewable. The brief:
   //     "private-photo retention/deletion workflow."
-  const retentionState = await getRetentionState(id);
+  let retentionState: "active" | "soft_deleted" | "purged";
+  try {
+    retentionState = await getRetentionState(id);
+  } catch {
+    // Never mint a signed URL when database state cannot be verified.
+    console.error("[evidence] Retention state lookup unavailable.");
+    return NextResponse.json(
+      { error: { code: "RETENTION_UNAVAILABLE", message: "Evidence access is temporarily unavailable." } },
+      { status: 503 },
+    );
+  }
   if (retentionState === "soft_deleted") {
     return NextResponse.json(
       {
@@ -127,7 +140,7 @@ export async function GET(
   if (!rate.ok) {
     return NextResponse.json(
       { error: { code: rate.code, message: rate.message, used: rate.used, limit: rate.limit } },
-      { status: 429 },
+      { status: rate.code === "SIGNED_URL_RATE_UNAVAILABLE" ? 503 : 429 },
     );
   }
 
@@ -180,19 +193,28 @@ export async function GET(
     );
   }
 
-  // 5. Audit: insert a row into evidence_signed_url_log. Best-effort
-  //    (a failed insert doesn't fail the request — the URL is already
-  //    minted). Logged server-side on failure.
+  // 5. Audit: refuse to return the signed URL unless the mint was
+  //    recorded. Supabase-js returns errors as values, not exceptions.
+  //    An unlogged mint would also invalidate rate-limit accounting.
   try {
-    await supabase.from("evidence_signed_url_log").insert({
+    const { error: auditError } = await supabase.from("evidence_signed_url_log").insert({
       user_id: user.id,
       report_id: id,
       kind,
       ttl_seconds: SIGNED_URL_TTL_SECONDS,
     });
-  } catch (err) {
-    console.error(
-      `[evidence] signed-url log insert failed: ${err instanceof Error ? err.message : String(err)}`,
+    if (auditError) {
+      console.error("[evidence] Signed-URL audit insert failed.", { code: auditError.code ?? "unknown" });
+      return NextResponse.json(
+        { error: { code: "AUDIT_UNAVAILABLE", message: "Evidence access is temporarily unavailable." } },
+        { status: 503 },
+      );
+    }
+  } catch {
+    console.error("[evidence] Signed-URL audit service unavailable.");
+    return NextResponse.json(
+      { error: { code: "AUDIT_UNAVAILABLE", message: "Evidence access is temporarily unavailable." } },
+      { status: 503 },
     );
   }
 

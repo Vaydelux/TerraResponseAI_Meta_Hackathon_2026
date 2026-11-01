@@ -85,15 +85,25 @@ export function adminOverrideEnabled(): boolean {
 export async function getRetentionState(
   reportId: string,
 ): Promise<"active" | "soft_deleted" | "purged"> {
-  if (!isSupabaseConfigured()) return "active";
+  if (!isSupabaseConfigured()) {
+    throw new Error("Retention service is not configured.");
+  }
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("report_retention")
     .select("retention_state")
     .eq("report_id", reportId)
     .maybeSingle();
-  if (error || !data) return "active";
-  return data.retention_state as "active" | "soft_deleted" | "purged";
+  // Missing rows are active for legacy reports. Query failures are NOT
+  // missing rows: never expose private evidence without verifying state.
+  if (error) throw new Error("Retention state could not be verified.");
+  if (!data) return "active";
+  if (data.retention_state !== "active" &&
+      data.retention_state !== "soft_deleted" &&
+      data.retention_state !== "purged") {
+    throw new Error("Unexpected retention state.");
+  }
+  return data.retention_state;
 }
 
 /**

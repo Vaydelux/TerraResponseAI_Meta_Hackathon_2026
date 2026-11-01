@@ -117,10 +117,14 @@ describe("getRetentionState", () => {
     expect(state).toBe("active");
   });
 
-  it("returns 'active' on a query error (fail-safe default)", async () => {
+  it("rejects on a query error rather than exposing soft-deleted evidence", async () => {
     mockFrom.mockReturnValue(makeThenable({ data: null, error: { message: "DB down" } }));
-    const state = await getRetentionState("report-1");
-    expect(state).toBe("active");
+    await expect(getRetentionState("report-1")).rejects.toThrow("Retention state could not be verified.");
+  });
+
+  it("rejects unrecognized retention values", async () => {
+    mockFrom.mockReturnValue(makeThenable({ data: { retention_state: "unknown" }, error: null }));
+    await expect(getRetentionState("report-1")).rejects.toThrow("Unexpected retention state.");
   });
 
   it("returns the stored state when the row exists", async () => {

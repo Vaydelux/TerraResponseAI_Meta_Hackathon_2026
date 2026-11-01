@@ -166,21 +166,29 @@ export async function checkSignedUrlRate(
   userId: string,
   config: CostControlConfig = readCostControlConfig(),
 ): Promise<RateLimitDecision> {
-  const supabase = await createSupabaseServerClient();
-  const since = new Date(Date.now() - 60 * 1000).toISOString();
-  const { count, error } = await supabase
-    .from("evidence_signed_url_log")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .gte("occurred_at", since);
-
-  if (error) {
-    console.error(
-      `[rate-limit] checkSignedUrlRate failed (allowing): ${error.message}`,
-    );
-    return { ok: true };
+  let used: number;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const since = new Date(Date.now() - 60 * 1000).toISOString();
+    const { count, error } = await supabase
+      .from("evidence_signed_url_log")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("occurred_at", since);
+    // A missing count is not zero. Do not permit unlimited URL mints
+    // when SELECT fails but INSERT or signing still works.
+    if (error || count === null) throw new Error("signed URL count unavailable");
+    used = count;
+  } catch {
+    console.error("[rate-limit] Signed evidence rate-limit accounting unavailable.");
+    return {
+      ok: false,
+      code: COST_CONTROL_ERRORS.SIGNED_URL_RATE_UNAVAILABLE,
+      message: "Evidence access is temporarily unavailable.",
+      used: 0,
+      limit: config.perUserSignedUrlsPerMinute,
+    };
   }
-  const used = count ?? 0;
   if (used >= config.perUserSignedUrlsPerMinute) {
     return {
       ok: false,
