@@ -13,7 +13,7 @@ import { createClient } from "@supabase/supabase-js";
 
 async function main() {
   const email = process.argv[2]?.trim().toLowerCase();
-  if (!email || !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) {
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     console.error("Usage: bun run scripts/bootstrap-admin.ts <existing-account-email>");
     process.exitCode = 1;
     return;
