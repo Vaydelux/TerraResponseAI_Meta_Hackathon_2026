@@ -159,10 +159,18 @@ describe("checkSignedUrlRate", () => {
     }
   });
 
-  it("fails OPEN on a count-query error", async () => {
+  it("fails CLOSED on a signed URL count-query error", async () => {
     mockFrom.mockReturnValue(makeCountThenable(null, { message: "DB down" }));
     const r = await checkSignedUrlRate("user-1");
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe(COST_CONTROL_ERRORS.SIGNED_URL_RATE_UNAVAILABLE);
+  });
+
+  it("fails CLOSED if the signed URL count is null without a reported error", async () => {
+    mockFrom.mockReturnValue(makeCountThenable(null));
+    const r = await checkSignedUrlRate("user-1");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe(COST_CONTROL_ERRORS.SIGNED_URL_RATE_UNAVAILABLE);
   });
 });
 
