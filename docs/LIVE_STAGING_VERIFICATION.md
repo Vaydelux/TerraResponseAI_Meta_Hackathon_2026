@@ -2,6 +2,14 @@
 
 The current GitHub CI suite proves **lint, TypeScript typechecking, mocked unit/integration tests, and a Next.js production build**. It is NOT evidence of live Supabase RLS, real Meta inference, or successful database migration.
 
+## Before any remote changes: staging project and historical versions
+
+The production Supabase project ref is `ywopsafppyykhwrejliz`. Do not apply pending SQL to it without a separate production change approval. Create or select a **different Supabase project** in the owner-approved organization, verify its exact ref, configure `PRODUCTION_SUPABASE_PROJECT_REF` and `STAGING_SUPABASE_PROJECT_REF`, and keep separate credentials for each. Project creation may incur charges and requires the owner's organization and cost approval.
+
+**Historical migration warning:** This repository contains legacy files `0001_schema.sql` through `0012_restrict_definer_rpc_access.sql`. The connected production database has already recorded versions `0001` and `0002`. New Supabase CLI migrations are timestamp-named; do not rename these applied files or repair remote history without independently reconciling actual SQL objects. Check `supabase migration list --linked` and `supabase db push --dry-run --linked` on isolated staging. If the CLI rejects these legacy version names, stop; do not force a migration to production. Create a reviewed, forward-only staging reconciliation plan instead.
+
+The read-only REST verifier cannot necessarily read `supabase_migrations.schema_migrations` because it is not an exposed Data API schema. An API failure **does not** mean zero migrations are applied. The linked CLI migration list is the version-history authority; SQL catalog and role probes separately verify database effects.
+
 ## 1. Run the staging migration preview first
 
 Actions → **Supabase staging migration preview** → **Run workflow** on `main`. Start a new run; old reruns keep old workflow revisions.
