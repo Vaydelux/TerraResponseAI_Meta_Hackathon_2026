@@ -273,7 +273,7 @@ if (haveCreds) {
 const appliedSet = new Set(appliedMigrations.map((m) => m.version));
 // Supabase migration IDs are the digits BEFORE the first underscore.
 // Comparing "0001_schema" with remote "0001" reports false pending SQL.
-const migrationVersion = (filename: string) => filename.match(/^(\\d+)_/)?.[1] ?? "";
+const migrationVersion = (filename: string) => filename.match(/^(\d+)_/)?.[1] ?? "";
 const pending = migrationHistoryVerified
   ? localMigrations.filter((f) => !appliedSet.has(migrationVersion(f)))
   : [];
