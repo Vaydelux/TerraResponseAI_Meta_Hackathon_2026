@@ -309,6 +309,25 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     expect(mockAnalyzeImage).not.toHaveBeenCalled();
   });
 
+  it("returns 503 before calling Meta when trusted AI accounting is unavailable", async () => {
+    mockFrom.mockReturnValueOnce(makeBuilder({
+      data: { id: REPORT_ID, event_id: EVENT_ID, status: "uploaded",
+        sha256: "abc", retry_count: 0, derivative_storage_key: "x/y.jpg", image_mime_type: "image/jpeg" },
+      error: null,
+    }));
+    mockLookupCachedAnalysis.mockResolvedValue(null);
+    mockCheckAllAiCallCeilings.mockResolvedValue({
+      ok: false, code: "AI_BUDGET_UNAVAILABLE",
+      message: "AI budget accounting unavailable", used: 0, limit: 0,
+    });
+    const { request, context } = makeRequest();
+    const res = await POST(request, context);
+    expect(res.status).toBe(503);
+    expect((await res.json()).error.code).toBe("AI_BUDGET_UNAVAILABLE");
+    expect(mockAnalyzeImage).not.toHaveBeenCalled();
+    expect(mockLogUsage).toHaveBeenCalledOnce();
+  });
+
   it("returns 402 EVENT_BUDGET_EXCEEDED when the per-event budget is exhausted", async () => {
     mockFrom.mockReturnValueOnce(makeBuilder({
       data: { id: REPORT_ID, event_id: EVENT_ID, status: "uploaded",
