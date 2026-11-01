@@ -90,6 +90,20 @@ jobs:
       - name: List remote migration history (read-only)
         run: supabase migration list --linked
 
+      - name: Refuse incompatible staging migration history
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The staging project was initially migrated through the Supabase
+          # connector, which recorded timestamped history entries while this
+          # repository still uses legacy four-digit migration versions.
+          # Never replay 0001..0009 as though this database were empty.
+          if [[ "$SUPABASE_PROJECT_REF" == "ytfaetqvtbsbmcsdlkvk" ]]; then
+            echo "::error::Staging has connector-created timestamped migrations for 0001..0009. Reconcile the migration ledger and review the SQL catalog before using supabase db push."
+            exit 1
+          fi
+          echo "No known connector migration history conflict for this target."
+
       - name: Preview pending SQL (read-only)
         run: supabase db push --dry-run --linked
 
