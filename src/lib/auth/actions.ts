@@ -1,7 +1,7 @@
 // src/lib/auth/actions.ts
 //
-// Server actions for Supabase email auth: signIn, signOut, and the
-// first-admin onboarding bootstrap. Server-only — uses the
+// Server actions for Supabase email auth: signIn, signOut, and signUp.
+// Server-only — uses the
 // @supabase/ssr cookies() pattern.
 //
 // Per the brief:
@@ -10,11 +10,9 @@
 //   - "Use server-side identity verification on mutations, not cookie
 //     presence alone." — signIn calls supabase.auth.signInWithPassword
 //     (server-side), signOut calls supabase.auth.signOut (server-side).
-//   - "Create a safe onboarding path for the first administrator
-//     documented in setup, rather than permitting users to self-assign
-//     reviewer/admin privileges." — bootstrapFirstAdmin() is the ONLY
-//     way to promote a user to admin, and it requires the service-role
-//     key + an empty profiles table (no existing admins).
+//   - The first-admin bootstrap is intentionally CLI-only in
+//     scripts/bootstrap-admin.ts. Never expose RLS-bypassing account
+//     promotion through a browser-callable Server Action.
 //
 // Phase 18: Added login rate limiting (brute-force protection) using
 // the audit_events table. Tracks AUTH_FAILED entries per email in a
@@ -182,71 +180,6 @@ export async function signOutAction(): Promise<void> {
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/login");
-}
-
-/**
- * Bootstrap the first administrator. This is the safe onboarding path:
- *   1. No existing admin in the profiles table (one-time gate).
- *   2. The caller supplies an email that already exists in auth.users
- *      (i.e., the user signed up but their profile is the default
- *      'reporter' role).
- *   3. The action runs with the service-role key (server-side only;
- *      never exposed to the browser) to UPDATE the profile to 'admin'.
- *
- * Per the brief: "rather than permitting users to self-assign
- * reviewer/admin privileges." After the first admin, all role changes
- * go through the admin UI (Phase 4) which is itself gated by the
- * is_admin() RLS helper.
- *
- * This action is intentionally simple: it's run from a setup page
- * (documented in README §First admin) by someone with shell access
- * to the server, NOT from the public /login page. The README
- * documents the procedure.
- */
-export async function bootstrapFirstAdminAction(email: string): Promise<{ ok: boolean; error?: string }> {
-  if (!isSupabaseConfigured()) {
-    return { ok: false, error: "Supabase is not configured." };
-  }
-  if (!email || !email.includes("@")) {
-    return { ok: false, error: "A valid email is required." };
-  }
-
-  // Use the service-role client (bypasses RLS). Server-side only.
-  const serviceClient = createClient(supabaseUrl(), serviceRoleKey(), {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  // Gate: refuse if any admin already exists (one-time bootstrap).
-  const { data: existingAdmins, error: countErr } = await serviceClient
-    .from("profiles")
-    .select("id")
-    .eq("role", "admin")
-    .limit(1);
-  if (countErr) return { ok: false, error: countErr.message };
-  if (existingAdmins && existingAdmins.length > 0) {
-    return { ok: false, error: "An admin already exists. Use the admin UI to promote further users." };
-  }
-
-  // Promote the profile matching the email. The user must already be
-  // signed up (auth.users row exists); the handle_new_user trigger
-  // created their profile with role='reporter'. Use .select() so we
-  // can verify a row was actually updated (PostgREST returns no error
-  // for 0 rows updated, so without .select() we'd silently succeed
-  // even when no profile matched the email).
-  const { data: updated, error: updateErr } = await serviceClient
-    .from("profiles")
-    .update({ role: "admin" })
-    .eq("email", email.toLowerCase())
-    .select("id");
-
-  if (updateErr) return { ok: false, error: updateErr.message };
-  if (!updated || updated.length === 0) {
-    return {
-      ok: false,
-      error: `No profile found for ${email}. The user must sign up first so the handle_new_user trigger creates their profile.`,
-    };
-  }
-  return { ok: true };
 }
 
 /**
