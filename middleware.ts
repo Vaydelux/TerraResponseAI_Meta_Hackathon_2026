@@ -5,7 +5,7 @@
 //      — only for protected routes (public routes skip the network
 //      call to Supabase Auth).
 //   2. Guard protected routes — unauthenticated → /login.
-//   3. Safe redirects: /login → role default when already signed in.
+//   3. Safe redirects: protected unauthenticated pages → /login.
 //
 // Per the brief: "Implement login, logout, signed-in session refresh,
 // protected dashboard routes, and safe redirects." The middleware is
@@ -16,10 +16,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { refreshSupabaseSession } from "@/lib/supabase/middleware-client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { safeAuthPath } from "@/lib/auth/safe-redirect";
 
 // Routes that don't require authentication. Everything else does.
-const PUBLIC_ROUTES = ["/login", "/signup", "/auth/callback"];
+const PUBLIC_ROUTES = ["/login", "/signup", "/auth/callback", "/account-unavailable"];
 
 function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
@@ -50,23 +49,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Returning authenticated users should not remain on /login.
-  // Verify their session and preserve rotated auth cookies on redirect.
-  // /signup and /auth/callback remain unguarded for email confirmation.
-  if (pathname === "/login") {
-    const { response, user } = await refreshSupabaseSession(request);
-    if (!user) return response;
-
-    const requested = safeAuthPath(request.nextUrl.searchParams.get("callbackUrl") ?? "/dashboard");
-    const targetPath = isPublicRoute(new URL(requested, request.nextUrl.origin).pathname)
-      ? "/dashboard"
-      : requested;
-    const target = new URL(targetPath, request.nextUrl.origin);
-    const redirectResponse = NextResponse.redirect(target);
-    response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
-    return redirectResponse;
-  }
-
+  // Do not automatically redirect /login to /dashboard. A valid Auth
+  // session does not prove the profile query or membership grants succeed.
+  // Redirecting here while (app)/layout redirects profile failures back
+  // to /login caused an infinite 307 loop. Signed-in users navigate to
+  // /dashboard explicitly after successful verification.
   if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
