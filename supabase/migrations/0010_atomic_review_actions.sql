@@ -30,6 +30,9 @@ declare
   v_key text;
   v_arr jsonb;
   v_item jsonb;
+  v_arr_max_items integer;
+  v_arr_max_length integer;
+  v_previous_observation jsonb;
   v_before jsonb;
   v_after jsonb;
   v_action text;
@@ -158,14 +161,21 @@ begin
       if pg_catalog.jsonb_typeof(v_arr) <> 'array' then
         raise exception 'Correction list must be an array' using errcode = '22023';
       end if;
-      if pg_catalog.jsonb_array_length(v_arr) >
-        case when v_key = 'uncertainties' then 10 else 20 end then
+      -- Avoid CASE..END nested in IF: some remote SQL statement parsers
+      -- terminate the function at the CASE END instead of the PL/pgSQL END.
+      if v_key = 'uncertainties' then
+        v_arr_max_items := 10;
+        v_arr_max_length := 300;
+      else
+        v_arr_max_items := 20;
+        v_arr_max_length := 500;
+      end if;
+      if pg_catalog.jsonb_array_length(v_arr) > v_arr_max_items then
         raise exception 'Correction list exceeds limit' using errcode = '22023';
       end if;
       for v_item in select value from pg_catalog.jsonb_array_elements(v_arr) as elem(value) loop
         if pg_catalog.jsonb_typeof(v_item) <> 'string' or
-          pg_catalog.length(v_item #>> '{}') >
-            case when v_key = 'uncertainties' then 300 else 500 end then
+          pg_catalog.length(v_item #>> '{}') > v_arr_max_length then
           raise exception 'Invalid correction list item' using errcode = '22023';
         end if;
       end loop;
@@ -178,10 +188,12 @@ begin
     raise exception 'No analysis exists to correct' using errcode = 'P0001';
   end if;
   v_before := coalesce(v_analysis.structured_observation, '{}'::jsonb);
+  v_previous_observation := null;
   v_after := null;
   v_severity := null;
 
   if v_has_corrections then
+    v_previous_observation := v_before;
     v_original := coalesce(
       v_before -> '_original_model_output', v_before
     );
@@ -201,13 +213,23 @@ begin
     end if;
   end if;
 
-  v_action := case when p_action in ('correct','comment') then 'comment'
-                   when p_action = 'request_info' then 'flag'
-                   else p_action end;
-  v_outcome := case when p_action in ('correct','comment','confirm') then 'confirmed'
-                    when p_action in ('flag','request_info') then 'flagged'
-                    when p_action = 'reject' then 'rejected'
-                    else 'resolved' end;
+  if p_action in ('correct', 'comment') then
+    v_action := 'comment';
+  elsif p_action = 'request_info' then
+    v_action := 'flag';
+  else
+    v_action := p_action;
+  end if;
+
+  if p_action in ('correct', 'comment', 'confirm') then
+    v_outcome := 'confirmed';
+  elsif p_action in ('flag', 'request_info') then
+    v_outcome := 'flagged';
+  elsif p_action = 'reject' then
+    v_outcome := 'rejected';
+  else
+    v_outcome := 'resolved';
+  end if;
 
   -- These writes occur in ONE Postgres function call/transaction.
   -- Any failed statement aborts all preceding mutations.
@@ -225,9 +247,9 @@ begin
     p_request_id, p_report_id, v_actor, v_action,
     coalesce(p_comment, p_reason),
     v_report.status, 'reviewed',
-    case when v_has_corrections then v_before else null end,
+    v_previous_observation,
     v_after, v_analysis.severity_score,
-    case when v_has_corrections then v_severity else null end
+    v_severity
   ) returning id into v_review_id;
 
   update public.reports r
