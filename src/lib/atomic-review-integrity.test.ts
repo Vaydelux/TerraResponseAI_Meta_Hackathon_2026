@@ -11,7 +11,7 @@ describe("atomic review database guardrails", () => {
     expect(sql).toContain("insert into public.review_actions");
     expect(sql).toContain("update public.report_analyses");
     expect(sql).toContain("update public.reports");
-    expect(route).toContain('supabase.rpc("submit_review_atomic"');
+    expect(route).toContain('supabase.rpc("submit_review_tx"');
     expect(route).not.toContain('.from("review_actions").insert');
     expect(route).not.toContain('.from("reports").update');
   });
@@ -25,7 +25,7 @@ describe("atomic review database guardrails", () => {
     expect(sql).toContain("review_actions_request_id_unique");
   });
   it("restricts executable permissions and prevents arbitrary field mutation", () => {
-    expect(sql).toMatch(/revoke all on function public\.submit_review_atomic\(/);
+    expect(sql).toMatch(/revoke all on function public\.submit_review_tx\(/);
     expect(sql).toMatch(/from public, anon/);
     expect(sql).toMatch(/to authenticated/);
     expect(sql).toContain("Correction field is not allowed");
