@@ -68,7 +68,7 @@ describe("atomic review route integration", () => {
     });
     expect(res.status).toBe(200);
     expect(mocks.rpc).toHaveBeenCalledTimes(1);
-    expect(mocks.rpc).toHaveBeenCalledWith("submit_review_atomic", {
+    expect(mocks.rpc).toHaveBeenCalledWith("submit_review_tx", {
       p_report_id: ID,
       p_request_id: REQUEST_ID,
       p_action: "correct",
@@ -94,7 +94,7 @@ describe("atomic review route integration", () => {
 
   it("fails closed on missing migration, never leaks provider SQL error text", async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: {
-      code: "42883", message: "function public.submit_review_atomic(...) does not exist and contains secret metadata"
+      code: "42883", message: "function public.submit_review_tx(...) does not exist and contains secret metadata"
     } });
     const res = await call({ action: "confirm", requestId: REQUEST_ID });
     expect(res.status).toBe(503);
