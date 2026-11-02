@@ -16,6 +16,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { refreshSupabaseSession } from "@/lib/supabase/middleware-client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { safeAuthPath } from "@/lib/auth/safe-redirect";
 
 // Routes that don't require authentication. Everything else does.
 const PUBLIC_ROUTES = ["/login", "/signup", "/auth/callback"];
@@ -49,10 +50,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // For public routes, skip the supabase.auth.getUser() network call
-  // — it adds latency to /login and /auth/callback, which don't need
-  // the session. The /login page handles the authenticated-redirect
-  // client-side via its own check.
+  // Returning authenticated users should not remain on /login.
+  // Verify their session and preserve rotated auth cookies on redirect.
+  // /signup and /auth/callback remain unguarded for email confirmation.
+  if (pathname === "/login") {
+    const { response, user } = await refreshSupabaseSession(request);
+    if (!user) return response;
+
+    const requested = safeAuthPath(request.nextUrl.searchParams.get("callbackUrl") ?? "/dashboard");
+    const targetPath = isPublicRoute(new URL(requested, request.nextUrl.origin).pathname)
+      ? "/dashboard"
+      : requested;
+    const target = new URL(targetPath, request.nextUrl.origin);
+    const redirectResponse = NextResponse.redirect(target);
+    response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+    return redirectResponse;
+  }
+
   if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
@@ -67,7 +81,9 @@ export async function middleware(request: NextRequest) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(loginUrl);
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+    return redirectResponse;
   }
 
   return response;
