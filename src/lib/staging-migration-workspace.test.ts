@@ -41,7 +41,7 @@ describe("staging connector history reconciliation", () => {
   it("reproduces all 12 installed staging timestamps without changing source", () => {
     const result = run();
     try {
-      expect(result.migrations).toHaveLength(12);
+      expect(result.migrations).toHaveLength(13);\n      expect(result.migrations).toContain("20261103090000_authenticated_core_read_grants.sql");
       expect(result.migrations).toContain("20261101171237_terraresponse_0001_schema.sql");
       expect(result.migrations).toContain("20261102064819_terraresponse_0010_atomic_review_actions.sql");
       expect(result.migrations).toContain("20261102054445_terraresponse_0011_api_grants.sql");
