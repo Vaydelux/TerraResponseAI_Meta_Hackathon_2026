@@ -83,6 +83,8 @@ export function ContextualIntelligenceCard({
 
   useEffect(() => {
     if (initialContext) {
+      // Preserve server-provided context without changing the existing render flow.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setContextData(initialContext);
       setLoading(false);
       return;
