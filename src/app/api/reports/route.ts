@@ -118,43 +118,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 4. An authenticated reporter can post to the FIXED community
-  // intake without being manually assigned to an event. All other
-  // event IDs still require an existing authorized membership.
-  let communityEventId: string | null = null;
-  if (isCommunityIntakeEnabled()) {
-    try {
-      communityEventId = await ensureCommunityIntakeMembership(user.id);
-    } catch {
-      return NextResponse.json(
-        { error: { code: "INTAKE_UNAVAILABLE", message: "Community reporting is temporarily unavailable." } },
-        { status: 503 },
-      );
-    }
-  }
-  const eventId = meta.eventId ?? communityEventId;
-  if (!eventId) {
+  // 4. Every authenticated user submits to the same fixed system intake.
+  // Never use a caller-selected event as an authorization shortcut.
+  // The service-role helper accepts ONLY this authenticated user's ID.
+  let eventId: string;
+  try {
+    eventId = await ensureCommunityIntakeMembership(user.id);
+  } catch {
     return NextResponse.json(
-      { error: { code: "EVENT_REQUIRED", message: "No reporting event is available." } },
-      { status: 400 },
+      { error: { code: "INTAKE_UNAVAILABLE", message: "Photo reporting is temporarily unavailable. No photo was saved." } },
+      { status: 503 },
     );
   }
-  const membership = ctx.events.find((e) => e.event_id === eventId) ??
-    (communityEventId === eventId ? { role: "contributor" as const } : undefined);
-  if (!membership) {
-    // The user is NOT a member of this event. We return 403 WITHOUT
-    // confirming whether the event exists (no cross-event leak).
+  // Accept older clients only when their submitted event is the SAME
+  // server-authorized intake. Foreign event IDs cannot route uploads.
+  if (meta.eventId && meta.eventId !== eventId) {
     return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "You are not a member of this event." } },
-      { status: 403 },
-    );
-  }
-  if (membership.role !== "contributor" && membership.role !== "reviewer" && membership.role !== "coordinator") {
-    // Defensive: the membership types are contributor/reviewer/coordinator;
-    // all three can submit reports (the RLS reports_insert_contributor_self
-    // policy allows contributor+). This check is belt-and-suspenders.
-    return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "Your event role cannot submit reports." } },
+      { error: { code: "FORBIDDEN", message: "Event selection is not required for photo reports." } },
       { status: 403 },
     );
   }
