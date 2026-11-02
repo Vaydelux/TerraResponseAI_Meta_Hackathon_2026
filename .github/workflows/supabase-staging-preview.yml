@@ -69,27 +69,27 @@ jobs:
           # Pin for reproducible --linked semantics; do not drift with CLI latest.
           version: 2.72.7
 
+      - name: Prepare timestamp-aligned disposable staging migration workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$RUNNER_TEMP/terraresponse-staging-migrations"
+          node scripts/prepare-staging-migration-workspace.mjs "$workspace"
+          echo "STAGING_MIGRATION_WORKSPACE=$workspace" >> "$GITHUB_ENV"
+
       - name: Link staging project (does not apply migrations)
+        working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}
         shell: bash
         run: |
           set -euo pipefail
           supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
-      - name: Warn on nonstandard local migration versions
-        shell: bash
-        run: |
-          set -euo pipefail
-          for file in supabase/migrations/*.sql; do
-            name="${file##*/}"
-            if ! [[ "$name" =~ ^[0-9]{14}_[a-zA-Z0-9_-]+\.sql$ ]]; then
-              echo "::warning file=$file::Nonstandard migration filename. Supabase expects YYYYMMDDHHmmss_name.sql. Do not rename an already applied migration without verifying remote migration history."
-            fi
-          done
-
       - name: Inspect applied and pending migration history
+        working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}
         run: supabase migration list --linked
 
       - name: Preview database migration changes (READ ONLY)
+        working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}
         run: supabase db push --dry-run --linked
 
       - name: Migration preview completed
