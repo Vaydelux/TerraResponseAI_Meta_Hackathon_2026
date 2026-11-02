@@ -24,8 +24,11 @@ describe("Supabase staging preview safety", () => {
     expect(workflow).not.toMatch(/run:\s*supabase (?:db reset|migration repair|db seed)/);
   });
 
-  it("warns on unsupported filename versions without touching remote migration history", () => {
-    expect(workflow).toContain("Nonstandard migration filename");
-    expect(workflow).toContain("Do not rename an already applied migration");
+  it("matches applied remote timestamps in a disposable staging workspace", () => {
+    expect(workflow).toContain("node scripts/prepare-staging-migration-workspace.mjs");
+    expect(workflow).toContain("node \"$GITHUB_WORKSPACE/scripts/verify-staging-migration-history.mjs\"");
+    expect(workflow).toContain("STAGING_MIGRATION_WORKSPACE");
+    expect(workflow).toContain('working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}');
+    expect(workflow).not.toContain("supabase migration repair");
   });
 });
