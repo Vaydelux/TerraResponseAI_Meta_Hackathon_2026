@@ -13,8 +13,6 @@ import { getServerUser, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAuthContext } from "@/lib/auth/profile";
 import { AppShell } from "@/components/layout/AppShell";
 import { SetupRedirect } from "@/components/terra/setup-redirect";
-import { isTriageEnabled } from "@/lib/triage/processing";
-import { isRoleManagementEnabled } from "@/lib/admin/role-management";
 
 export default async function AppLayout({
   children,
@@ -58,7 +56,7 @@ export default async function AppLayout({
   }
 
   return (
-    <AppShell ctx={ctx} pendingReviewCount={pendingReviewCount} showIncidentNotifications={isTriageEnabled()} showRoleManagement={isRoleManagementEnabled()}>
+    <AppShell ctx={ctx} pendingReviewCount={pendingReviewCount}>
       {children}
     </AppShell>
   );

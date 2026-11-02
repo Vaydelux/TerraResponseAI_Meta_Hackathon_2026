@@ -51,8 +51,8 @@ export function WhatMakesDifferent() {
         human-reviewed incident intelligence platform.
       </p>
 
-      <div className="table" style={{ overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
+      <div className="table" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <table style={{ width: "100%", minWidth: 580, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr>
               <th

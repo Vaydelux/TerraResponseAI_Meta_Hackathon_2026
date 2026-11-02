@@ -1,14 +1,20 @@
 "use client";
 
+import { useEffect } from "react";
 import { ThemeProvider } from "next-themes";
+import { applyMode, readInitialTheme } from "@/components/layout/ThemeToggle";
 
 /**
  * Client-side providers shared across the whole app.
- * - ThemeProvider (next-themes) — drives light/dark mode via `class`
- *   strategy. `enableSystem={true}` allows following the OS preference;
- *   the user can override via the theme toggle in the header.
+ * - ThemeProvider (next-themes) + synchronized TerraResponse `data-theme`
+ *   ("day" | "night" | "auto") so every page honors the user's saved
+ *   Day / Night Ops choice immediately on hydration.
  */
 export function Providers({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    applyMode(readInitialTheme());
+  }, []);
+
   return (
     <ThemeProvider
       attribute="class"

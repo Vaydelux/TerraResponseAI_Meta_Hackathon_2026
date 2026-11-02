@@ -16,8 +16,8 @@ describe("staging isolation hardening", () => {
       expect(workflow).toContain("PRODUCTION_PROJECT_REF");
       expect(workflow).toContain("exit 1");
     }
-    expect(provision).toContain('ref !== "ytfaetqvtbsbmcsdlkvk"');
-    expect(provision).toContain('production !== "ywopsafppyykhwrejliz"');
+    expect(provision).toContain('ref === "ywopsafppyykhwrejliz"');
+    expect(provision).toContain('!/^[a-z0-9]{12,32}$/.test(production)');
   });
   it("uses distinct staging-only credentials and never accidentally reuses production secrets", () => {
     for (const workflow of [apply, verify]) {

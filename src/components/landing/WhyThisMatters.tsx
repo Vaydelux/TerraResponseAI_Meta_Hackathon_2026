@@ -36,11 +36,7 @@ export function WhyThisMatters() {
   return (
     <section
       style={{
-        marginTop: "var(--s-6)",
-        marginLeft: "calc(50% - 50vw)",
-        marginRight: "calc(50% - 50vw)",
-        paddingLeft: "calc(50vw - var(--content-max) / 2)",
-        paddingRight: "calc(50vw - var(--content-max) / 2)",
+        width: "100%",
         paddingTop: "var(--s-5)",
         paddingBottom: "var(--s-5)",
         background: "var(--sheet)",

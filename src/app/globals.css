@@ -20,7 +20,7 @@
 @import "./styles/components.css";
 @import "./styles/map.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="night"], [data-theme="night"] *));
 
 /* Tailwind v4 bridge — expose design tokens to Tailwind utilities for
  * one-off layout work (per docs/DESIGN.md "Tailwind v4 bridge"). Do

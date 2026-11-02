@@ -1,19 +1,7 @@
 // src/app/page.tsx
 //
-// Landing page — Phase 19 restructure.
-//
-// Section order (per the hackathon presentation requirements):
-//   1. Cinematic hero with video background + interactive demo
-//   2. "Why this matters" strip (disaster photos → overwhelmed → AI → humans)
-//   3. "How it works" demo flow (upload → AI → review → map)
-//   4. Live incident map preview
-//   5. "How Meta AI powers this" (Muse Spark + SAM 3.1 + human correction)
-//   6. "What makes this different" comparison table
-//   7. Human-review workflow (trust model)
-//   8. Responsible AI (condensed)
-//   9. Final CTA (Watch demo · Explore incident · View GitHub)
-//
-// Server Component — server-side identity verification for CTA targets.
+// Landing page — Responsive & User-Friendly layout with Day / Night Ops
+// theme support in the sticky top bar.
 
 import { getServerUser, isSupabaseConfigured } from "@/lib/supabase/server";
 import { Hero } from "@/components/landing/Hero";
@@ -26,6 +14,7 @@ import { TrustModelDiagram } from "@/components/landing/TrustModelDiagram";
 import { BoundariesGrid } from "@/components/landing/BoundariesGrid";
 import { FinalCTA } from "@/components/landing/FinalCTA";
 import { Wordmark } from "@/components/layout/Wordmark";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 export default async function LandingPage() {
   const configured = isSupabaseConfigured();
@@ -33,17 +22,22 @@ export default async function LandingPage() {
   const signedIn = !!user;
 
   return (
-    <div className="tr-shell" style={{ background: "var(--paper)" }}>
+    <div className="tr-shell" style={{ background: "var(--paper)", gridTemplateRows: "var(--nav-h) 1fr auto" }}>
       <header className="topbar" style={{ position: "sticky", top: 0 }}>
         <Wordmark />
+        <nav className="nav" aria-label="Page sections">
+          <a className="nav__link" href="#how-it-works">How it works</a>
+          <a className="nav__link" href="#incident-map-preview">Map preview</a>
+        </nav>
         <div className="topbar__spacer" />
+        <ThemeToggle />
         {signedIn ? (
-          <a className="btn btn--primary" href="/review">Open review queue</a>
+          <a className="btn btn--primary" href="/dashboard">Open workspace</a>
         ) : (
           <a className="btn btn--primary" href="/login">Sign in</a>
         )}
       </header>
-      <main id="main-content" tabIndex={-1}>
+      <main id="main-content" tabIndex={-1} style={{ overflowX: "hidden" }}>
         {/* 1. Cinematic hero with video background + interactive demo */}
         <Hero signedIn={signedIn} />
 
@@ -77,6 +71,10 @@ export default async function LandingPage() {
         {/* 9. Final CTA */}
         <FinalCTA />
       </main>
+      <footer className="tr-status-footer">
+        <span>TerraResponse AI · Disaster-Photo Intelligence &amp; Human Review</span>
+        <span>Built for Emergency Response Teams · Day &amp; Night Ops Ready</span>
+      </footer>
     </div>
   );
 }

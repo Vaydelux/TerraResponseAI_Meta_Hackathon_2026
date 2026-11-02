@@ -25,7 +25,6 @@ import { stateFromReport } from "@/lib/design/status";
 import { toSeverityLevel } from "@/lib/design/severity";
 import { formatRelativeTime } from "@/lib/design/format";
 import { cn } from "@/lib/utils";
-import { rankQueue, triageLabel, type TriageQueueClass } from "@/lib/triage/queue-priority";
 
 export interface ReviewQueueRow {
   id: string;
@@ -39,11 +38,6 @@ export interface ReviewQueueRow {
   location_label: string | null;
   uploaded_at: string;
   priority_score: number | null;
-  report_triage?: {
-    triage_class?: TriageQueueClass;
-    verification_status?: string;
-    preliminary_severity?: number | null;
-  } | null;
   report_analyses?: Array<{ structured_observation: { incident_type?: string; preliminary_severity?: number } }> | null;
 }
 
@@ -73,7 +67,7 @@ export function ReviewQueueTable({ eventId, className }: ReviewQueueTableProps) 
     const ctrl = new AbortController();
     const load = async (status: "needs_review" | "needs_manual_review"): Promise<ReviewQueueRow[]> => {
       const params = new URLSearchParams({
-        event_id: eventId, status, limit: "50", include_analysis: "true", include_triage: "true",
+        event_id: eventId, status, limit: "50", include_analysis: "true",
       });
       const response = await fetch(`/api/reports?${params.toString()}`, { signal: ctrl.signal });
       if (!response.ok) throw new Error("Review queue could not be loaded.");
@@ -97,7 +91,8 @@ export function ReviewQueueTable({ eventId, className }: ReviewQueueTableProps) 
         // Duplicate IDs should never appear twice, even if an API returns
         // overlapping states during concurrent state transitions.
         const unique = new Map([...pending, ...manual].map((row) => [row.id, row]));
-        const all = rankQueue([...unique.values()]);
+        const all = [...unique.values()].sort((a, b) =>
+          (b.priority_score ?? 0) - (a.priority_score ?? 0));
         setRows(all);
         setActiveIdx(0);
         setError(null);
@@ -165,7 +160,6 @@ export function ReviewQueueTable({ eventId, className }: ReviewQueueTableProps) 
           <TH>Photo</TH>
           <TH>Incident</TH>
           <TH>Seal</TH>
-          <TH>AI triage</TH>
           <TH>Severity</TH>
           <TH>Priority</TH>
           <TH>Uploaded</TH>
@@ -198,7 +192,6 @@ export function ReviewQueueTable({ eventId, className }: ReviewQueueTableProps) 
               <TD>
                 <SealBadge state={state} />
               </TD>
-              <TD className="t-meta">{triageLabel(r)}</TD>
               <TD>
                 <SeverityMeter level={toSeverityLevel(severity)} state={state} compact />
               </TD>

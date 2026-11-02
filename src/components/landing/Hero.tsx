@@ -65,16 +65,13 @@ export function Hero({ signedIn = false, className }: HeroProps) {
       className={cn("hero-hero", className)}
       style={{
         position: "relative",
-        minHeight: "min(90vh, 760px)",
+        minHeight: "min(88vh, 740px)",
         display: "flex",
         alignItems: "center",
         overflow: "hidden",
-        marginLeft: "calc(50% - 50vw)",
-        marginRight: "calc(50% - 50vw)",
-        paddingLeft: "calc(50vw - var(--content-max) / 2)",
-        paddingRight: "calc(50vw - var(--content-max) / 2)",
-        paddingTop: "var(--s-7)",
-        paddingBottom: "var(--s-7)",
+        width: "100%",
+        paddingTop: "var(--s-6)",
+        paddingBottom: "var(--s-6)",
       }}
     >
       {/* Cinematic disaster montage background */}
@@ -100,7 +97,6 @@ export function Hero({ signedIn = false, className }: HeroProps) {
           maxWidth: "var(--content-max)",
           margin: "0 auto",
           padding: "0 clamp(16px, 3vw, 40px)",
-          gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 1fr)",
         }}
       >
         {/* Left: headline + CTAs */}

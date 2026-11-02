@@ -1,37 +1,52 @@
 // src/components/layout/ThemeToggle.tsx
 //
 // Cycles day → night → auto. Persists to localStorage; sets
-// `data-theme` on `<html>`. The auto state falls back to the
-// `prefers-color-scheme` media query (the tokens.css handles the
-// actual variable swap).
-//
-// Client component — needs DOM access to write localStorage + the
-// `data-theme` attribute. We mount-read once to set the initial
-// state (no flash of wrong theme — the CSS prefers-color-scheme
-// fallback handles SSR).
+// `data-theme` AND `.dark` class on `<html>`, and dispatches a
+// `tr-theme-change` window event so WebGL canvases (IncidentMap)
+// and any other listeners stay in sync immediately.
 
 "use client";
 
 import { useEffect, useState } from "react";
 import { Segmented } from "@/components/ui-tr/Segmented";
 
-type ThemeMode = "day" | "night" | "auto";
+export type ThemeMode = "day" | "night" | "auto";
 
 const STORAGE_KEY = "tr-theme";
 
-function applyMode(mode: ThemeMode) {
+export function resolveIsNight(mode: ThemeMode): boolean {
+  if (typeof window === "undefined") return false;
+  if (mode === "night") return true;
+  if (mode === "day") return false;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+}
+
+export function applyMode(mode: ThemeMode) {
   if (typeof document === "undefined") return;
+  const root = document.documentElement;
   if (mode === "auto") {
-    document.documentElement.removeAttribute("data-theme");
+    root.removeAttribute("data-theme");
   } else {
-    document.documentElement.setAttribute("data-theme", mode);
+    root.setAttribute("data-theme", mode);
+  }
+  const isNight = resolveIsNight(mode);
+  root.classList.toggle("dark", isNight);
+  root.style.colorScheme = isNight ? "dark" : "light";
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("tr-theme-change", { detail: { mode, isNight } }),
+    );
   }
 }
 
-function readInitial(): ThemeMode {
+export function readInitialTheme(): ThemeMode {
   if (typeof window === "undefined") return "auto";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "day" || stored === "night" || stored === "auto") return stored;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === "day" || stored === "night" || stored === "auto") return stored;
+  } catch {
+    // ignore storage errors
+  }
   return "auto";
 }
 
@@ -56,24 +71,40 @@ const AutoIcon = (
 export function ThemeToggle() {
   const [mode, setMode] = useState<ThemeMode>("auto");
 
-  // Mount-read — runs after hydration (the localStorage isn't
-  // available during SSR). The initial state is "auto" so the SSR
-  // markup matches the first client paint; we update to the stored
-  // value (or auto) after mount. The setState-in-effect pattern is
-  // standard for client-only external state.
   useEffect(() => {
+    const initial = readInitialTheme();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMode(readInitial());
+    setMode(initial);
+    applyMode(initial);
+
+    const onExternalChange = (e: Event) => {
+      const custom = e as CustomEvent<{ mode: ThemeMode; isNight: boolean }>;
+      if (custom.detail?.mode) {
+        setMode(custom.detail.mode);
+      }
+    };
+    const mql = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const onMediaChange = () => {
+      const current = readInitialTheme();
+      if (current === "auto") applyMode("auto");
+    };
+
+    window.addEventListener("tr-theme-change", onExternalChange);
+    mql?.addEventListener?.("change", onMediaChange);
+    return () => {
+      window.removeEventListener("tr-theme-change", onExternalChange);
+      mql?.removeEventListener?.("change", onMediaChange);
+    };
   }, []);
 
   function change(next: ThemeMode) {
     setMode(next);
-    applyMode(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
     } catch {
       // storage unavailable — skip persistence
     }
+    applyMode(next);
   }
 
   return (
@@ -83,7 +114,7 @@ export function ThemeToggle() {
       onChange={change}
       options={[
         { value: "day", label: "Day", icon: SunIcon },
-        { value: "night", label: "Night", icon: MoonIcon },
+        { value: "night", label: "Night Ops", icon: MoonIcon },
         { value: "auto", label: "Auto", icon: AutoIcon },
       ]}
     />

@@ -4,38 +4,40 @@
  *
  * The Verification Seal is the keystone: amber hatch = AI-generated,
  * not verified; solid = signed by a human. Every color, shape, and
- * motion token below exists to reinforce that single idea.
+ * motion token below exists to reinforce that single idea, elevated
+ * with a refined Deep Ocean Teal -> Emerald & Warm Amber gradient
+ * and glassmorphic surface system.
  *
  * See docs/DESIGN.md §3 for the full token reference.
  */
 
 :root {
   /* Surfaces */
-  --paper:        #F2F4F1;   /* app background */
+  --paper:        #F0F4F3;   /* app background with subtle cool-teal warmth */
   --sheet:        #FFFFFF;   /* panels */
-  --sheet-sunk:   #E8ECE8;   /* wells, table headers, inputs at rest */
-  --rule:         #D3D9D4;   /* 1px borders */
-  --rule-strong:  #AEB8B1;
+  --sheet-sunk:   #E6ECEB;   /* wells, table headers, inputs at rest */
+  --rule:         #CFD9D6;   /* 1px borders */
+  --rule-strong:  #A8B7B2;
 
   /* Ink */
-  --ink:          #17232E;   /* primary text */
-  --ink-2:        #3E4C58;   /* secondary text */
-  --ink-3:        #66737E;   /* tertiary / helper (4.6:1 on paper) */
+  --ink:          #13222C;   /* primary text */
+  --ink-2:        #3A4B57;   /* secondary text */
+  --ink-3:        #5E6F7B;   /* tertiary / helper (4.6:1 on paper) */
   --ink-inverse:  #F2F4F1;
 
   /* Action */
   --tide:         #0B6574;
   --tide-hover:   #084E5A;
   --tide-press:   #063C45;
-  --tide-wash:    #DDEEF0;
+  --tide-wash:    #DCF0F2;
 
   /* Verification states — each means exactly one thing */
   --amber:        #E8A317;   /* AI-generated, not verified (hatch + fills) */
   --amber-ink:    #7A4F00;   /* text on amber washes (7.2:1 on --amber-wash) */
   --amber-wash:   #FFF3D6;
-  --green:        #2F7D4F;   /* confirmed by a human */
-  --green-ink:    #1D5535;
-  --green-wash:   #DFF1E6;
+  --green:        #218358;   /* confirmed by a human */
+  --green-ink:    #165B3C;
+  --green-wash:   #DCF3E7;
   --brick:        #B3382C;   /* rejected */
   --brick-ink:    #8A241A;
   --brick-wash:   #F9E1DD;
@@ -48,6 +50,24 @@
   --sev-3: #4A97A3;
   --sev-4: #1F6E7C;
   --sev-5: #0E3F4A;
+
+  /* Deep Ocean Teal -> Emerald & Amber Gradient Palette (Day Mode) */
+  --grad-primary:       linear-gradient(135deg, #0A5463 0%, #0E6F7D 52%, #1D835A 100%);
+  --grad-primary-hover: linear-gradient(135deg, #07424E 0%, #0B5C68 52%, #166B49 100%);
+  --grad-amber:         linear-gradient(135deg, #C47A12 0%, #E09624 55%, #F2B238 100%);
+  --grad-critical:      linear-gradient(135deg, #A82E22 0%, #CC4637 55%, #E08B24 100%);
+  --grad-moderate:      linear-gradient(135deg, #0B6574 0%, #248899 55%, #3CA6B5 100%);
+  --grad-surface-sheen: linear-gradient(160deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.94) 62%, rgba(220, 240, 242, 0.38) 100%);
+  --grad-banner-wash:   linear-gradient(135deg, rgba(11, 101, 116, 0.08) 0%, rgba(33, 131, 88, 0.06) 55%, rgba(232, 163, 23, 0.06) 100%);
+  --grad-aside-wash:    linear-gradient(165deg, #E5F0F1 0%, #E8EFEA 55%, #DCEAE7 100%);
+
+  /* Refined Glassmorphism & Elevation */
+  --glass-bg:        rgba(255, 255, 255, 0.86);
+  --glass-bg-strong: rgba(255, 255, 255, 0.93);
+  --glass-border:    rgba(11, 101, 116, 0.16);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --lift:            0 10px 30px -6px rgba(15, 34, 46, 0.11), 0 2px 8px -2px rgba(15, 34, 46, 0.06);
+  --lift-primary:    0 6px 18px -4px rgba(11, 101, 116, 0.35);
 
   /* Type */
   --font-display: var(--font-bricolage), "Segoe UI", system-ui, sans-serif;
@@ -70,7 +90,6 @@
   --r-panel:  14px;
   --r-pill:   999px;
 
-  --lift: 0 8px 28px rgba(23, 35, 46, 0.16);
   --focus: 0 0 0 2px var(--paper), 0 0 0 4px var(--tide);
 
   /* Motion */
@@ -85,32 +104,106 @@
   --content-max: 1440px;
 }
 
-/* Night Ops: for reviewers on long shifts. Toggle via [data-theme="night"]
- * or prefers-color-scheme (when [data-theme] is not "day"). */
-:root[data-theme="night"] {
-  --paper: #0F1A22;  --sheet: #17242E;  --sheet-sunk: #1E2E3A;
-  --rule: #2B3E4B;   --rule-strong: #3F566A;
-  --ink: #E8EEF0;    --ink-2: #B7C4CC;  --ink-3: #8C9BA6;
-  --tide: #4FB3C2;   --tide-hover: #72C6D3; --tide-press: #9AD8E2; --tide-wash: #123A44;
-  --amber: #F0B23A;  --amber-ink: #F6CE7A; --amber-wash: #3A2D0E;
-  --green: #52B87D;  --green-ink: #8FDBAE; --green-wash: #123525;
-  --brick: #E0675B;  --brick-ink: #F2A59C; --brick-wash: #3E1914;
-  --flood: #6FA8E6;  --graphite: #8C9BA6;
-  --lift: 0 8px 28px rgba(0, 0, 0, 0.5);
+/* Night Ops: for reviewers on long shifts. Toggle via [data-theme="night"],
+ * .dark class, or prefers-color-scheme (when [data-theme] is not "day"). */
+:root[data-theme="night"],
+:root.dark:not([data-theme="day"]) {
+  --paper: #0A1319;
+  --sheet: #111F29;
+  --sheet-sunk: #172936;
+  --rule: #233847;
+  --rule-strong: #355266;
+  --ink: #EBF1F4;
+  --ink-2: #B7C6CF;
+  --ink-3: #8A9BA7;
+  --ink-inverse: #0A1319;
+  --tide: #48B5C6;
+  --tide-hover: #6DC7D6;
+  --tide-press: #9AD8E2;
+  --tide-wash: #123944;
+  --amber: #F0B23A;
+  --amber-ink: #F6CE7A;
+  --amber-wash: #3A2D0E;
+  --green: #48C07A;
+  --green-ink: #8FDBAE;
+  --green-wash: #113524;
+  --brick: #E0675B;
+  --brick-ink: #F2A59C;
+  --brick-wash: #3E1914;
+  --flood: #6FA8E6;
+  --graphite: #8C9BA6;
+  --sev-1: #1D3B44;
+  --sev-2: #295966;
+  --sev-3: #388091;
+  --sev-4: #4CA6BA;
+  --sev-5: #7CE0F5;
+
+  /* Deep Ocean Teal -> Emerald & Amber Gradient Palette (Night Ops) */
+  --grad-primary:       linear-gradient(135deg, #106072 0%, #1C889C 52%, #269E67 100%);
+  --grad-primary-hover: linear-gradient(135deg, #157286 0%, #249BB1 52%, #31B578 100%);
+  --grad-amber:         linear-gradient(135deg, #B87314 0%, #DF9826 55%, #F5BC47 100%);
+  --grad-critical:      linear-gradient(135deg, #B4382A 0%, #DA5445 55%, #E8962E 100%);
+  --grad-moderate:      linear-gradient(135deg, #17697A 0%, #2E96AA 55%, #4CC2D4 100%);
+  --grad-surface-sheen: linear-gradient(160deg, rgba(20, 37, 49, 0.96) 0%, rgba(17, 31, 41, 0.96) 62%, rgba(18, 57, 68, 0.44) 100%);
+  --grad-banner-wash:   linear-gradient(135deg, rgba(72, 181, 198, 0.14) 0%, rgba(72, 192, 122, 0.09) 55%, rgba(240, 178, 58, 0.08) 100%);
+  --grad-aside-wash:    linear-gradient(165deg, #0E1D27 0%, #122631 55%, #0F292B 100%);
+
+  --glass-bg:        rgba(17, 31, 41, 0.84);
+  --glass-bg-strong: rgba(17, 31, 41, 0.92);
+  --glass-border:    rgba(72, 181, 198, 0.22);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --lift:            0 14px 36px -6px rgba(0, 0, 0, 0.55), 0 4px 12px -2px rgba(0, 0, 0, 0.35);
+  --lift-primary:    0 6px 20px -4px rgba(28, 136, 156, 0.45);
   --focus: 0 0 0 2px var(--paper), 0 0 0 4px var(--tide);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="day"]) {
-    --paper: #0F1A22;  --sheet: #17242E;  --sheet-sunk: #1E2E3A;
-    --rule: #2B3E4B;   --rule-strong: #3F566A;
-    --ink: #E8EEF0;    --ink-2: #B7C4CC;  --ink-3: #8C9BA6;
-    --tide: #4FB3C2;   --tide-hover: #72C6D3; --tide-press: #9AD8E2; --tide-wash: #123A44;
-    --amber: #F0B23A;  --amber-ink: #F6CE7A; --amber-wash: #3A2D0E;
-    --green: #52B87D;  --green-ink: #8FDBAE; --green-wash: #123525;
-    --brick: #E0675B;  --brick-ink: #F2A59C; --brick-wash: #3E1914;
-    --flood: #6FA8E6;  --graphite: #8C9BA6;
-    --lift: 0 8px 28px rgba(0, 0, 0, 0.5);
+    --paper: #0A1319;
+    --sheet: #111F29;
+    --sheet-sunk: #172936;
+    --rule: #233847;
+    --rule-strong: #355266;
+    --ink: #EBF1F4;
+    --ink-2: #B7C6CF;
+    --ink-3: #8A9BA7;
+    --ink-inverse: #0A1319;
+    --tide: #48B5C6;
+    --tide-hover: #6DC7D6;
+    --tide-press: #9AD8E2;
+    --tide-wash: #123944;
+    --amber: #F0B23A;
+    --amber-ink: #F6CE7A;
+    --amber-wash: #3A2D0E;
+    --green: #48C07A;
+    --green-ink: #8FDBAE;
+    --green-wash: #113524;
+    --brick: #E0675B;
+    --brick-ink: #F2A59C;
+    --brick-wash: #3E1914;
+    --flood: #6FA8E6;
+    --graphite: #8C9BA6;
+    --sev-1: #1D3B44;
+    --sev-2: #295966;
+    --sev-3: #388091;
+    --sev-4: #4CA6BA;
+    --sev-5: #7CE0F5;
+
+    --grad-primary:       linear-gradient(135deg, #106072 0%, #1C889C 52%, #269E67 100%);
+    --grad-primary-hover: linear-gradient(135deg, #157286 0%, #249BB1 52%, #31B578 100%);
+    --grad-amber:         linear-gradient(135deg, #B87314 0%, #DF9826 55%, #F5BC47 100%);
+    --grad-critical:      linear-gradient(135deg, #B4382A 0%, #DA5445 55%, #E8962E 100%);
+    --grad-moderate:      linear-gradient(135deg, #17697A 0%, #2E96AA 55%, #4CC2D4 100%);
+    --grad-surface-sheen: linear-gradient(160deg, rgba(20, 37, 49, 0.96) 0%, rgba(17, 31, 41, 0.96) 62%, rgba(18, 57, 68, 0.44) 100%);
+    --grad-banner-wash:   linear-gradient(135deg, rgba(72, 181, 198, 0.14) 0%, rgba(72, 192, 122, 0.09) 55%, rgba(240, 178, 58, 0.08) 100%);
+    --grad-aside-wash:    linear-gradient(165deg, #0E1D27 0%, #122631 55%, #0F292B 100%);
+
+    --glass-bg:        rgba(17, 31, 41, 0.84);
+    --glass-bg-strong: rgba(17, 31, 41, 0.92);
+    --glass-border:    rgba(72, 181, 198, 0.22);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --lift:            0 14px 36px -6px rgba(0, 0, 0, 0.55), 0 4px 12px -2px rgba(0, 0, 0, 0.35);
+    --lift-primary:    0 6px 20px -4px rgba(28, 136, 156, 0.45);
     --focus: 0 0 0 2px var(--paper), 0 0 0 4px var(--tide);
   }
 }

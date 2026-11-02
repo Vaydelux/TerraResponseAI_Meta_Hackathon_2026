@@ -1,19 +1,32 @@
 // src/app/(app)/dashboard/page.tsx
 //
-// The dashboard. A launchpad — light touch per the brief: "the
-// dashboard is a launchpad, not a primary screen." Shows honest
-// metrics (drawn from /api/reports) + a 6-card grid of the most
-// recent reports using the new ReportCard.
+// Overview Dashboard. Combines a welcoming 4-step workflow guide,
+// honest database-backed KPI cards, the severity-banded Active
+// Incident Triage grid, the interactive Quick Actions Hub (with
+// F1–F4 shortcuts), and the Recent Activity & Alerts Stream.
 
 import { getServerUser, isSupabaseConfigured, createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/lib/auth/profile";
 import { redirect } from "next/navigation";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { ReportCard } from "@/components/report/ReportCard";
+import { cookies } from "next/headers";
+import Link from "next/link";
+import {
+  AlertTriangle,
+  ClipboardCheck,
+  CheckCircle2,
+  MapPinOff,
+  Clock,
+  ShieldCheck,
+  Bell,
+  Activity,
+} from "lucide-react";
+import { IncidentTriageCard } from "@/components/report/IncidentTriageCard";
+import { QuickActionsHub } from "@/components/report/QuickActionsHub";
+import { KeyboardShortcutsDock } from "@/components/report/KeyboardShortcutsDock";
 import type { ReportRowData } from "@/components/report/ReportRow";
 import { EmptyState } from "@/components/ui-tr/EmptyState";
 import { Button } from "@/components/ui-tr";
-import Link from "next/link";
+import { formatRelativeTime } from "@/lib/design/format";
 import type { UserEventMembership } from "@/lib/auth/profile";
 
 export default async function DashboardPage() {
@@ -26,34 +39,55 @@ export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
   const eventIds = ctx.events.map((e) => e.event_id);
 
-  // Honest metrics — counts from the DB.
-  const [allRes, pendingRes, reviewedRes, unlocatedRes, failedRes, manualRes] = await Promise.all([
-    supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds),
-    supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "needs_review"),
-    supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "reviewed"),
-    supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("location_source", "unknown"),
-    supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "retryable_error"),
-    supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "needs_manual_review"),
-  ]);
+  // Resolve active event from cookie or first membership
+  const cookieStore = await cookies();
+  const cookieEventId = cookieStore.get("tr-active-event")?.value;
+  const activeEvent: UserEventMembership | null =
+    (cookieEventId ? ctx.events.find((e) => e.event_id === cookieEventId) : null) ??
+    ctx.events[0] ??
+    null;
 
-  const stats = [
-    { label: "Reports received", value: allRes.count ?? 0 },
-    { label: "Awaiting review", value: (pendingRes.count ?? 0) + (manualRes.count ?? 0) },
-    { label: "Reviewed", value: reviewedRes.count ?? 0 },
-    { label: "Unlocated", value: unlocatedRes.count ?? 0 },
-    { label: "AI analysis failed", value: failedRes.count ?? 0 },
-  ];
+  // Honest metrics — counts from the DB across the user's events.
+  const [allRes, pendingRes, reviewedRes, unlocatedRes, failedRes, manualRes] =
+    eventIds.length > 0
+      ? await Promise.all([
+          supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds),
+          supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "needs_review"),
+          supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "reviewed"),
+          supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("location_source", "unknown"),
+          supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "retryable_error"),
+          supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "needs_manual_review"),
+        ])
+      : [
+          { count: 0 },
+          { count: 0 },
+          { count: 0 },
+          { count: 0 },
+          { count: 0 },
+          { count: 0 },
+        ];
 
-  // The 6 most recent reports (with the AI observation joined so the
-  // card can show the incident type).
-  const { data: recentRows } = await supabase
-    .from("reports")
-    .select(
-      "id, status, review_outcome, title, description, latitude, longitude, location_source, location_label, image_mime_type, captured_at, uploaded_at, priority_score, created_at, report_analyses(structured_observation)",
-    )
-    .in("event_id", eventIds)
-    .order("created_at", { ascending: false })
-    .range(0, 5);
+  const totalReceived = allRes.count ?? 0;
+  const awaitingReview = (pendingRes.count ?? 0) + (manualRes.count ?? 0);
+  const totalReviewed = reviewedRes.count ?? 0;
+  const totalUnlocated = unlocatedRes.count ?? 0;
+  const totalFailed = failedRes.count ?? 0;
+  const verificationRate =
+    totalReceived > 0 ? Math.round((totalReviewed / totalReceived) * 100) : 0;
+
+  // Top 6 reports ordered by priority score desc, then newest first
+  const { data: recentRows } =
+    eventIds.length > 0
+      ? await supabase
+          .from("reports")
+          .select(
+            "id, status, review_outcome, title, description, latitude, longitude, location_source, location_label, image_mime_type, captured_at, uploaded_at, priority_score, created_at, report_analyses(structured_observation)",
+          )
+          .in("event_id", eventIds)
+          .order("priority_score", { ascending: false, nullsFirst: false })
+          .order("created_at", { ascending: false })
+          .range(0, 5)
+      : { data: [] };
 
   const recent: ReportRowData[] = (recentRows ?? []).map((r) => {
     const row = r as unknown as {
@@ -69,7 +103,9 @@ export default async function DashboardPage() {
       captured_at: string | null;
       uploaded_at: string;
       priority_score: number | null;
-      report_analyses?: Array<{ structured_observation: { incident_type?: string; preliminary_severity?: number } }>;
+      report_analyses?: Array<{
+        structured_observation: { incident_type?: string; preliminary_severity?: number };
+      }>;
     };
     const obs = row.report_analyses?.[0]?.structured_observation ?? {};
     return {
@@ -90,20 +126,169 @@ export default async function DashboardPage() {
     };
   });
 
-  const activeEvent: UserEventMembership | null = ctx.events[0] ?? null;
+  // Fetch recent audit events (if reviewer/admin) or derive activity from recent reports
+  const canReview = ctx.user.role === "reviewer" || ctx.user.role === "admin";
+  let streamItems: Array<{
+    id: string;
+    category: string;
+    title: string;
+    detail: string;
+    timestamp: string;
+    badge: string;
+    tone: "amber" | "green" | "brick" | "tide";
+  }> = [];
+
+  if (canReview) {
+    const { data: auditRows } = await supabase
+      .from("audit_events")
+      .select("id, created_at, actor_name, actor_email, action, target, details")
+      .order("created_at", { ascending: false })
+      .range(0, 4);
+
+    if (auditRows && auditRows.length > 0) {
+      streamItems = auditRows.map((a) => {
+        const row = a as unknown as {
+          id: string;
+          created_at: string;
+          actor_name: string | null;
+          actor_email: string | null;
+          action: string;
+          target: string | null;
+          details: string | null;
+        };
+        const actionClean = row.action.replace(/_/g, " ").toUpperCase();
+        const isConfirm = row.action.includes("confirm") || row.action.includes("review");
+        const isFail = row.action.includes("fail") || row.action.includes("reject");
+        return {
+          id: row.id,
+          category: actionClean,
+          title: row.details || `Activity recorded on ${row.target ?? "report"}`,
+          detail: `By ${row.actor_name || row.actor_email || "System"}${row.target ? ` · Ref: ${row.target.slice(0, 8)}` : ""}`,
+          timestamp: row.created_at,
+          badge: isConfirm ? "VERIFIED" : isFail ? "FLAGGED" : "LOGGED",
+          tone: isConfirm ? "green" : isFail ? "brick" : "tide",
+        };
+      });
+    }
+  }
+
+  // Fallback / supplement stream from actual report rows when auditRows is empty
+  if (streamItems.length === 0 && recent.length > 0) {
+    streamItems = recent.slice(0, 4).map((r) => {
+      const isReviewed = r.status === "reviewed";
+      const isFailed = r.status === "retryable_error";
+      return {
+        id: r.id,
+        category: (r.incident_type ?? "FIELD REPORT").replace(/_/g, " ").toUpperCase(),
+        title: r.title || `Report #TR-${r.id.slice(0, 6).toUpperCase()} (${r.location_label || "Field upload"})`,
+        detail: `Status: ${r.status.replace(/_/g, " ")}${r.review_outcome ? ` · ${r.review_outcome}` : ""} · Priority: ${r.priority_score ?? "—"}`,
+        timestamp: r.uploaded_at,
+        badge: isReviewed ? "VERIFIED" : isFailed ? "NEEDS RETRY" : "NEEDS REVIEW",
+        tone: isReviewed ? "green" : isFailed ? "brick" : "amber",
+      };
+    });
+  }
+
+  const displayName = ctx.user.name || ctx.user.email.split("@")[0];
+  const utcNow = new Date().toISOString().slice(11, 16);
 
   return (
-    <div className="tr-page">
-      <PageHeader
-        title="Dashboard"
-        subtitle="Honest metrics from database queries. No fabricated or cached numbers."
-        actions={
-          <>
-            <Button variant="primary" href="/reports/new">Upload a photo</Button>
-            <Button href="/review">Open review queue</Button>
-          </>
-        }
-      />
+    <div className="tr-page" style={{ display: "grid", gap: "var(--s-5)" }}>
+      {/* Friendly Welcome Header */}
+      <header className="welcome-hero-banner">
+        <div style={{ display: "grid", gap: 6 }}>
+          <div className="t-meta" style={{ fontWeight: 700, color: "var(--tide)" }}>
+            {activeEvent ? `Active Event: ${activeEvent.event_name}` : "No Event Assigned"} · Role: {ctx.user.role}
+          </div>
+          <h1 style={{ fontSize: "var(--step-3)", lineHeight: 1.15 }}>
+            Welcome back, {displayName}.{" "}
+            <span style={{ fontWeight: 400, color: "var(--ink-2)" }}>
+              {ctx.events.length} {ctx.events.length === 1 ? "event" : "events"} in your workspace.
+            </span>
+          </h1>
+          <p className="t-meta">
+            Live summary of submitted disaster photos, AI observations, and human verification progress.
+          </p>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "var(--s-2)" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--s-2)" }}>
+            <span
+              className="t-meta"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "4px 10px",
+                borderRadius: "var(--r-ctl)",
+                background: "var(--green-wash)",
+                color: "var(--green-ink)",
+                fontWeight: 600,
+              }}
+            >
+              <ShieldCheck size={14} aria-hidden="true" />
+              Human-Review Protected
+            </span>
+            <span
+              className="t-meta num"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "4px 10px",
+                borderRadius: "var(--r-ctl)",
+                background: "var(--sheet-sunk)",
+                border: "1px solid var(--rule)",
+              }}
+            >
+              <Clock size={14} aria-hidden="true" />
+              {utcNow} UTC
+            </span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--s-2)" }}>
+            <Button variant="primary" href="/reports/new">
+              Upload a photo
+            </Button>
+            {canReview ? (
+              <Button href="/review">Open review queue</Button>
+            ) : (
+              <Button href="/map">Explore incident map</Button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* User-Friendly 4-Step Workflow Strip */}
+      <section aria-label="How TerraResponse works" className="workflow-strip">
+        <div className="workflow-strip__step">
+          <span className="workflow-strip__num">1</span>
+          <div>
+            <strong style={{ display: "block", color: "var(--ink)" }}>Upload a Photo</strong>
+            <span className="t-meta">Attach field imagery &amp; GPS pin</span>
+          </div>
+        </div>
+        <div className="workflow-strip__step">
+          <span className="workflow-strip__num">2</span>
+          <div>
+            <strong style={{ display: "block", color: "var(--ink)" }}>AI Organizes Evidence</strong>
+            <span className="t-meta">Drafts hazard type &amp; severity</span>
+          </div>
+        </div>
+        <div className="workflow-strip__step">
+          <span className="workflow-strip__num">3</span>
+          <div>
+            <strong style={{ display: "block", color: "var(--ink)" }}>Human Verifies</strong>
+            <span className="t-meta">Reviewer confirms or corrects</span>
+          </div>
+        </div>
+        <div className="workflow-strip__step">
+          <span className="workflow-strip__num">4</span>
+          <div>
+            <strong style={{ display: "block", color: "var(--ink)" }}>Live on Incident Map</strong>
+            <span className="t-meta">Verified pins guide response</span>
+          </div>
+        </div>
+      </section>
 
       {ctx.events.length === 0 ? (
         <EmptyState
@@ -113,52 +298,247 @@ export default async function DashboardPage() {
         />
       ) : (
         <>
-          <section aria-label="Metrics">
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                gap: "var(--s-3)",
-              }}
-            >
-              {stats.map((s) => (
-                <div key={s.label} className="panel panel--sunk" style={{ padding: "var(--s-4)", display: "grid", gap: 4 }}>
-                  <div className="t-label" style={{ fontSize: "var(--step--1)" }}>{s.label}</div>
-                  <div className="num" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "var(--step-2)" }}>
-                    {s.value}
-                  </div>
+          {/* 4 Clear KPI Cards */}
+          <section aria-label="Workspace metrics">
+            <div className="kpi-grid">
+              <div className="kpi-card">
+                <div className="kpi-card__top">
+                  <span className="t-label" style={{ fontSize: "var(--step--1)", color: "var(--ink-2)" }}>
+                    Total Reports
+                  </span>
+                  <span className="kpi-card__icon" style={{ color: "var(--tide)", background: "var(--tide-wash)" }}>
+                    <AlertTriangle size={18} aria-hidden="true" />
+                  </span>
                 </div>
-              ))}
+                <div>
+                  <span className="kpi-card__value num">{totalReceived}</span>
+                  <span className="t-meta" style={{ marginLeft: 8 }}>photos submitted</span>
+                </div>
+                <div className="t-meta num">
+                  {awaitingReview} waiting for review · {totalReviewed} verified
+                </div>
+              </div>
+
+              <div className="kpi-card">
+                <div className="kpi-card__top">
+                  <span className="t-label" style={{ fontSize: "var(--step--1)", color: "var(--ink-2)" }}>
+                    Waiting for Review
+                  </span>
+                  <span className="kpi-card__icon" style={{ color: "var(--amber-ink)", background: "var(--amber-wash)" }}>
+                    <ClipboardCheck size={18} aria-hidden="true" />
+                  </span>
+                </div>
+                <div>
+                  <span className="kpi-card__value num">{awaitingReview}</span>
+                  <span className="t-meta" style={{ marginLeft: 8 }}>in review queue</span>
+                </div>
+                <div className="t-meta num">
+                  {pendingRes.count ?? 0} AI-drafted · {manualRes.count ?? 0} manual check
+                </div>
+              </div>
+
+              <div className="kpi-card">
+                <div className="kpi-card__top">
+                  <span className="t-label" style={{ fontSize: "var(--step--1)", color: "var(--ink-2)" }}>
+                    Verification Progress
+                  </span>
+                  <span className="kpi-card__icon" style={{ color: "var(--green)", background: "var(--green-wash)" }}>
+                    <CheckCircle2 size={18} aria-hidden="true" />
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                  <span className="kpi-card__value num">{verificationRate}%</span>
+                  <span className="t-meta num" style={{ color: "var(--green)", fontWeight: 700 }}>
+                    {totalReviewed} of {totalReceived} reviewed
+                  </span>
+                </div>
+                <div className="kpi-bar" aria-hidden="true">
+                  <div
+                    className="kpi-bar__fill"
+                    style={{ width: `${verificationRate}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="kpi-card">
+                <div className="kpi-card__top">
+                  <span className="t-label" style={{ fontSize: "var(--step--1)", color: "var(--ink-2)" }}>
+                    Needs Location or Retry
+                  </span>
+                  <span className="kpi-card__icon">
+                    <MapPinOff size={18} aria-hidden="true" />
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                  <span
+                    className="kpi-card__value num"
+                    style={{ color: totalFailed > 0 ? "var(--brick)" : "var(--ink)" }}
+                  >
+                    {totalUnlocated + totalFailed}
+                  </span>
+                  <span className="t-meta num">
+                    {totalUnlocated} unlocated · {totalFailed} failed
+                  </span>
+                </div>
+                <div className="t-meta">
+                  Reports without coordinates stay off the map until pinned.
+                </div>
+              </div>
             </div>
           </section>
 
-          <section aria-label="Recent reports" style={{ marginTop: "var(--s-6)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "var(--s-3)" }}>
-              <h2 style={{ fontSize: "var(--step-1)" }}>Recent reports</h2>
-              <Link href="/reports" className="t-meta" style={{ color: "var(--tide)" }}>All reports →</Link>
+          {/* Active Incident Triage Grid */}
+          <section aria-label="Priority incident reports">
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+                gap: "var(--s-2)",
+                marginBottom: "var(--s-4)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--s-2)" }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 6,
+                    height: 22,
+                    borderRadius: 3,
+                    background: "var(--tide)",
+                    display: "inline-block",
+                  }}
+                />
+                <h2 style={{ fontSize: "var(--step-2)", margin: 0 }}>Priority Incident Reports</h2>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--s-4)", flexWrap: "wrap" }}>
+                <span className="t-meta">Sorted by priority score</span>
+                <Link href="/reports" className="t-meta" style={{ color: "var(--tide)", fontWeight: 600 }}>
+                  View all reports ({totalReceived}) →
+                </Link>
+              </div>
             </div>
+
             {recent.length === 0 ? (
               <EmptyState
                 title="No reports yet"
-                description="Submitted disaster photos appear here once the upload pipeline is wired."
+                description="Submitted disaster photos appear here once uploaded to the active event."
                 action={<Button variant="primary" href="/reports/new">Upload the first photo</Button>}
               />
             ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                  gap: "var(--s-4)",
-                }}
-              >
+              <div className="triage-grid">
                 {recent.map((r) => (
-                  <ReportCard key={r.id} report={r} eventName={activeEvent?.event_name} />
+                  <IncidentTriageCard
+                    key={r.id}
+                    report={r}
+                    eventName={activeEvent?.event_name}
+                    canReview={canReview}
+                  />
                 ))}
               </div>
             )}
           </section>
+
+          {/* Bottom Split: Quick Actions Hub + Recent Activity Stream */}
+          <div className="command-bottom-grid">
+            <QuickActionsHub canReview={canReview} disableGlobalHotkeys />
+
+            <section className="panel" aria-labelledby="alerts-stream-heading" style={{ display: "flex", flexDirection: "column", gap: "var(--s-4)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--s-2)", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--s-2)" }}>
+                  <Bell size={18} aria-hidden="true" style={{ color: "var(--tide)" }} />
+                  <h2 id="alerts-stream-heading" style={{ fontSize: "var(--step-1)", margin: 0 }}>
+                    Recent Activity &amp; Updates
+                  </h2>
+                </div>
+                <Link
+                  href={canReview ? "/audit" : "/reports"}
+                  className="t-meta"
+                  style={{ color: "var(--tide)", fontWeight: 600 }}
+                >
+                  View full history →
+                </Link>
+              </div>
+
+              {streamItems.length === 0 ? (
+                <div className="well-uncertain">
+                  <p className="t-meta">No recent activity recorded yet in this event. Upload a photo to get started.</p>
+                </div>
+              ) : (
+                <ul className="alert-stream">
+                  {streamItems.map((item) => (
+                    <li key={item.id} className="alert-stream__item">
+                      <span className="alert-stream__icon" aria-hidden="true">
+                        <Activity size={16} />
+                      </span>
+                      <div style={{ display: "grid", gap: 4 }}>
+                        <div className="t-meta num" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                          <strong style={{ color: "var(--ink)" }}>{item.category}</strong>
+                          <span>·</span>
+                          <span>{formatRelativeTime(item.timestamp)}</span>
+                        </div>
+                        <div style={{ fontWeight: 600, fontSize: "var(--step-0)" }}>{item.title}</div>
+                        <div className="t-meta">{item.detail}</div>
+                      </div>
+                      <span
+                        className="alert-stream__badge t-meta num"
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "0.75rem",
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          background:
+                            item.tone === "green"
+                              ? "var(--green-wash)"
+                              : item.tone === "brick"
+                              ? "var(--brick-wash)"
+                              : item.tone === "amber"
+                              ? "var(--amber-wash)"
+                              : "var(--tide-wash)",
+                          color:
+                            item.tone === "green"
+                              ? "var(--green-ink)"
+                              : item.tone === "brick"
+                              ? "var(--brick-ink)"
+                              : item.tone === "amber"
+                              ? "var(--amber-ink)"
+                              : "var(--tide)",
+                        }}
+                      >
+                        {item.badge}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div
+                className="t-meta"
+                style={{
+                  marginTop: "auto",
+                  paddingTop: "var(--s-3)",
+                  borderTop: "1px solid var(--rule)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "var(--s-2)",
+                }}
+              >
+                <span>Synced with live event database</span>
+                <span style={{ color: "var(--tide)", fontWeight: 600 }}>Real-time query</span>
+              </div>
+            </section>
+          </div>
         </>
       )}
+
+      {/* Persistent Role-Aware Keyboard Shortcuts Footer Tip & Dialog */}
+      <KeyboardShortcutsDock
+        role={ctx.user.role}
+        pendingReviewCount={awaitingReview}
+      />
     </div>
   );
 }

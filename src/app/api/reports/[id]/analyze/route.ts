@@ -36,8 +36,6 @@ import { checkAllAiCallCeilings } from "@/lib/rate-limit";
 import { lookupCachedAnalysis } from "@/lib/ai/dedup-cache";
 import { logUsage } from "@/lib/ai/usage-log";
 import { decideManualRetry, MAX_MANUAL_RETRIES } from "@/lib/ai/safe-retry";
-import { observationSchema } from "@/lib/ai/observation-schema";
-import { processReportTriage, isTriageEnabled } from "@/lib/triage/processing";
 
 export async function POST(
   _request: NextRequest,
@@ -107,25 +105,6 @@ export async function POST(
       .eq("report_id", id)
       .single();
     if (existing) {
-      if (isTriageEnabled()) {
-        const parsed = observationSchema.safeParse(existing.structured_observation);
-        if (!parsed.success) {
-          return NextResponse.json({ error: {
-            code: "TRIAGE_PENDING", message: "Saved observation needs manual triage.",
-          } }, { status: 503 });
-        }
-        try {
-          await processReportTriage({
-            reportId: id, eventId: report.event_id,
-            modelId: existing.model_id, observation: parsed.data,
-          });
-        } catch {
-          console.error("[triage] Retrying persisted triage failed.");
-          return NextResponse.json({ error: {
-            code: "TRIAGE_PENDING", message: "AI analysis is saved; incident routing needs retry.",
-          } }, { status: 503 });
-        }
-      }
       return NextResponse.json({
         ok: true,
         idempotent: true,
@@ -248,25 +227,6 @@ export async function POST(
           { error: { code: "CACHE_SAVE_FAILED", message: "Analysis could not be saved. A reviewer must inspect the report." } },
           { status: 500 },
         );
-      }
-      if (isTriageEnabled()) {
-        const parsed = observationSchema.safeParse(cached.structuredObservation);
-        if (!parsed.success) {
-          return NextResponse.json({ error: {
-            code: "TRIAGE_PENDING", message: "Cached observation needs manual triage.",
-          } }, { status: 503 });
-        }
-        try {
-          await processReportTriage({
-            reportId: id, eventId: report.event_id,
-            modelId: cached.modelId, observation: parsed.data,
-          });
-        } catch {
-          console.error("[triage] Cached report triage failed.");
-          return NextResponse.json({ error: {
-            code: "TRIAGE_PENDING", message: "Cached analysis saved; incident routing needs retry.",
-          } }, { status: 503 });
-        }
       }
       return NextResponse.json({
         ok: true,
@@ -519,31 +479,12 @@ export async function POST(
     outcome: "succeeded",
   });
 
-  // The triage policy is not the AI model and cannot human-confirm a
-  // disaster. A failure leaves the saved observation in needs_review
-  // and can be retried through this idempotent endpoint.
-  let triage: Awaited<ReturnType<typeof processReportTriage>> = null;
-  if (isTriageEnabled()) {
-    try {
-      triage = await processReportTriage({
-        reportId: id, eventId: report.event_id,
-        modelId: result.modelId, observation: result.observation,
-      });
-    } catch {
-      console.error("[triage] Saved analysis could not be routed. Human review still required.");
-      return NextResponse.json({ error: {
-        code: "TRIAGE_PENDING", message: "AI analysis was saved, but incident routing needs retry.",
-      } }, { status: 503 });
-    }
-  }
-
   // 12. Return the validated observation.
   return NextResponse.json(
     {
       ok: true,
       reportId: id,
       observation: result.observation,
-      ...(triage ? { triage } : {}),
       modelId: result.modelId,
       promptVersion: result.promptVersion,
       schemaVersion: result.schemaVersion,
