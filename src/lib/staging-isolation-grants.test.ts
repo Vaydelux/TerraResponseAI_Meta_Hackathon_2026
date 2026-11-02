@@ -28,6 +28,8 @@ describe("staging isolation hardening", () => {
       expect(workflow).not.toContain("secrets.SUPABASE_SERVICE_ROLE_KEY");
     }
     expect(apply).toContain("supabase db push --dry-run --linked");
+    expect(apply).toContain('if [[ "$SUPABASE_PROJECT_REF" == "ytfaetqvtbsbmcsdlkvk" ]]');
+    expect(apply).toContain("Reconcile the migration ledger");
     expect(apply).toContain("environment: staging");
   });
 });
