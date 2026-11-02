@@ -1,0 +1,125 @@
+# Apply ONLY source migration 0010 to the known isolated staging database.
+# Uses psql rather than the Supabase CLI SQL splitter, which incorrectly
+# parses the submit_review_atomic function identifier/body in this file.
+# A reviewed, protected GitHub staging environment must supply the connection.
+name: Staging install review transaction (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_project_ref:
+        description: "Type the exact isolated staging project reference"
+        required: true
+        type: string
+      confirmation:
+        description: "Type INSTALL-REVIEW-STAGING-ONLY"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraresponse-staging-db-writer
+  cancel-in-progress: false
+
+jobs:
+  install_review_function:
+    if: github.ref == 'refs/heads/main' && github.repository == 'Vaydelux/TerraResponseAI_Meta_Hackathon_2026'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: staging
+    env:
+      STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      EXPECTED_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF || secrets.STAGING_SUPABASE_PROJECT_REF }}
+      PRODUCTION_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
+      CONFIRM_REF: ${{ inputs.staging_project_ref }}
+      CONFIRM_ACTION: ${{ inputs.confirmation }}
+      PGSSLMODE: require
+
+    steps:
+      - name: Checkout reviewed code only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify isolation and exact database connection without logging secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const ref = process.env.EXPECTED_REF ?? "";
+          const prod = process.env.PRODUCTION_REF ?? "";
+          const confirmRef = process.env.CONFIRM_REF ?? "";
+          const confirmation = process.env.CONFIRM_ACTION ?? "";
+          const conn = process.env.STAGING_DATABASE_URL ?? "";
+          const knownProd = "ywopsafppyykhwrejliz";
+          const isolated = "ytfaetqvtbsbmcsdlkvk";
+          const validRef = /^[a-z0-9]{12,32}$/;
+          if (!validRef.test(ref) || !validRef.test(prod) || ref !== isolated ||
+              ref === prod || ref === knownProd || ref !== confirmRef ||
+              confirmation !== "INSTALL-REVIEW-STAGING-ONLY") {
+            throw new Error("Staging identity/approval gate failed.");
+          }
+          if (!conn) throw new Error("STAGING_DATABASE_URL staging environment secret is missing.");
+          let u;
+          try { u = new URL(conn); }
+          catch { throw new Error("Invalid staging database connection URL."); }
+          const direct = u.hostname === `db.${isolated}.supabase.co` &&
+            decodeURIComponent(u.username) === "postgres";
+          const pooler = u.hostname.endsWith(".pooler.supabase.com") &&
+            decodeURIComponent(u.username) === `postgres.${isolated}`;
+          if (!["postgres:", "postgresql:"].includes(u.protocol) ||
+              (!direct && !pooler) ||
+              (u.port && u.port !== "5432") ||
+              u.pathname !== "/postgres" ||
+              u.searchParams.get("sslmode") !== "require" ||
+              !u.password) {
+            throw new Error("Database URL must target the known staging project with TLS and session port 5432.");
+          }
+          console.log("Verified isolated staging database host, user, SSL and explicit authorization.");
+          NODE
+
+      - name: Check migration 0010 preconditions (read only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$(psql "$STAGING_DATABASE_URL" -X -q -t -A -v ON_ERROR_STOP=1 -c "
+            select
+              (to_regprocedure('public.submit_review_atomic(uuid,uuid,text,text,text,jsonb)') is null)::text
+              || '|' ||
+              (exists (select 1 from information_schema.tables where table_schema='public' and table_name='review_actions'))::text;
+          " | tr -d '\r\n ')"
+          if [[ "$state" != "true|true" ]]; then
+            echo "::error::Unexpected function/schema state. Review catalog and abort rather than overwrite."
+            exit 1
+          fi
+          echo "Review function is absent and prerequisite table exists."
+
+      - name: Apply exactly the reviewed 0010 migration in a transaction
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$STAGING_DATABASE_URL" -X -v ON_ERROR_STOP=1 --single-transaction \
+            -f supabase/migrations/0010_atomic_review_actions.sql
+
+      - name: Verify function, column and permission boundary (read only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$(psql "$STAGING_DATABASE_URL" -X -q -t -A -v ON_ERROR_STOP=1 -c "
+            select
+              (to_regprocedure('public.submit_review_atomic(uuid,uuid,text,text,text,jsonb)') is not null)::text
+              || '|' ||
+              (exists(select 1 from information_schema.columns where table_schema='public' and table_name='review_actions' and column_name='request_id'))::text
+              || '|' ||
+              (not has_function_privilege('anon', 'public.submit_review_atomic(uuid,uuid,text,text,text,jsonb)', 'EXECUTE'))::text
+              || '|' ||
+              has_function_privilege('authenticated', 'public.submit_review_atomic(uuid,uuid,text,text,text,jsonb)', 'EXECUTE')::text;
+          " | tr -d '\r\n ')"
+          if [[ "$state" != "true|true|true|true" ]]; then
+            echo "::error::Staging reviewer RPC failed required schema/privilege checks."
+            exit 1
+          fi
+          echo "Staging review RPC installed: authenticated-only, atomic and column present."
+          echo "NEXT: reconcile connector migration ledger manually and run real reporter/reviewer RLS tests."
