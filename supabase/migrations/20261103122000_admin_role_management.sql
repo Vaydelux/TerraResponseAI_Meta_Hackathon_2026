@@ -13,6 +13,7 @@ declare
   v_actor_role text;
   v_previous_role text;
   v_intake_id uuid;
+  v_membership_role text;
 begin
   if p_actor is null or p_target is null
      or p_new_role not in ('reporter','reviewer','admin') then
@@ -59,11 +60,15 @@ begin
   select id into v_intake_id from public.events
     where slug='community-intake' and status='active';
   if v_intake_id is not null then
+    if p_new_role='admin' then
+      v_membership_role := 'coordinator';
+    elsif p_new_role='reviewer' then
+      v_membership_role := 'reviewer';
+    else
+      v_membership_role := 'contributor';
+    end if;
     insert into public.event_members(event_id,user_id,role)
-    values(v_intake_id,p_target,
-      case when p_new_role='admin' then 'coordinator'
-           when p_new_role='reviewer' then 'reviewer'
-           else 'contributor' end)
+    values(v_intake_id,p_target,v_membership_role)
     on conflict(event_id,user_id) do update
       set role=excluded.role;
   end if;
