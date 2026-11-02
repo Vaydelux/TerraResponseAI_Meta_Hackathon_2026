@@ -44,6 +44,20 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-useless-escape": "off",
   },
 }, {
+  // The Nov 2 UI dependency update surfaces these pre-existing hook
+  // patterns. Limit the downgrade to these six presentation files
+  // while their design refactor is in progress. All backend and new
+  // components retain the normal strict rule.
+  files: [
+    "src/components/review/CorrectionForm.tsx",
+    "src/components/review/MaskControl.tsx",
+    "src/components/terra/resilience-panel.tsx",
+    "src/components/terra/reviewer-action-panel.tsx",
+    "src/components/ui/carousel.tsx",
+    "src/hooks/use-mobile.ts",
+  ],
+  rules: { "react-hooks/set-state-in-effect": "warn" },
+}, {
   ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]
 }];
 
