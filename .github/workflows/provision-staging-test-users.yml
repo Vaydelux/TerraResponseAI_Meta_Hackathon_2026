@@ -23,8 +23,8 @@ jobs:
     environment: staging
     env:
       STAGING_SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF || secrets.STAGING_SUPABASE_PROJECT_REF }}
-      PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
-      STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF || 'ywopsafppyykhwrejliz' }}
+      STAGING_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL || 'https://ytfaetqvtbsbmcsdlkvk.supabase.co' }}
       STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
       TEST_REPORTER_EMAIL: ${{ secrets.TEST_REPORTER_EMAIL }}
       TEST_REPORTER_PASSWORD: ${{ secrets.TEST_REPORTER_PASSWORD }}
@@ -40,5 +40,5 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - name: Create and verify three accounts without confirmation email
+      - name: Create three staging test accounts, roles and shared event
         run: bun run scripts/provision-staging-test-users.ts
