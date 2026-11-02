@@ -25,6 +25,19 @@ describe("report-first safety policy", () => {
       priority: "critical",
     });
   });
+  it("permits only explicit, evidence-backed critical provisional publication", () => {
+    const released = decideTriage(base, true, true);
+    expect(released).toMatchObject({
+      triageClass: "critical_provisional",
+      verificationStatus: "awaiting_human",
+      publicationStatus: "public_provisional",
+      notifyAdmin: true,
+    });
+    expect(decideTriage({ ...base, preliminary_severity: 4 }, true, true).publicationStatus).toBe("private");
+    expect(decideTriage(base, false, true).publicationStatus).toBe("private");
+    expect(decideTriage({ ...base, visible_evidence: ["flood"] }, true, true).publicationStatus).toBe("private");
+    expect(decideTriage({ ...base, incident_type: "unclear" }, true, true).publicationStatus).toBe("private");
+  });
   it("routes an unlocated critical picture for high priority manual review", () => {
     expect(decideTriage(base, false)).toMatchObject({ triageClass: "high_review", priority: "high" });
   });

@@ -15,7 +15,7 @@ export type TriageDecision = {
   reasonCode: string;
   // NEVER infer the fact of a disaster or verification from severity.
   verificationStatus: "awaiting_human";
-  publicationStatus: "private";
+  publicationStatus: "private" | "public_provisional";
   notifyAdmin: boolean;
   priority: "critical" | "high" | "normal";
 };
@@ -23,12 +23,13 @@ export type TriageDecision = {
 /**
  * Conservative policy. The model does not output a calibrated probability;
  * visible evidence count and uncertainty language are quality gates only.
- * No AI score automatically marks evidence "confirmed" or public.
+ * No AI score automatically marks evidence confirmed. Only an explicit\n * separately gated critical policy may publish an UNVERIFIED alert; it\n * never exposes original evidence, and database triggers enforce the guard.
  */
 export function decideTriage(
   observation: Pick<Observation,
     "incident_type" | "preliminary_severity" | "visible_evidence" | "uncertainties">,
   hasTrustedLocation: boolean,
+  allowProvisionalPublication = false,
 ): TriageDecision {
   const base = {
     verificationStatus: "awaiting_human" as const,
@@ -61,5 +62,5 @@ export function decideTriage(
   if (!sufficientEvidence || !clearlyLocalized || !limitedUncertainty) {
     return { ...base, triageClass: "high_review", reasonCode: "CRITICAL_WITH_UNCERTAIN_EVIDENCE", notifyAdmin: true, priority: "high" };
   }
-  return { ...base, triageClass: "critical_provisional", reasonCode: "CRITICAL_POSSIBLE_DISASTER", notifyAdmin: true, priority: "critical" };
+  return { ...base, publicationStatus: allowProvisionalPublication ? "public_provisional" : "private", triageClass: "critical_provisional", reasonCode: "CRITICAL_POSSIBLE_DISASTER", notifyAdmin: true, priority: "critical" };
 }

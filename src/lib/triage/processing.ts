@@ -98,7 +98,14 @@ export async function processReportTriage(args: {
   }
   const hasLocation = report.location_source !== "unknown" &&
     Number.isFinite(report.latitude) && Number.isFinite(report.longitude);
-  const decision = decideTriage(args.observation, hasLocation);
+  // No automatic publication in normal environments or demo/mock inference.
+  // A published state is always provisional and is additionally checked
+  // by a database trigger. No private evidence URL is exposed here.
+  const authenticInference = !/(?:demo|mock|stub|test)/i.test(args.modelId) &&
+    args.modelId.trim().length > 0 && process.env.DEMO_MODE !== "true";
+  const publicationEnabled = process.env.REPORT_FIRST_CRITICAL_PUBLICATION_ENABLED === "true" &&
+    authenticInference;
+  const decision = decideTriage(args.observation, hasLocation, publicationEnabled);
   const { data: existing, error: lookupError } = await db.from("report_triage")
     .select("report_id,triage_class").eq("report_id", args.reportId).maybeSingle();
   if (lookupError) throw new Error("Cannot read previous triage.");
@@ -166,7 +173,10 @@ export async function processReportTriage(args: {
 
   await notifyRecipients(db, {
     reportId: args.reportId, eventId: args.eventId,
-    kind: decision.notifyAdmin ? "critical_provisional" : "review_required",
+    // High and critical are admin-only; reviewer notifications are reserved
+    // for low/moderate triage. Each recipient is also checked against RLS.
+    kind: decision.priority === "critical" ? "critical_provisional"
+      : decision.priority === "high" ? "triage_completed" : "review_required",
     title: decision.priority === "critical" ? "Urgent provisional disaster observation" :
       decision.priority === "high" ? "High-priority observation requires review" :
       "New report requires moderation",
