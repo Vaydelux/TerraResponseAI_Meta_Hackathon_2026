@@ -5,14 +5,14 @@
 // The client form for /login. Uses the new design-system components
 // (Button, Field, Input) + the existing signInAction server action.
 
-import { useState, useActionState } from "react";
+import { useState, useActionState, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button, Field, Input } from "@/components/ui-tr";
 import { Wordmark } from "@/components/layout/Wordmark";
 import { AuthLoadingBanner } from "@/components/auth/AuthLoadingBanner";
 import { safeAuthPath } from "@/lib/auth/safe-redirect";
-import { signInAction } from "@/lib/auth/actions";
+import { signInAction, type SignInState } from "@/lib/auth/actions";
 
 export function LoginContent({ configured }: { configured: boolean }) {
   const params = useSearchParams();
@@ -22,10 +22,19 @@ export function LoginContent({ configured }: { configured: boolean }) {
   const cbParam = params.get("callbackUrl");
   const callbackUrl = safeAuthPath(cbParam ?? "/dashboard");
 
-  const [state, formAction, pending] = useActionState<
-    ReturnType<typeof signInAction> | null,
-    FormData
-  >(async (_prev, fd) => signInAction(fd), null);
+  const [state, formAction, pending] = useActionState<SignInState, FormData>(
+    async (_prev, fd) => signInAction(fd),
+    null,
+  );
+  const redirectTo = state?.redirectTo;
+
+  useEffect(() => {
+    if (redirectTo) {
+      // Read the server-set Supabase cookies on a fresh protected request.
+      // Avoid unhandled redirect exceptions in a client-wrapped form action.
+      window.location.replace(redirectTo);
+    }
+  }, [redirectTo]);
 
   if (!configured) {
     return <SetupState />;
@@ -49,8 +58,8 @@ export function LoginContent({ configured }: { configured: boolean }) {
             <p className="t-meta" style={{ marginTop: "var(--s-2)", marginBottom: "var(--s-4)" }}>
               Use your registered email address and password to continue.
             </p>
-            {pending && <AuthLoadingBanner mode="login" />}
-            <form action={formAction} aria-busy={pending} style={{ display: "grid", gap: "var(--s-3)" }}>
+            {(pending || redirectTo) && <AuthLoadingBanner mode="login" />}
+            <form action={formAction} aria-busy={pending || Boolean(redirectTo)} style={{ display: "grid", gap: "var(--s-3)" }}>
               {(state?.error || urlError) && (
                 <div role="alert" className="field__error" style={{ padding: "var(--s-2)", background: "var(--brick-wash)", borderRadius: "var(--r-ctl)" }}>
                   {state?.error ?? "Email verification failed. Please try signing in again."}
@@ -58,7 +67,7 @@ export function LoginContent({ configured }: { configured: boolean }) {
               )}
               <input type="hidden" name="callbackUrl" value={callbackUrl} />
               <Field label="Email address" htmlFor="email">
-                <Input id="email" name="email" type="email" autoComplete="email" inputMode="email" aria-describedby="login-email-hint" placeholder="you@example.com" required disabled={pending} />
+                <Input id="email" name="email" type="email" autoComplete="email" inputMode="email" aria-describedby="login-email-hint" placeholder="you@example.com" required disabled={pending || Boolean(redirectTo)} />
               </Field>
               <p id="login-email-hint" className="t-meta" style={{ marginTop: "calc(var(--s-2) * -1)" }}>
                 Enter the email used at registration, not your display username.
@@ -71,12 +80,12 @@ export function LoginContent({ configured }: { configured: boolean }) {
                     type={showPw ? "text" : "password"}
                     autoComplete="current-password"
                     required
-                    disabled={pending}
+                    disabled={pending || Boolean(redirectTo)}
                     style={{ paddingRight: 48 }}
                   />
                   <button
                     type="button"
-                    disabled={pending}
+                    disabled={pending || Boolean(redirectTo)}
                     onClick={() => setShowPw((s) => !s)}
                     aria-label={showPw ? "Hide password" : "Show password"}
                     style={{
@@ -95,8 +104,8 @@ export function LoginContent({ configured }: { configured: boolean }) {
                   </button>
                 </div>
               </Field>
-              <Button type="submit" variant="primary" block busy={pending} disabled={pending}>
-                {pending ? "Signing in…" : "Sign in"}
+              <Button type="submit" variant="primary" block busy={pending || Boolean(redirectTo)} disabled={pending || Boolean(redirectTo)}>
+                {pending || redirectTo ? "Signing in…" : "Sign in"}
               </Button>
             </form>
             <p className="t-meta" style={{ marginTop: "var(--s-4)", textAlign: "center" }}>
