@@ -50,7 +50,13 @@ async function notifyRecipients(
     body: args.body,
   }));
   if (next.length) {
-    const { error } = await db.from("notifications").insert(next);
+    // Unique (recipient_id,report_id,kind) prevents two workers from
+    // creating duplicate notifications under concurrent retries.
+    // ignoreDuplicates preserves successful delivery for every
+    // recipient even if another worker already inserted one row.
+    const { error } = await db.from("notifications").upsert(next, {
+      onConflict: "recipient_id,report_id,kind", ignoreDuplicates: true,
+    });
     if (error) throw new Error("Could not queue admin notifications.");
   }
 }
