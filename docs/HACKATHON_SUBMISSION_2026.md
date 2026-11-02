@@ -10,7 +10,7 @@
 - **Application:** https://terra-response-ai.vercel.app
 - **Official deadline:** November 4, 2026, 9:00 PM US Eastern Time (November 5, 2026, 10:00 AM Philippine time).
 - **Review gate:** GitHub CI success and Vercel deployment READY are necessary, not sufficient.
-- **Connected staging:** `ytfaetqvtbsbmcsdlkvk` — separate from production; source migrations 0001–0009 and 0011–0012 applied through connector, but migration 0010 (transactional reviewer RPC) is NOT installed. Its remote migration history uses connector-generated timestamps rather than the repository's four-digit versions.
+- **Connected staging:** `ytfaetqvtbsbmcsdlkvk` — separate from production; all twelve source migrations are now applied and recorded, including 0010's transactional reviewer RPC. Its remote migration history uses connector-generated timestamps rather than the repository's four-digit versions; do not use `db push` until reconciled. The RPC schema, grants and unauthenticated denial were verified, but live distinct-user role tests are pending.
 - **Security verified with read-only SQL:** 11 public application tables with RLS enabled, 3 private evidence buckets, zero privileged `SECURITY DEFINER` functions executable by `anon` after staging permission hardening.
 - **Not yet proven:** end-to-end reporter → live Muse Spark → human review → map with real JWTs, live model use, SMTP deliverability, automated browser acceptance. Keep issue #21 and issue #30 open until proven.
 - **Deployment:** Production data is not an authorized staging test surface. No real responder or victim evidence should be uploaded for public hackathon use.
@@ -67,11 +67,11 @@ Record **one continuous successful end-to-end path** if possible. If a step fail
 
 **GO for a *working Meta-powered* submission:** In addition to the above, staging has required database objects and role-scoped grants; real auth works; a reporter uploads a photo; Muse Spark is invoked successfully and persists a validated observation; a distinct reviewer saves a decision; and the map shows the reviewed incident. Capture the video from the deployed app.
 
-**NO-GO for claiming end-to-end working:** Missing `submit_review_tx`/review RPC; unconfigured staging server secret; unavailable real model; no live reviewed-map flow; or unverified email confirmation. Fallback demo data must never be passed off as real inference.
+**NO-GO for claiming end-to-end working:** Missing `submit_review_atomic`/review RPC; unconfigured staging server secret; unavailable real model; no live reviewed-map flow; or unverified email confirmation. Fallback demo data must never be passed off as real inference.
 
 ## Current blocking items
 
-1. [Issue #30](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/30): Staging SQL parser/history mismatch; reviewer RPC absent. A source fix is under review; do not ship API changes before the matching database function exists.
+1. [Issue #30](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/30): Staging SQL parser issue fixed and reviewer RPC installed; legacy/timestamped migration history still needs reconciliation and live role tests. A source fix is under review; do not ship API changes before the matching database function exists.
 2. [Issue #21](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/21): Custom SMTP, email confirmation and removal of temporary staging test identities require evidence and owner signoff.
 3. Vercel Preview has a staging URL and public anon key, but lacks its own privileged service key and paid-model keys. Do **not** copy production service-role secrets to Preview or expose server keys in source code.
 4. GitHub Actions cannot safely `db push` the connector-created migration history until both are reconciled and reviewed.
