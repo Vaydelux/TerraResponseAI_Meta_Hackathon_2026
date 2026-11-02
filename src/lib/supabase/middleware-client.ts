@@ -53,16 +53,20 @@ export async function refreshSupabaseSession(request: NextRequest): Promise<{
     },
   });
 
-  // getUser() verifies the JWT signature; getSession() reads the
-  // cached session. Calling getUser() is the official recommendation
-  // for server-side identity verification (it hits Supabase Auth,
-  // not the local cookie).
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Refresh the session cookie (rotates the access token).
-  await supabase.auth.getSession();
-
-  return { response, user };
+  // getUser() verifies the JWT against Supabase Auth and refreshes
+  // expired tokens via the SSR cookie adapter when appropriate.
+  // A second getSession() read is unnecessary and can fail after a
+  // successful verification, turning /login into a 500/error boundary.
+  // On a provider outage, fail closed (unauthenticated) rather than
+  // throwing an uncaught middleware exception.
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+      return { response, user: null };
+    }
+    return { response, user: { id: data.user.id, email: data.user.email } };
+  } catch {
+    console.error("[auth-middleware] Supabase Auth verification unavailable.");
+    return { response, user: null };
+  }
 }
