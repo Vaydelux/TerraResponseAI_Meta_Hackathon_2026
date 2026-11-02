@@ -81,39 +81,39 @@ jobs:
         with:
           version: 2.72.7
 
+      - name: Build isolated staging migration workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$RUNNER_TEMP/terraresponse-staging-migrations"
+          node scripts/prepare-staging-migration-workspace.mjs "$workspace"
+          echo "STAGING_MIGRATION_WORKSPACE=$workspace" >> "$GITHUB_ENV"
+
       - name: Link configured staging project
+        working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}
         shell: bash
         run: |
           set -euo pipefail
           supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
       - name: List remote migration history (read-only)
+        working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}
         run: supabase migration list --linked
 
-      - name: Refuse incompatible staging migration history
-        shell: bash
-        run: |
-          set -euo pipefail
-          # The staging project was initially migrated through the Supabase
-          # connector, which recorded timestamped history entries while this
-          # repository still uses legacy four-digit migration versions.
-          # Never replay 0001..0009 as though this database were empty.
-          if [[ "$SUPABASE_PROJECT_REF" == "ytfaetqvtbsbmcsdlkvk" ]]; then
-            echo "::error::Staging has connector-created timestamped migrations for 0001..0009. Reconcile the migration ledger and review the SQL catalog before using supabase db push."
-            exit 1
-          fi
-          echo "No known connector migration history conflict for this target."
-
       - name: Preview pending SQL (read-only)
+        working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}
         run: supabase db push --dry-run --linked
 
       - name: Apply approved pending SQL to STAGING (writes)
+        working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}
         run: supabase db push --linked
 
       - name: Confirm remote versions
+        working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}
         run: supabase migration list --linked
 
       - name: Confirm no further pending SQL (read-only)
+        working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}
         run: supabase db push --dry-run --linked
 
       - name: Setup Bun for post-apply verification
