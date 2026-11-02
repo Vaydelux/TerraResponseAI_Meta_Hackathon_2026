@@ -7,6 +7,10 @@ const route = readFileSync("src/app/api/reports/[id]/review/route.ts", "utf8");
 describe("atomic review database guardrails", () => {
   it("runs the full decision and correction in one SQL function transaction", () => {
     expect(sql).toContain("security definer");
+    expect(sql).toContain("create or replace function public.submit_review_tx(");
+    expect(sql).toContain("as $");
+    expect(sql).not.toContain("$function$");
+    expect(sql).not.toContain("create or replace function public.submit_review_atomic(");
     expect(sql).toContain("for update");
     expect(sql).toContain("insert into public.review_actions");
     expect(sql).toContain("update public.report_analyses");
