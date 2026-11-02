@@ -13,28 +13,31 @@ async function main() {
   const key = process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY ?? "";
   const confirmed = process.env.CONFIRM_ACTION ?? "";
   const inputRef = process.env.CONFIRM_PROJECT_REF ?? "";
+  // Explicit allowlist: NEVER provision sample identities in production or
+  // another project even if environment variables are accidentally swapped.
   if (confirmed !== "CREATE-STAGING-TEST-USERS" ||
-      !/^[a-z0-9]{12,32}$/.test(ref) ||
-      !/^[a-z0-9]{12,32}$/.test(production) ||
-      ref === production || ref === "ywopsafppyykhwrejliz" ||
+      ref !== "ytfaetqvtbsbmcsdlkvk" ||
+      production !== "ywopsafppyykhwrejliz" ||
       inputRef !== ref || url !== `https://${ref}.supabase.co` || !key) {
     throw new Error("Staging-only guard failed. No identities created.");
   }
 
   const entries = [
-    { role: "reporter", email: process.env.TEST_REPORTER_EMAIL, password: process.env.TEST_REPORTER_PASSWORD },
-    { role: "reviewer", email: process.env.TEST_REVIEWER_EMAIL, password: process.env.TEST_REVIEWER_PASSWORD },
-    { role: "admin", email: process.env.TEST_ADMIN_EMAIL, password: process.env.TEST_ADMIN_PASSWORD },
+    { role: "reporter", email: process.env.TEST_REPORTER_EMAIL || "qa.reporter@example.com", password: process.env.TEST_REPORTER_PASSWORD },
+    { role: "reviewer", email: process.env.TEST_REVIEWER_EMAIL || "qa.reviewer@example.com", password: process.env.TEST_REVIEWER_PASSWORD },
+    { role: "admin", email: process.env.TEST_ADMIN_EMAIL || "qa.admin@example.com", password: process.env.TEST_ADMIN_PASSWORD },
   ] as const;
 
   if (entries.some(x => !x.email || !x.password || x.password.length < 16) ||
+      new Set(entries.map(x => x.password)).size !== 3 ||
       new Set(entries.map(x => x.email?.trim().toLowerCase())).size !== 3 ||
       entries.some(x => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x.email!))) {
-    throw new Error("Configure 3 unique valid emails and separate strong passwords of at least 16 chars in protected staging secrets.");
+    throw new Error("Provide 3 distinct strong passwords (16+ characters) and valid unique emails in protected staging secrets.");
   }
 
   const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const createdIds: string[] = [];
+  let createdEventId: string | null = null;
   try {
     for (const entry of entries) {
       const { data, error } = await supabase.auth.admin.createUser({
@@ -57,16 +60,61 @@ async function main() {
       }
       console.log(`Created and verified staging ${entry.role} account (identifier withheld).`);
     }
+
+    // A global role alone does not grant event access. Each sample account
+    // must share one private test event to exercise upload, review and
+    // coordinator permissions. This slug is intentionally staging-only.
+    const adminUserId = createdIds[2];
+    const { data: event, error: eventError } = await supabase
+      .from("events")
+      .insert({
+        slug: "hackathon-qa-roles",
+        name: "QA Demo — Three Roles",
+        description: "Isolated staging test event. Synthetic/authorized evidence only.",
+        status: "active",
+        location_label: "Test workspace — not a real incident",
+        created_by: adminUserId,
+      })
+      .select("id")
+      .single();
+    if (eventError || !event?.id) {
+      throw new Error("Creating the shared staging test event failed.");
+    }
+    createdEventId = event.id;
+
+    const expectedMemberships = [
+      { event_id: createdEventId, user_id: createdIds[0], role: "contributor" },
+      { event_id: createdEventId, user_id: createdIds[1], role: "reviewer" },
+      { event_id: createdEventId, user_id: createdIds[2], role: "coordinator" },
+    ];
+    const { data: memberships, error: membersError } = await supabase
+      .from("event_members")
+      .insert(expectedMemberships)
+      .select("event_id, user_id, role");
+    if (membersError || memberships?.length !== expectedMemberships.length ||
+        !expectedMemberships.every(row => memberships.some(member =>
+          member.event_id === row.event_id && member.user_id === row.user_id && member.role === row.role
+        ))) {
+      throw new Error("Staging role-to-event membership verification failed.");
+    }
+    console.log("Created the shared staging QA event with contributor, reviewer and coordinator memberships.");
   } catch (failure) {
     // Compensate for partial provision. Never delete any existing account:
     // only the IDs created in THIS invocation are eligible.
     let cleanupFailed = false;
+    // Delete the newly-created event FIRST: events.created_by is a
+    // RESTRICT foreign key, and memberships cascade from events.
+    // Never delete or overwrite an existing event or identity.
+    if (createdEventId) {
+      const { error: deleteEventError } = await supabase.from("events").delete().eq("id", createdEventId);
+      if (deleteEventError) cleanupFailed = true;
+    }
     for (const id of createdIds.reverse()) {
       const { error } = await supabase.auth.admin.deleteUser(id);
       if (error) cleanupFailed = true;
     }
     if (cleanupFailed) {
-      throw new Error("Staging provisioning failed and compensation was incomplete. Audit and remove the partial staging identities.");
+      throw new Error("Staging QA provisioning failed and cleanup was incomplete. Audit newly created event and identities in the staging project.");
     }
     throw failure;
   }
