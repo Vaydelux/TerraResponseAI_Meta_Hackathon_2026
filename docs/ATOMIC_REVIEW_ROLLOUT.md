@@ -2,7 +2,7 @@
 
 The previous reviewer endpoint issued three independent PostgREST writes: append the audit action, change report review status, then update an analysis. This was **not atomic**. Ordinary reviewer RLS also denies direct update to `report_analyses`; corrections could silently fail after the report was marked reviewed. The correction form sent `action: "comment"` while the previous route rejected that value.
 
-Migration `0010_atomic_review_actions.sql` introduces `public.submit_review_atomic`, adds an idempotency UUID to `review_actions`, and keeps the audit, analysis correction and review-state change in one Postgres transaction.
+Migration `0010_atomic_review_actions.sql` introduces `public.submit_review_tx`, adds an idempotency UUID to `review_actions`, and keeps the audit, analysis correction and review-state change in one Postgres transaction.
 
 **Do not deploy the updated API before migration 0010 is applied**. It fails closed with a 503 if the RPC is missing. Deploy the DB migration and API as one coordinated staging release, then inspect logs and complete the actual role-isolation tests.
 
