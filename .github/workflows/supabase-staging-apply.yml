@@ -98,7 +98,11 @@ jobs:
 
       - name: List remote migration history (read-only)
         working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}
-        run: supabase migration list --linked
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration list --linked | tee "$RUNNER_TEMP/terraresponse-staging-migration-list.txt"
+          node "$GITHUB_WORKSPACE/scripts/verify-staging-migration-history.mjs" "$RUNNER_TEMP/terraresponse-staging-migration-list.txt"
 
       - name: Preview pending SQL (read-only)
         working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}
