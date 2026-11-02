@@ -1,3 +1,5 @@
+> **Staging update (2026-11-02):** Migration 0010 was applied successfully to isolated staging `ytfaetqvtbsbmcsdlkvk` after replacing ambiguous `CASE ... END` expressions in the PL/pgSQL body with equivalent `IF/ELSIF` branches and limit variables. Live catalog confirmed `public.submit_review_atomic`, a unique request ID index, `anon` EXECUTE denied, and `authenticated` EXECUTE granted. Unauthenticated invocation produced SQLSTATE 42501 as expected. These checks do not replace real role-specific end-to-end tests. Production schema is unchanged.
+
 # Atomic review rollout — TerraResponse AI
 
 The previous reviewer endpoint issued three independent PostgREST writes: append the audit action, change report review status, then update an analysis. This was **not atomic**. Ordinary reviewer RLS also denies direct update to `report_analyses`; corrections could silently fail after the report was marked reviewed. The correction form sent `action: "comment"` while the previous route rejected that value.
