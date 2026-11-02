@@ -17,13 +17,14 @@ import type { AuthContext } from "@/lib/auth/profile";
 export interface AppShellProps {
   ctx: AuthContext;
   pendingReviewCount?: number;
+  showIncidentNotifications?: boolean;
   children: ReactNode;
 }
 
-export function AppShell({ ctx, pendingReviewCount, children }: AppShellProps) {
+export function AppShell({ ctx, pendingReviewCount, showIncidentNotifications, children }: AppShellProps) {
   return (
     <div className="tr-shell">
-      <TopBar ctx={ctx} pendingReviewCount={pendingReviewCount} />
+      <TopBar ctx={ctx} pendingReviewCount={pendingReviewCount} showIncidentNotifications={showIncidentNotifications} />
       <DemoBanner />
       <main id="main-content" tabIndex={-1}>
         {children}
