@@ -19,7 +19,7 @@ export default async function ReviewPageRoute() {
   const user = await getServerUser();
   if (!user) redirect("/login?callbackUrl=" + encodeURIComponent("/review"));
   const ctx = await getAuthContext(user);
-  if (!ctx) redirect("/login?callbackUrl=" + encodeURIComponent("/review"));
+  if (!ctx) redirect("/account-unavailable");
   if (ctx.user.role !== "reviewer" && ctx.user.role !== "admin") {
     redirect("/dashboard");
   }

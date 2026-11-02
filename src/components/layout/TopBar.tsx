@@ -21,6 +21,8 @@ export interface TopBarProps {
   ctx: AuthContext;
   /** Number of reports in the pending review queue (the count badge). */
   pendingReviewCount?: number;
+  showIncidentNotifications?: boolean;
+  showRoleManagement?: boolean;
   className?: string;
 }
 
@@ -28,12 +30,14 @@ interface NavLink {
   href: string;
   label: string;
   showCount?: boolean;
+  triageOnly?: boolean;
   roles?: string[];
 }
 
 const NAV_LINKS: NavLink[] = [
   { href: "/dashboard", label: "Overview" },
   { href: "/reports", label: "Reports" },
+  { href: "/incidents", label: "Incident threads", triageOnly: true },
   { href: "/map", label: "Incident Map" },
   { href: "/review", label: "Review Queue", showCount: true, roles: ["reviewer", "admin"] },
   { href: "/audit", label: "Audit & Spend", roles: ["reviewer", "admin"] },
@@ -44,10 +48,11 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function TopBar({ ctx, pendingReviewCount = 0, className }: TopBarProps) {
+export function TopBar({ ctx, pendingReviewCount = 0, showIncidentNotifications = false, showRoleManagement = false, className }: TopBarProps) {
   const pathname = usePathname() ?? "";
   const [mobileOpen, setMobileOpen] = useState(false);
-  const links = NAV_LINKS.filter((l) => !l.roles || l.roles.includes(ctx.user.role));
+  const links = NAV_LINKS.filter((l) => (!l.roles || l.roles.includes(ctx.user.role)) && (!l.triageOnly || showIncidentNotifications));
+  const utilityLinks: NavLink[] = [...(showIncidentNotifications ? [{ href: "/notifications", label: "Notifications" }] : []), ...(showRoleManagement && ctx.user.role === "admin" ? [{ href: "/admin/users", label: "User roles" }] : [])];
 
   return (
     <div style={{ position: "sticky", top: 0, zIndex: 40 }}>
@@ -74,6 +79,7 @@ export function TopBar({ ctx, pendingReviewCount = 0, className }: TopBarProps) 
             );
           })}
         </nav>
+        {utilityLinks.map(l => <Link key={l.href} href={l.href} className="nav__link" aria-current={isActive(pathname,l.href) ? "page" : undefined}>{l.label}</Link>)}
         <div className="topbar__spacer" />
         <div className="topbar__desktop-only">
           <EventSwitcher events={ctx.events} />
@@ -94,7 +100,7 @@ export function TopBar({ ctx, pendingReviewCount = 0, className }: TopBarProps) 
       {mobileOpen && (
         <div className="mobile-nav-drawer" role="region" aria-label="Mobile navigation">
           <nav className="mobile-nav-drawer__links" aria-label="Mobile primary">
-            {links.map((l) => {
+            {[...links, ...utilityLinks].map((l) => {
               const active = isActive(pathname, l.href);
               return (
                 <Link
