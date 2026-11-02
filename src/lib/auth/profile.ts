@@ -11,20 +11,14 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { normalizeEventMemberships, type UserEventMembership } from "@/lib/auth/event-memberships";
+export type { UserEventMembership } from "@/lib/auth/event-memberships";
 
 export interface UserProfile {
   id: string;
   email: string;
   name: string | null;
   role: "reporter" | "reviewer" | "admin";
-}
-
-export interface UserEventMembership {
-  event_id: string;
-  event_name: string;
-  event_slug: string;
-  event_status: string;
-  role: "contributor" | "reviewer" | "coordinator";
 }
 
 export interface AuthContext {
@@ -60,28 +54,19 @@ export async function getAuthContext(user?: { id: string } | null): Promise<Auth
     .single();
   if (!profile) return null;
 
-  // Event memberships. RLS: event members see their own memberships.
-  // The Supabase client without generated types returns `any`; we cast
-  // to the expected shape. The `events:event_id(...)` join returns an
-  // array (one-to-many), so we take the first element.
-  const { data: memberships } = await supabase
+  // The events:event_id(...) join is a MANY-TO-ONE embedding: PostgREST
+  // returns an event object, not an array. The old array-only parser
+  // silently hid valid event memberships, blocking photo uploads.
+  const { data: memberships, error: membershipError } = await supabase
     .from("event_members")
     .select("event_id, role, events:event_id(id, name, slug, status)")
     .eq("user_id", resolvedUser.id);
+  if (membershipError) {
+    console.error("[auth] Event membership lookup failed.", { code: membershipError.code ?? "unknown" });
+    throw new Error("Unable to load event permissions.");
+  }
 
-  const events: UserEventMembership[] = ((memberships ?? []) as unknown as Array<{
-    event_id: string;
-    role: "contributor" | "reviewer" | "coordinator";
-    events: Array<{ id: string; name: string; slug: string; status: string }>;
-  }>)
-    .filter((m) => m.events && m.events.length > 0)
-    .map((m) => ({
-      event_id: m.event_id,
-      event_name: m.events[0].name,
-      event_slug: m.events[0].slug,
-      event_status: m.events[0].status,
-      role: m.role,
-    }));
+  const events: UserEventMembership[] = normalizeEventMemberships(memberships);
 
   return {
     user: {
