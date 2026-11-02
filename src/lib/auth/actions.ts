@@ -31,7 +31,7 @@ import { safeAuthPath } from "@/lib/auth/safe-redirect";
 import { signupFailure } from "@/lib/auth/signup-error";
 import { normalizeUsername, validateRegistration } from "@/lib/auth/registration-policy";
 
-export type SignInState = { error?: string } | null;
+export type SignInState = { error?: string; redirectTo?: string } | null;
 
 /** Read the login rate limit from env (default 10 attempts/hour). */
 function getLoginRateLimit(): number {
@@ -196,10 +196,13 @@ export async function signInAction(formData: FormData): Promise<SignInState> {
     return { error: "Your session could not be verified. Please try signing in again." };
   }
 
-  // Same-origin redirect only, never attacker-supplied external URLs.
+  // Return an explicit authenticated destination to the useActionState
+  // caller. A redirect thrown through an extra client-side async wrapper
+  // can surface as an uncaught navigation error rather than a transition.
+  // Cookies are written by the server action before the browser navigates.
   const safe = safeAuthPath(callbackUrl);
   revalidatePath("/", "layout");
-  redirect(safe);
+  return { redirectTo: safe };
 }
 
 /**
