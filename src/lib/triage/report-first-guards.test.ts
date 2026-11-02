@@ -9,11 +9,12 @@ const analyze=readFileSync("src/app/api/reports/[id]/analyze/route.ts","utf8");
 const triage=readFileSync("src/lib/triage/processing.ts","utf8");
 
 describe("report-first workflow security and compatibility", () => {
-  it("keeps the existing production flow behind explicit rollout gates", () => {
-    expect(intake).toContain('process.env.REPORT_FIRST_INTAKE_ENABLED === "true"');
+  it("defaults report-first intake on in both production and preview while keeping an emergency shutdown", () => {
+    expect(intake).toContain('process.env.REPORT_FIRST_INTAKE_ENABLED !== "false"');
     expect(triage).toContain('process.env.REPORT_FIRST_TRIAGE_ENABLED === "true"');
-    expect(upload).toContain("if (isCommunityIntakeEnabled())");
-    expect(page).toContain("if (isCommunityIntakeEnabled())");
+    expect(upload).toContain("await ensureCommunityIntakeMembership(user.id)");
+    expect(page).toContain("await ensureCommunityIntakeMembership(user.id)");
+    expect(page).not.toContain("tr-active-event");
   });
   it("only enrolls in one server-selected intake, never in client-selected private events", () => {
     expect(intake).toContain('COMMUNITY_INTAKE_SLUG = "community-intake"');
@@ -21,8 +22,8 @@ describe("report-first workflow security and compatibility", () => {
     expect(intake).toContain('profile.role === "admin" ? "coordinator"');
     expect(intake).toContain('profile.role === "reviewer" ? "reviewer" : "contributor"');
     expect(intake).toContain('onConflict: "event_id,user_id"');
-    expect(upload).toContain("communityEventId === eventId");
-    expect(upload).toContain("ctx.events.find");
+    expect(upload).toContain("meta.eventId !== eventId");
+    expect(upload).toContain("No photo was saved.");
     expect(upload).not.toContain("ensureCommunityIntakeMembership(meta.eventId)");
   });
   it("uses RLS and never grants anonymous access to incident evidence or alerts", () => {
