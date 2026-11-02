@@ -28,8 +28,12 @@ describe("staging isolation hardening", () => {
       expect(workflow).not.toContain("secrets.SUPABASE_SERVICE_ROLE_KEY");
     }
     expect(apply).toContain("supabase db push --dry-run --linked");
-    expect(apply).toContain('if [[ "$SUPABASE_PROJECT_REF" == "ytfaetqvtbsbmcsdlkvk" ]]');
-    expect(apply).toContain("Reconcile the migration ledger");
+    expect(apply).toContain("node scripts/prepare-staging-migration-workspace.mjs");
+    expect(apply).toContain('working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}');
+    const stagingWorkspace = get("scripts/prepare-staging-migration-workspace.mjs");
+    expect(stagingWorkspace).toContain('"ytfaetqvtbsbmcsdlkvk"');
+    expect(stagingWorkspace).toContain('"ywopsafppyykhwrejliz"');
+    expect(stagingWorkspace).toContain("Unknown, non-timestamped or out-of-order migration");
     expect(apply).toContain("environment: staging");
   });
 });
