@@ -24,6 +24,7 @@ export interface TopBarProps {
   ctx: AuthContext;
   /** Number of reports in the pending review queue (the count badge). */
   pendingReviewCount?: number;
+  showIncidentNotifications?: boolean;
   className?: string;
 }
 
@@ -46,7 +47,7 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function TopBar({ ctx, pendingReviewCount = 0, className }: TopBarProps) {
+export function TopBar({ ctx, pendingReviewCount = 0, showIncidentNotifications = false, className }: TopBarProps) {
   const pathname = usePathname() ?? "";
   const links = NAV_LINKS.filter((l) => !l.roles || l.roles.includes(ctx.user.role));
   return (
@@ -72,6 +73,12 @@ export function TopBar({ ctx, pendingReviewCount = 0, className }: TopBarProps) 
           );
         })}
       </nav>
+      {showIncidentNotifications && (
+        <Link href="/notifications" className="nav__link"
+          aria-current={isActive(pathname, "/notifications") ? "page" : undefined}>
+          Notifications
+        </Link>
+      )}
       <div className="topbar__spacer" />
       <EventSwitcher events={ctx.events} />
       <ThemeToggle />
