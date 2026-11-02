@@ -15,6 +15,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { SetupRedirect } from "@/components/terra/setup-redirect";
 import { isTriageEnabled } from "@/lib/triage/processing";
 import { isRoleManagementEnabled } from "@/lib/admin/role-management";
+import { ensureCommunityIntakeMembership } from "@/lib/community/intake";
 
 export default async function AppLayout({
   children,
@@ -30,6 +31,14 @@ export default async function AppLayout({
     redirect("/login?callbackUrl=" + encodeURIComponent("/dashboard"));
   }
 
+  // Provision the fixed workspace at login so dashboards, report lists,
+  // reviewer queues and direct navigation all share one report-first context.
+  // Failure is non-fatal for navigation; /reports/new surfaces the outage.
+  try {
+    await ensureCommunityIntakeMembership(user.id);
+  } catch {
+    console.error("[intake] Shared reporting workspace unavailable.");
+  }
   const ctx = await getAuthContext(user);
   if (!ctx) {
     // Authenticated but missing/inaccessible profile is NOT a login

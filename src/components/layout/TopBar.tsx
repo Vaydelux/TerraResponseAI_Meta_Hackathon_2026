@@ -13,7 +13,6 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Wordmark } from "./Wordmark";
 import { ThemeToggle } from "./ThemeToggle";
-import { EventSwitcher } from "./EventSwitcher";
 import { UserMenu } from "./UserMenu";
 import type { AuthContext } from "@/lib/auth/profile";
 
@@ -37,6 +36,7 @@ interface NavLink {
 const NAV_LINKS: NavLink[] = [
   { href: "/dashboard", label: "Overview" },
   { href: "/reports", label: "Reports" },
+  { href: "/reports/new", label: "Upload Photo" },
   { href: "/incidents", label: "Incident threads", triageOnly: true },
   { href: "/map", label: "Incident Map" },
   { href: "/review", label: "Review Queue", showCount: true, roles: ["reviewer", "admin"] },
@@ -82,7 +82,6 @@ export function TopBar({ ctx, pendingReviewCount = 0, showIncidentNotifications 
         {utilityLinks.map(l => <Link key={l.href} href={l.href} className="nav__link" aria-current={isActive(pathname,l.href) ? "page" : undefined}>{l.label}</Link>)}
         <div className="topbar__spacer" />
         <div className="topbar__desktop-only">
-          <EventSwitcher events={ctx.events} />
           <ThemeToggle />
         </div>
         <UserMenu user={ctx.user} />
@@ -121,7 +120,6 @@ export function TopBar({ ctx, pendingReviewCount = 0, showIncidentNotifications 
             })}
           </nav>
           <div className="mobile-nav-drawer__controls">
-            <EventSwitcher events={ctx.events} />
             <ThemeToggle />
           </div>
         </div>

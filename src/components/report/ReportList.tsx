@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 
 export interface ReportListProps {
   /** The event id to filter by. */
-  eventId: string;
+  eventId?: string;
   /** Optional status filter (e.g. "needs_review" for the review queue). */
   status?: string;
   /** Optional: only show unlocated reports. */
@@ -60,9 +60,9 @@ export function ReportList({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!eventId) return;
     const ctrl = new AbortController();
-    const params = new URLSearchParams({ event_id: eventId, limit: String(limit) });
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (eventId) params.set("event_id", eventId);
     if (status) params.set("status", status);
     if (unlocated) params.set("unlocated", "true");
     if (includeAnalysis) params.set("include_analysis", "true");

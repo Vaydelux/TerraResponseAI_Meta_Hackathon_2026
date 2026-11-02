@@ -5,15 +5,16 @@ import { serviceRoleKey, supabaseUrl } from "@/lib/supabase/env";
 export const COMMUNITY_INTAKE_SLUG = "community-intake";
 
 /**
- * Rollout gate: production keeps existing event-scoped behavior until
- * staging proves role isolation and intake event/membership persistence.
+ * Report-first intake is the default in every environment. The explicit
+ * false value is an emergency rollback switch, not a launch prerequisite.
+ * Never create arbitrary event memberships from user-supplied event IDs.
  */
 export function isCommunityIntakeEnabled() {
-  return process.env.REPORT_FIRST_INTAKE_ENABLED === "true";
+  return process.env.REPORT_FIRST_INTAKE_ENABLED !== "false";
 }
 
-export async function ensureCommunityIntakeMembership(userId: string): Promise<string | null> {
-  if (!isCommunityIntakeEnabled()) return null;
+export async function ensureCommunityIntakeMembership(userId: string): Promise<string> {
+  if (!isCommunityIntakeEnabled()) throw new Error("Community reporting is paused.");
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
     throw new Error("Invalid authenticated user.");
   }

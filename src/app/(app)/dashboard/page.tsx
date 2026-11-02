@@ -8,7 +8,6 @@
 import { getServerUser, isSupabaseConfigured, createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/lib/auth/profile";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -39,13 +38,11 @@ export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
   const eventIds = ctx.events.map((e) => e.event_id);
 
-  // Resolve active event from cookie or first membership
-  const cookieStore = await cookies();
-  const cookieEventId = cookieStore.get("tr-active-event")?.value;
+  // A broad reporting workspace is internal routing metadata, not
+  // something a resident must select before submitting evidence.
   const activeEvent: UserEventMembership | null =
-    (cookieEventId ? ctx.events.find((e) => e.event_id === cookieEventId) : null) ??
-    ctx.events[0] ??
-    null;
+    ctx.events.find((e) => e.event_slug === "community-intake") ??
+    ctx.events[0] ?? null;
 
   // Honest metrics — counts from the DB across the user's events.
   const [allRes, pendingRes, reviewedRes, unlocatedRes, failedRes, manualRes] =
@@ -198,7 +195,7 @@ export default async function DashboardPage() {
       <header className="welcome-hero-banner">
         <div style={{ display: "grid", gap: 6 }}>
           <div className="t-meta" style={{ fontWeight: 700, color: "var(--tide)" }}>
-            {activeEvent ? `Active Event: ${activeEvent.event_name}` : "No Event Assigned"} · Role: {ctx.user.role}
+            Reporting access · Role: {ctx.user.role}
           </div>
           <h1 style={{ fontSize: "var(--step-3)", lineHeight: 1.15 }}>
             Welcome back, {displayName}.{" "}
@@ -463,7 +460,7 @@ export default async function DashboardPage() {
 
               {streamItems.length === 0 ? (
                 <div className="well-uncertain">
-                  <p className="t-meta">No recent activity recorded yet in this event. Upload a photo to get started.</p>
+                  <p className="t-meta">No recent activity yet. You can upload a photo without choosing an event.</p>
                 </div>
               ) : (
                 <ul className="alert-stream">

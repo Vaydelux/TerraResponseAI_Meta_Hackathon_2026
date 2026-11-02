@@ -39,19 +39,11 @@ type UploadState =
   | { kind: "success"; reportId: string; analysis: AnalysisProgress }
   | { kind: "error"; message: string };
 
-function readCookie(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
 export interface UploadFlowProps {
-  /** The active event id (from the cookie set by EventSwitcher). */
-  eventId?: string | null;
   className?: string;
 }
 
-export function UploadFlow({ eventId, className }: UploadFlowProps) {
+export function UploadFlow({ className }: UploadFlowProps) {
   const [step, setStep] = useState<Step>(1);
   const [files, setFiles] = useState<File[]>([]);
   const [checks, setChecks] = useState<FileCheckItem[]>([]);
@@ -135,7 +127,6 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
 
   function buildMeta(linkToReportId?: string): Record<string, unknown> {
     const meta: Record<string, unknown> = {
-      eventId: eventId ?? readCookie("tr-active-event"),
       title: title || undefined,
       description: description || undefined,
     };
@@ -250,16 +241,6 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
     setState({ kind: "idle" });
   }
 
-  if (!eventId) {
-    return (
-      <div className="tr-page">
-        <PageHeader title="Upload a photo" subtitle="Submit a disaster photo for AI analysis and human review." />
-        <div className="panel">
-          <p className="t-meta">Select an incident event above (top bar) before uploading.</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={className}>
@@ -339,7 +320,7 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
               </p>
               <div className="tr-cluster" style={{ marginTop: "var(--s-3)" }}>
                 <Link className="btn" href={`/reports/${state.existingReportId}`}>Open existing report</Link>
-                <Button variant="primary" onClick={() => void doUpload(state.existingReportId)}>Submit as linked</Button>
+                <Button variant="primary" onClick={() => void doUpload(state.existingReportId)}>Link existing report</Button>
               </div>
             </div>
           )}
@@ -347,7 +328,7 @@ export function UploadFlow({ eventId, className }: UploadFlowProps) {
             <div className="panel" role="status">
               <h3 style={{ fontSize: "var(--step-1)" }}>Linked to existing report</h3>
               <p className="t-meta" style={{ marginTop: "var(--s-2)" }}>
-                The same photo was already submitted to this event. No additional report was created and no new AI analysis was requested.
+                The same photo was already submitted. No additional report was created and no new AI analysis was requested.
               </p>
               <Link className="btn btn--primary" style={{ marginTop: "var(--s-3)" }} href={`/reports/${state.existingReportId}`}>
                 Open existing report
