@@ -50,7 +50,15 @@ export default async function IncidentThreadDetailPage({
       <p role="alert" className="panel">Authorized report details are temporarily unavailable.</p>
     </section>;
   }
-  const authorized = new Map((reports ?? []).map(report => [report.id as string, report]));
+  type VisibleReport = {
+    id: string; title: string | null; status: string;
+    review_outcome: string | null; location_label: string | null;
+    created_at: string; creator_id: string;
+  };
+  const authorized = new Map<string, VisibleReport>();
+  for (const report of reports ?? []) {
+    authorized.set(report.id as string, report as VisibleReport);
+  }
   const reportItems = (links ?? []).flatMap(link => {
     const report = authorized.get(link.report_id as string);
     return report ? [{ report, link }] : [];
