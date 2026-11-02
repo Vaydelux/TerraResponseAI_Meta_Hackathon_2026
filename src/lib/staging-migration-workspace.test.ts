@@ -71,5 +71,11 @@ describe("staging connector history reconciliation", () => {
     expect(workflow).toContain("environment: staging");
     expect(workflow).toContain("APPLY-STAGING-ONLY");
     expect(workflow).not.toMatch(/run:\s*supabase migration repair/);
+
+    const preview = readFileSync(".github/workflows/supabase-staging-preview.yml", "utf8");
+    expect(preview).toContain("node scripts/prepare-staging-migration-workspace.mjs");
+    expect(preview).toContain('working-directory: ${{ env.STAGING_MIGRATION_WORKSPACE }}');
+    expect(preview).toContain("supabase db push --dry-run --linked");
+    expect(preview).not.toMatch(/run:\s*supabase db push --linked/);
   });
 });
