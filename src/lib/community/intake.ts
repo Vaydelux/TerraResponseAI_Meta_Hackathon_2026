@@ -1,4 +1,4 @@
-import "server-only";
+// Server-side entry point: only imported by Next.js server routes/components.
 import { createClient } from "@supabase/supabase-js";
 import { serviceRoleKey, supabaseUrl } from "@/lib/supabase/env";
 
