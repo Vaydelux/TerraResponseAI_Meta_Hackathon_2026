@@ -143,6 +143,11 @@ export async function signInAction(formData: FormData): Promise<SignInState> {
   const callbackUrl = String(formData.get("callbackUrl") ?? "/dashboard");
 
   if (!email || !password) return { error: "Email and password are required." };
+  // Current Supabase sign-in uses email as the identity. The display
+  // username is not a unique authentication ID; never treat it as email.
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Enter your registered email address, not your display username." };
+  }
 
   const supabase = await createSupabaseServerClient();
 
@@ -155,15 +160,43 @@ export async function signInAction(formData: FormData): Promise<SignInState> {
     return { error: `Too many failed login attempts (${rate.used}/${rate.limit} in the last hour). Please try again later.` };
   }
 
-  // 2. Attempt sign-in.
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    // 3. Record the failed attempt for rate-limiting.
+  // 2. Attempt sign-in. The callbackUrl is only a return destination,
+  // not proof of successful authentication.
+  let signedIn: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>;
+  try {
+    signedIn = await supabase.auth.signInWithPassword({ email, password });
+  } catch {
+    console.error("[auth] Sign-in provider unavailable.");
+    return { error: "Sign-in is temporarily unavailable. Please try again." };
+  }
+  if (signedIn.error) {
+    // 3. Record the failed attempt for rate-limiting. Keep credential
+    // failure details generic; only explain confirmation after the
+    // provider has validated a password.
     await recordAuthFailure(email);
+    if (signedIn.error.code === "email_not_confirmed") {
+      return { error: "Please confirm your email address before signing in." };
+    }
     return { error: "Invalid email or password. Please try again." };
   }
+  if (!signedIn.data.session || !signedIn.data.user) {
+    return { error: "A sign-in session could not be established. Please try again." };
+  }
 
-  // Safe redirect: same-origin, no protocol-relative.
+  // Verify the newly issued session before navigating to a route that
+  // the middleware protects. Do not silently redirect back to /login.
+  try {
+    const { data: verified, error: verifyError } = await supabase.auth.getUser();
+    if (verifyError || !verified.user || verified.user.id !== signedIn.data.user.id) {
+      console.error("[auth] New sign-in session failed verification.");
+      return { error: "Your session could not be verified. Please try signing in again." };
+    }
+  } catch {
+    console.error("[auth] New sign-in session verification unavailable.");
+    return { error: "Your session could not be verified. Please try signing in again." };
+  }
+
+  // Same-origin redirect only, never attacker-supplied external URLs.
   const safe = safeAuthPath(callbackUrl);
   revalidatePath("/", "layout");
   redirect(safe);
