@@ -47,6 +47,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { checkUserUploadRate } from "@/lib/rate-limit";
 import { sanitizeUserText } from "@/lib/ai/prompt-injection";
 import { resolveLocation, validateBounds } from "@/lib/storage/missing-location";
+import { ensureCommunityIntakeMembership, isCommunityIntakeEnabled } from "@/lib/community/intake";
 
 // MIME → file extension for the storage path.
 const EXT_BY_TYPE: Record<AllowedImageType, "jpg" | "png" | "webp"> = {
@@ -116,9 +117,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 4. Event authorization — the user must be a member (contributor+)
-  //    of meta.eventId.
-  const membership = ctx.events.find((e) => e.event_id === meta.eventId);
+  // 4. An authenticated reporter can post to the FIXED community
+  // intake without being manually assigned to an event. All other
+  // event IDs still require an existing authorized membership.
+  let communityEventId: string | null = null;
+  if (isCommunityIntakeEnabled()) {
+    try {
+      communityEventId = await ensureCommunityIntakeMembership(user.id);
+    } catch {
+      return NextResponse.json(
+        { error: { code: "INTAKE_UNAVAILABLE", message: "Community reporting is temporarily unavailable." } },
+        { status: 503 },
+      );
+    }
+  }
+  const eventId = meta.eventId ?? communityEventId;
+  if (!eventId) {
+    return NextResponse.json(
+      { error: { code: "EVENT_REQUIRED", message: "No reporting event is available." } },
+      { status: 400 },
+    );
+  }
+  const membership = ctx.events.find((e) => e.event_id === eventId) ??
+    (communityEventId === eventId ? { role: "contributor" as const } : undefined);
   if (!membership) {
     // The user is NOT a member of this event. We return 403 WITHOUT
     // confirming whether the event exists (no cross-event leak).
@@ -174,7 +195,7 @@ export async function POST(request: NextRequest) {
   const digest = sha256Hex(buf);
 
   // 8. Dedup check within the authorized event.
-  const dup = await checkDuplicate(meta.eventId, digest);
+  const dup = await checkDuplicate(eventId, digest);
   if (dup.isDuplicate && dup.existingReportId) {
     // If the client asked to link (meta.linkToReportId === the existing
     // id), we'd allow it — but linking is a Phase 4 affordance. For now,
@@ -232,7 +253,7 @@ export async function POST(request: NextRequest) {
   let keys;
   try {
     keys = await storeEvidence({
-      eventId: meta.eventId,
+      eventId,
       reportId,
       original: buf,
       derivative: derivatives.derivative,
@@ -300,7 +321,7 @@ export async function POST(request: NextRequest) {
     .from("reports")
     .insert({
       id: reportId,
-      event_id: meta.eventId,
+      event_id: eventId,
       creator_id: user.id,
       status: "uploaded",
       title: titleSanitized?.text ?? null,
