@@ -12,9 +12,9 @@ describe("authenticated profile access never loops between login and dashboard",
       expect(sql).toContain(`grant select on public.${table} to authenticated;`);
     }
     const statements = sql.split("\n").filter(line => !line.trim().startsWith("--")).join("\n");
-    expect(statements).not.toMatch(/grant\\s+(?:select|all).*\\s+to\\s+(?:anon|public)\\s*;/i);
+    expect(statements).not.toMatch(/grant\s+(?:select|all).*\s+to\s+(?:anon|public)\s*;/i);
     expect(statements).not.toMatch(/disable row level security|bypassrls/i);
-    expect(statements).not.toMatch(/grant\\s+(insert|update|delete)/i);
+    expect(statements).not.toMatch(/grant\s+(insert|update|delete)/i);
   });
   it("separates a missing profile from an unauthenticated session", () => {
     expect(appLayout).toContain('if (!ctx) {');
