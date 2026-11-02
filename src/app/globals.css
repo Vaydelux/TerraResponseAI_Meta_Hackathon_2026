@@ -47,7 +47,6 @@
    * work while the migration to the new design system is in progress. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -154,6 +153,37 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Single semantic color source for Tailwind/shadcn and civic styles.
+ * Night, Mist and Day now share the same high-contrast token palette. */
+:root, :root.dark {
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--sheet);
+  --card-foreground: var(--ink);
+  --popover: var(--sheet);
+  --popover-foreground: var(--ink);
+  --primary: var(--tide);
+  --primary-foreground: var(--on-tide);
+  --secondary: var(--sheet-sunk);
+  --secondary-foreground: var(--ink);
+  --muted: var(--sheet-sunk);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--tide-wash);
+  --accent-foreground: var(--ink);
+  --destructive: var(--brick);
+  --border: var(--rule);
+  --input: var(--rule-strong);
+  --ring: var(--tide);
+  --sidebar: var(--sheet);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--tide);
+  --sidebar-primary-foreground: var(--on-tide);
+  --sidebar-accent: var(--sheet-sunk);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--tide);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -162,11 +192,16 @@
     @apply bg-background text-foreground antialiased;
   }
 
-  /* Smooth theme transitions (light ↔ dark) */
-  *,
-  *::before,
-  *::after {
-    transition: background-color 200ms ease, border-color 200ms ease, color 150ms ease;
+  /* Theme changes affect surfaces/text, not every animated element.
+     Global * transitions used to override component timing and hurt motion
+     performance. Keep state-change transitions explicitly scoped. */
+  :where(body, .topbar, .panel, .map-panel, .ui-tr-popover__body,
+         .btn, .nav__link, .input, .select, .textarea, .segmented__btn,
+         .mobile-nav-drawer, .well-uncertain) {
+    transition:
+      background-color var(--t-theme) var(--ease-theme),
+      border-color var(--t-theme) var(--ease-theme),
+      color var(--t-theme) var(--ease-theme);
   }
 
   /* Visible focus-visible for keyboard navigation (a11y) */
