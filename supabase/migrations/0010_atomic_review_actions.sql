@@ -1,6 +1,8 @@
 -- TerraResponse AI: review decisions must be a single atomic transaction.
 -- This forward-only migration deliberately requires staging verification before deployment.
--- Supabase CLI statement splitters can misparse function identifiers containing\n-- the substring 'atomic' (supabase/cli#5020); use submit_review_tx instead.\n-- Standard $ delimiters also improve compatibility with migration parsers.\n-- A SECURITY DEFINER RPC is necessary because reviewer RLS forbids direct
+-- Supabase CLI statement splitters can misparse function identifiers containing
+-- the substring 'atomic' (supabase/cli#5020); use submit_review_tx instead.
+-- Standard $$ delimiters improve compatibility with migration parsers.\n-- A SECURITY DEFINER RPC is necessary because reviewer RLS forbids direct
 -- UPDATE of report_analyses; all authorization is re-checked inside the function.
 
 alter table public.review_actions
@@ -21,7 +23,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_actor uuid := auth.uid();
   v_report public.reports%rowtype;
@@ -242,7 +244,7 @@ begin
     'reviewerId', v_actor, 'reviewedAt', v_reviewed_at
   );
 end;
-$;
+$$;
 
 -- Public functions default to PUBLIC EXECUTE: revoke explicitly.
 revoke all on function public.submit_review_tx(
