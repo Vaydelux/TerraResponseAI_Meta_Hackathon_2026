@@ -93,7 +93,6 @@ describe("email-only sign-in and verified redirect", () => {
   });
 
   it("redirects only after successful authentication and verified identity", async () => {
-    const { redirect } = await import("next/navigation");
     mocks.signInWithPassword.mockResolvedValue({
       data: { user: { id: "user-1" }, session: { access_token: "test-only" } },
       error: null,
@@ -101,8 +100,8 @@ describe("email-only sign-in and verified redirect", () => {
     mocks.getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
     const fd = loginForm();
     fd.set("callbackUrl", "/dashboard?tab=review");
-    await signInAction(fd);
-    expect(redirect).toHaveBeenCalledWith("/dashboard?tab=review");
+    const result = await signInAction(fd);
+    expect(result).toEqual({ redirectTo: "/dashboard?tab=review" });
     expect(mocks.getUser).toHaveBeenCalledOnce();
   });
 });
