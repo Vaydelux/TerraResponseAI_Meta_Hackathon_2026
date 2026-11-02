@@ -33,12 +33,14 @@ interface NavLink {
   href: string;
   label: string;
   showCount?: boolean;
+  triageOnly?: boolean;
   roles?: string[];
 }
 
 const NAV_LINKS: NavLink[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/reports", label: "Reports" },
+  { href: "/incidents", label: "Incident threads", triageOnly: true },
   { href: "/map", label: "Map" },
   { href: "/review", label: "Review queue", showCount: true, roles: ["reviewer", "admin"] },
 ];
@@ -50,7 +52,10 @@ function isActive(pathname: string, href: string): boolean {
 
 export function TopBar({ ctx, pendingReviewCount = 0, showIncidentNotifications = false, showRoleManagement = false, className }: TopBarProps) {
   const pathname = usePathname() ?? "";
-  const links = NAV_LINKS.filter((l) => !l.roles || l.roles.includes(ctx.user.role));
+  const links = NAV_LINKS.filter((l) =>
+    (!l.roles || l.roles.includes(ctx.user.role)) &&
+    (!l.triageOnly || showIncidentNotifications)
+  );
   return (
     <header className={`topbar${className ? ` ${className}` : ""}`}>
       <Wordmark />
