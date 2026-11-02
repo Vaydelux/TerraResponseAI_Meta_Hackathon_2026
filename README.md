@@ -102,26 +102,25 @@ Both models use the Meta Model API at `https://api.meta.ai/v1` with Bearer token
 
 ```bash
 # 1. Clone + install
-git clone <repo-url>
-cd terraresponse-ai
-bun install
+git clone https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026.git
+cd TerraResponseAI_Meta_Hackathon_2026
+bun install --frozen-lockfile
 
-# 2. Environment
+# 2. Local configuration (do not commit credentials)
 cp .env.example .env
-# Fill in: NEXTAUTH_SECRET (openssl rand -base64 32), Supabase keys, MODEL_API_KEY
+# Fill in the matching Supabase project URL, anon key and server-only
+# service-role key. MODEL_API_KEY is needed for real Muse Spark inference.
 
-# 3. Database migrations (requires Supabase CLI)
-supabase link --project-ref <your-ref>
-supabase db push
-
-# 4. Seed demo data (creates 5 demo reports + 2 events + 2 users)
-bun run scripts/seed-demo.ts
-
-# 5. Run
+# 3. Run locally
 bun run dev    # http://localhost:3000
+
+# 4. Verification
+bun run lint && bun run typecheck && bun run test && bun run build
 ```
 
-See `docs/DEPLOYMENT.md` for the full Vercel + Supabase deployment guide.
+**Database migration safety:** The existing production and staging projects have different migration histories. Do not run `supabase db push` against either without reconciling the remote migration ledger and verifying the target. Staging has source migrations 0001–0009 and 0011–0012 applied, but migration 0010's reviewer RPC remains blocked. See [staging issue #30](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/30) and [the staging verification guide](docs/LIVE_STAGING_VERIFICATION.md).
+
+See `docs/DEPLOYMENT.md` for the full Vercel + Supabase deployment guide, and [the hackathon submission kit](docs/HACKATHON_SUBMISSION_2026.md) for an evidence-based three-minute demo and release criteria.
 
 ## Environment variables
 
@@ -132,7 +131,6 @@ See `.env.example` for the full list. Key variables:
 | `MODEL_API_KEY` | ✅ | (empty) | Meta Model API key |
 | `SAM_API_KEY` | ✅ | (empty) | SAM 3.1 API key (optional) |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | (empty) | Bypasses RLS — server only |
-| `NEXTAUTH_SECRET` | ✅ | (empty) | Signs JWT session cookies |
 | `NEXT_PUBLIC_SUPABASE_URL` | ❌ | (empty) | Supabase project URL (public) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ❌ | (empty) | Supabase anon key (public; RLS is the boundary) |
 | `DEMO_MODE` | ✅ | (unset) | `1` = show "Demonstration Data" banner |
@@ -140,9 +138,9 @@ See `.env.example` for the full list. Key variables:
 ## Tests
 
 ```bash
-bun run test          # 369 Vitest unit + integration tests
-bun run test:e2e      # 86 Playwright E2E tests (desktop + mobile)
-bun run test:smoke    # Opt-in live Meta API smoke tests (requires keys)
+bun run test          # Vitest unit + mocked integration tests
+bun run test:e2e      # Playwright browser tests (requires the proper test environment)
+bun run test:smoke    # Opt-in: paid/real Meta model API smoke tests (requires keys)
 bun run typecheck     # TypeScript strict typecheck
 bun run lint          # ESLint
 bun run build         # Production build
