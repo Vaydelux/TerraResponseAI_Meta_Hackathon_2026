@@ -59,11 +59,16 @@ export async function GET() {
     return NextResponse.json({ error: { code: "UNAVAILABLE" } },
       { status: 503, headers: CACHE_HEADERS });
   }
-  const eligible = new Map((reports ?? [])
-    .filter(r => r.location_source !== "unknown" &&
-      Number.isFinite(r.latitude) && Number.isFinite(r.longitude) &&
-      r.review_outcome === null)
-    .map(r => [r.id as string, r]));
+  const eligible = new Map<string, { id: string; latitude: number; longitude: number }>();
+  for (const r of reports ?? []) {
+    if (r.location_source === "unknown" || !Number.isFinite(r.latitude) ||
+        !Number.isFinite(r.longitude) || r.review_outcome !== null) continue;
+    eligible.set(r.id as string, {
+      id: r.id as string,
+      latitude: r.latitude as number,
+      longitude: r.longitude as number,
+    });
+  }
 
   const alerts = triage.flatMap(t => {
     const r = eligible.get(t.report_id as string);
