@@ -44,7 +44,7 @@ export interface ReviewQueueRow {
 }
 
 export interface ReviewQueueTableProps {
-  eventId: string;
+  eventId?: string;
   className?: string;
 }
 
@@ -65,12 +65,12 @@ export function ReviewQueueTable({ eventId, className }: ReviewQueueTableProps) 
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    if (!eventId) return;
     const ctrl = new AbortController();
     const load = async (status: "needs_review" | "needs_manual_review"): Promise<ReviewQueueRow[]> => {
       const params = new URLSearchParams({
-        event_id: eventId, status, limit: "50", include_analysis: "true", include_triage: "true",
+        status, limit: "50", include_analysis: "true", include_triage: "true",
       });
+      if (eventId) params.set("event_id", eventId);
       const response = await fetch(`/api/reports?${params.toString()}`, { signal: ctrl.signal });
       if (!response.ok) throw new Error("Review queue could not be loaded.");
       const body: unknown = await response.json();
