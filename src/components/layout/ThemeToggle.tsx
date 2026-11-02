@@ -1,6 +1,6 @@
 // src/components/layout/ThemeToggle.tsx
 //
-// Cycles day → night → auto. Persists to localStorage; sets
+// Offers Day, Mist (light), Night Ops, and Auto. Persists to localStorage; sets
 // `data-theme` AND `.dark` class on `<html>`, and dispatches a
 // `tr-theme-change` window event so WebGL canvases (IncidentMap)
 // and any other listeners stay in sync immediately.
@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import { Segmented } from "@/components/ui-tr/Segmented";
 
-export type ThemeMode = "day" | "night" | "auto";
+export type ThemeMode = "day" | "mist" | "night" | "auto";
 
 const STORAGE_KEY = "tr-theme";
 
@@ -43,7 +43,7 @@ export function readInitialTheme(): ThemeMode {
   if (typeof window === "undefined") return "auto";
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "day" || stored === "night" || stored === "auto") return stored;
+    if (stored === "day" || stored === "mist" || stored === "night" || stored === "auto") return stored;
   } catch {
     // ignore storage errors
   }
@@ -114,6 +114,7 @@ export function ThemeToggle() {
       onChange={change}
       options={[
         { value: "day", label: "Day", icon: SunIcon },
+        { value: "mist", label: "Mist", icon: SunIcon },
         { value: "night", label: "Night Ops", icon: MoonIcon },
         { value: "auto", label: "Auto", icon: AutoIcon },
       ]}
