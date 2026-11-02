@@ -44,11 +44,24 @@ export async function refreshSupabaseSession(request: NextRequest): Promise<{
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
+      setAll(cookiesToSet, headersToSet) {
+        // Refresh must reach BOTH downstream Server Components and browser.
+        // The initial NextResponse.next snapshot precedes these cookie
+        // mutations; rebuilding it is required to propagate request changes.
+        cookiesToSet.forEach(({ name, value }) => {
           request.cookies.set(name, value);
+        });
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options);
         });
+        // Supabase SSR includes private cache headers on token refresh.
+        // Preserve them to prevent an auth response from being CDN-cached.
+        if (headersToSet) {
+          for (const [name, value] of Object.entries(headersToSet)) {
+            response.headers.set(name, value);
+          }
+        }
       },
     },
   });

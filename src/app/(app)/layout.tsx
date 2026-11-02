@@ -30,7 +30,9 @@ export default async function AppLayout({
 
   const ctx = await getAuthContext(user);
   if (!ctx) {
-    redirect("/login?callbackUrl=" + encodeURIComponent("/dashboard"));
+    // Authenticated but missing/inaccessible profile is NOT a login
+    // failure. Directing back to /login creates a 307 bounce loop.
+    redirect("/account-unavailable");
   }
 
   // The pending review count for the TopBar badge. This is a single

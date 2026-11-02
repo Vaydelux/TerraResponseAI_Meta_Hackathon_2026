@@ -30,32 +30,29 @@ beforeEach(() => {
 });
 
 describe("login callback and session redirect", () => {
-  it("keeps an unauthenticated visitor on /login with the callback as a destination", async () => {
+  it("does not auto-redirect a visitor from /login to /dashboard", async () => {
     const res = await middleware(request("/login?callbackUrl=%2Fdashboard"));
     expect(res.headers.get("location")).toBeNull();
-    expect(mocks.refreshSupabaseSession).toHaveBeenCalledOnce();
+    expect(mocks.refreshSupabaseSession).not.toHaveBeenCalled();
   });
 
-  it("redirects a verified existing session to its safe callback target", async () => {
-    mocks.refreshSupabaseSession.mockImplementation(async (req: NextRequest) => {
-      const response = NextResponse.next({ request: req });
-      response.cookies.set("sb-test-auth-token", "refreshed", { httpOnly: true, path: "/" });
-      return { user: { id: "user-1" }, response };
-    });
-    const res = await middleware(request("/login?callbackUrl=%2Fdashboard%3Ftab%3Dreview"));
-    expect(res.headers.get("location")).toBe("https://terra-response-ai.vercel.app/dashboard?tab=review");
-    expect(res.cookies.get("sb-test-auth-token")?.value).toBe("refreshed");
-  });
-
-  it("ignores callback attempts to redirect authenticated users off-site or back to login", async () => {
+  it("never bounces a previously authenticated visitor from /login to /dashboard", async () => {
+    // The login route is public by design; a valid cookie does NOT prove
+    // profile / membership RLS reads work. A redirect here causes a 307
+    // cycle when the dashboard sends such accounts back to login.
     mocks.refreshSupabaseSession.mockImplementation(async (req: NextRequest) => ({
       response: NextResponse.next({ request: req }),
       user: { id: "user-1" },
     }));
-    for (const target of ["https%3A%2F%2Fevil.example", "%2F%2Fevil.example", "%2Flogin"]) {
-      const res = await middleware(request("/login?callbackUrl=" + target));
-      expect(res.headers.get("location")).toBe("https://terra-response-ai.vercel.app/dashboard");
-    }
+    const res = await middleware(request("/login?callbackUrl=%2Fdashboard"));
+    expect(res.headers.get("location")).toBeNull();
+    expect(mocks.refreshSupabaseSession).not.toHaveBeenCalled();
+  });
+
+  it("does not guard the recoverable account-unavailable page", async () => {
+    const res = await middleware(request("/account-unavailable"));
+    expect(res.headers.get("location")).toBeNull();
+    expect(mocks.refreshSupabaseSession).not.toHaveBeenCalled();
   });
 
   it("redirects unauthenticated protected requests back to login and preserves refreshed cookies", async () => {

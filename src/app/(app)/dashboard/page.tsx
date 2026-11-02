@@ -21,7 +21,7 @@ export default async function DashboardPage() {
   const user = await getServerUser();
   if (!user) redirect("/login?callbackUrl=" + encodeURIComponent("/dashboard"));
   const ctx = await getAuthContext(user);
-  if (!ctx) redirect("/login?callbackUrl=" + encodeURIComponent("/dashboard"));
+  if (!ctx) redirect("/account-unavailable");
 
   const supabase = await createSupabaseServerClient();
   const eventIds = ctx.events.map((e) => e.event_id);

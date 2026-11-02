@@ -37,6 +37,27 @@ describe("Supabase middleware session resilience", () => {
     expect(mocks.getSession).not.toHaveBeenCalled();
   });
 
+  it("propagates refreshed cookie to the downstream Server Component and browser", async () => {
+    mocks.createServerClient.mockImplementation((_url: string, _key: string, options: {
+      cookies: { setAll: (value: Array<{ name: string; value: string; options: { path: string } }>, headers: Record<string, string>) => void };
+    }) => ({
+      auth: {
+        getUser: async () => {
+          options.cookies.setAll([
+            { name: "sb-staging-auth-token", value: "refreshed", options: { path: "/" } },
+          ], { "cache-control": "private, no-store" });
+          return { data: { user: { id: "user-1" } }, error: null };
+        },
+      },
+    }));
+    const req = request();
+    const result = await refreshSupabaseSession(req);
+    expect(req.cookies.get("sb-staging-auth-token")?.value).toBe("refreshed");
+    expect(result.response.cookies.get("sb-staging-auth-token")?.value).toBe("refreshed");
+    expect(result.response.headers.get("cache-control")).toBe("private, no-store");
+    expect(result.response.headers.get("x-middleware-request-cookie")).toContain("sb-staging-auth-token");
+  });
+
   it("keeps the login page recoverable when Auth is temporarily unavailable", async () => {
     mocks.getUser.mockRejectedValue(new Error("Simulated network outage"));
     const result = await refreshSupabaseSession(request());
