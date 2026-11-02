@@ -37,8 +37,11 @@ describe("DB-enforced severity/verification security", () => {
     expect(sql).not.toMatch(/disable row level security|drop table public\.review_actions/i);
   });
   it("routes elevated notifications only to admins", () => {
-    expect(processor).toContain('decision.priority === "high" ? "triage_completed"');
-    expect(processor).toContain('decision.priority === "critical" ? "critical_provisional"');
+    // A retried model result cannot override the committed moderation priority.
+    expect(processor).toContain('stored.priority === "high" ? "triage_completed"');
+    expect(processor).toContain('stored.priority === "critical" ? "critical_provisional"');
+    expect(processor).toContain('stored.verificationStatus === "awaiting_human"');
+    expect(processor).toContain("readPersistedTriage(persisted)");
     expect(processor).toContain('if (args.kind === "review_required")');
   });
 });
