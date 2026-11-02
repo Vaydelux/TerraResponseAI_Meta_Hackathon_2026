@@ -2,7 +2,7 @@
  * Staging-only migration workspace for the connector-created history.
  *
  * DO NOT rewrite the production ledger or copy prod secrets. The existing
- * staging database has 12 fully installed migrations with timestamped
+ * staging database has 17 fully installed migrations with timestamped
  * versions, while this repository historically names them 0001..0012.
  * Create a disposable, timestamp-aligned CLI workspace in RUNNER_TEMP.
  *
@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 const stagingRef = "ytfaetqvtbsbmcsdlkvk";
 const productionRef = "ywopsafppyykhwrejliz";
 
-// Exactly the recorded staging versions as verified on 2026-11-02.
+// Recorded staging versions as verified on 2026-11-02; 17 installed in total.
 // The installation order differs from filename numbers for 0010-0012,
 // but every object was verified as present in the staging catalog.
 export const history = [
@@ -31,6 +31,14 @@ export const history = [
   ["0010_atomic_review_actions.sql", "20261102064819_terraresponse_0010_atomic_review_actions.sql"],
   ["0011_explicit_data_api_grants.sql", "20261102054445_terraresponse_0011_api_grants.sql"],
   ["0012_restrict_definer_rpc_access.sql", "20261102054450_terraresponse_0012_privileged_rpc_permissions.sql"],
+  // Phase 2 records created via the connected staging migration API.
+  // The source names use normal migration timestamps; the remote ledger
+  // records the earlier API-applied version and must never be rewritten.
+  ["20261103120000_report_first_triage_and_threads.sql", "20261102184430_report_first_triage_and_threads_20261103.sql"],
+  ["20261103121000_community_membership_privacy.sql", "20261102185222_community_membership_privacy_20261103.sql"],
+  ["20261103122000_admin_role_management.sql", "20261102190055_admin_role_management_20261103.sql"],
+  ["20261103140000_review_severity_and_publication_guards.sql", "20261102194542_review_severity_and_publication_guards_20261103.sql"],
+  ["20261103141000_alert_lifecycle_and_notification_uniqueness.sql", "20261102195717_alert_lifecycle_and_notification_uniqueness_20261103.sql"],
 ];
 
 export function main() {
@@ -52,7 +60,7 @@ export function main() {
   const currentSqlFiles = readdirSync(local).filter((x) => x.endsWith(".sql")).sort();
   const legacy = new Set(history.map(([name]) => name));
   const mapped = new Set(history.map(([,name]) => name));
-  const maxHistoricalVersion = "20261102064819";
+  const maxHistoricalVersion = "20261102195717";
   const future = [];
 
   for (const name of currentSqlFiles) {
@@ -63,7 +71,7 @@ export function main() {
     }
     future.push(name);
   }
-  if (legacy.size !== 12 || ![...legacy].every((x) => currentSqlFiles.includes(x))) {
+  if (legacy.size !== 17 || ![...legacy].every((x) => currentSqlFiles.includes(x))) {
     throw new Error("Required historical migration file missing; refuse to construct incomplete staging history.");
   }
 
