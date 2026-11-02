@@ -44,9 +44,10 @@ describe("reportUploadMetaSchema", () => {
     expect(r.success).toBe(false);
   });
 
-  it("rejects a missing eventId", () => {
-    const r = reportUploadMetaSchema.safeParse({ title: "Missing event" });
-    expect(r.success).toBe(false);
+  it("accepts omitted eventId; the API authorizes the feature-gated community intake", () => {
+    const r = reportUploadMetaSchema.safeParse({ title: "Community report" });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.eventId).toBeUndefined();
   });
 
   it("rejects title over 200 chars", () => {
