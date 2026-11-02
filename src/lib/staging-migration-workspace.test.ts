@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -60,6 +60,33 @@ describe("staging connector history reconciliation", () => {
       expect(() => run(ref)).toThrow();
     }
     expect(() => run(staging, staging)).toThrow();
+  });
+
+  it("fails closed if CLI lists a historical migration only locally", () => {
+    const result = run();
+    try {
+      const versions = result.migrations.map(x => x.slice(0, 14));
+      const output = join(result.temporaryRoot, "migration-list.txt");
+      const env = {
+        ...process.env,
+        SUPABASE_PROJECT_REF: staging,
+        PRODUCTION_PROJECT_REF: production,
+      };
+      writeFileSync(output, ["Local │ Remote │ Time (UTC)", ...versions.map(v => `${v} │ ${v} │ 2026-11-02`)].join("\n"));
+      const success = execFileSync(process.execPath, ["scripts/verify-staging-migration-history.mjs", output], {
+        cwd: process.cwd(), encoding: "utf8", env,
+      });
+      expect(success).toContain("Verified 12 historical staging migrations");
+
+      writeFileSync(output, ["Local │ Remote │ Time (UTC)", ...versions.map((v, i) =>
+        i === 9 ? `${v} │  │ 2026-11-02` : `${v} │ ${v} │ 2026-11-02`
+      )].join("\n"));
+      expect(() => execFileSync(process.execPath, ["scripts/verify-staging-migration-history.mjs", output], {
+        cwd: process.cwd(), encoding: "utf8", env, stdio: ["ignore", "pipe", "pipe"],
+      })).toThrow();
+    } finally {
+      rmSync(result.temporaryRoot, { recursive: true, force: true });
+    }
   });
 
   it("keeps all push operations inside the disposable staging workspace", () => {
