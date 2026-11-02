@@ -169,7 +169,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="day"]) {
+  :root:not([data-theme="day"]):not([data-theme="mist"]) {
     --paper: #0B1217;
     --sheet: #111C24;
     --sheet-sunk: #172530;
