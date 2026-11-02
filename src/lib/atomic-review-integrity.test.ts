@@ -24,6 +24,17 @@ describe("atomic review database guardrails", () => {
     expect(sql).toContain("p_request_id");
     expect(sql).toContain("review_actions_request_id_unique");
   });
+  it("avoids nested CASE expressions that truncate the remote migration parser", () => {
+    expect(sql).not.toMatch(/\\bcase\\s+when\\b/i);
+    expect(sql).toContain("v_arr_max_items");
+    expect(sql).toContain("v_arr_max_length");
+    expect(sql).toContain("v_previous_observation");
+    expect(sql).toContain("v_action := 'comment'");
+    expect(sql).toContain("v_outcome := 'confirmed'");
+    expect(sql).toContain("set search_path = ''");
+    expect(sql).toContain("as $function$");
+  });
+
   it("restricts executable permissions and prevents arbitrary field mutation", () => {
     expect(sql).toMatch(/revoke all on function public\.submit_review_atomic\(/);
     expect(sql).toMatch(/from public, anon/);
