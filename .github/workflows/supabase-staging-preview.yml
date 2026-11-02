@@ -37,7 +37,7 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
       # Accept the project reference as a Variable or Secret.
       SUPABASE_PROJECT_REF: ${{ inputs.project_ref || vars.STAGING_SUPABASE_PROJECT_REF || secrets.STAGING_SUPABASE_PROJECT_REF }}
-      PRODUCTION_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
+      PRODUCTION_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF || 'ywopsafppyykhwrejliz' }}
 
     steps:
       - name: Checkout reviewed main branch
