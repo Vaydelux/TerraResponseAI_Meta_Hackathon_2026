@@ -77,8 +77,8 @@
     border-color: var(--amber);
     border-style: dashed;
   }
-  .seal--confirmed { background: var(--green); color: #fff; }
-  .seal--corrected { background: var(--tide); color: #fff; }
+  .seal--confirmed { background: var(--green); color: var(--on-green); }
+  .seal--corrected { background: var(--tide); color: var(--on-tide); }
   .seal--flagged   { background: var(--amber); color: #2B1D00; }
   .seal--rejected  {
     background: transparent;
