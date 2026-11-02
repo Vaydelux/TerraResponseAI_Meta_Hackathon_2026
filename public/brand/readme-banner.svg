@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="370" viewBox="0 0 1280 370" role="img" aria-labelledby="title desc">
+<title id="title">TerraResponse AI — See the evidence. Share the signal.</title>
+<desc id="desc">A dark civic-cartographic banner with the TerraResponse signal icon and a calm cyan horizon line.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#123548"/><stop offset="1" stop-color="#071925"/></linearGradient>
+  <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#36C0CF" stop-opacity=".05"/><stop offset="1" stop-color="#36C0CF" stop-opacity=".52"/></linearGradient>
+</defs>
+<rect width="1280" height="370" rx="28" fill="url(#bg)"/>
+<g fill="none" stroke="#41798B" stroke-opacity=".22" stroke-width="1">
+  <path d="M720 0v370M810 0v370M900 0v370M990 0v370M1080 0v370M1170 0v370"/>
+  <path d="M650 82h630M650 164h630M650 246h630M650 328h630"/>
+</g>
+<path d="M740 310c70-80 108-44 166-107s105-16 167-58 112-12 207-73" fill="none" stroke="url(#wave)" stroke-width="2.5"/>
+<path d="M710 349c70-47 118-7 192-73s125-24 180-90 97-44 198-60" fill="none" stroke="#FF8552" stroke-opacity=".48" stroke-width="2.4"/>
+<g transform="translate(70 68) scale(2.35)">
+  <rect x="1" y="1" width="62" height="62" rx="14" fill="#122D3C" stroke="#376071" stroke-width="1"/>
+  <path d="M14.8 43.2 29.5 17.4c1.1-2 3.4-2.1 4.5-.1L46 39.3h-7.7l-6.8-12.8-8.8 16.7z" fill="#F7FBFB"/>
+  <path d="M14.1 48c11.6-5.8 25.1-7.5 37-3.2" fill="none" stroke="#4CD3D9" stroke-width="4.4" stroke-linecap="round"/>
+  <path d="M41 13.2c8.2 1.5 13.2 7 14.1 14.8M41.4 20.2c4.4 1.3 6.7 4 7 8" fill="none" stroke="#FF8552" stroke-width="3.5" stroke-linecap="round"/>
+</g>
+<text x="250" y="133" font-family="Arial,Helvetica,sans-serif" font-size="49" font-weight="750" fill="#F7FBFB">TerraResponse <tspan fill="#FF8552">AI</tspan></text>
+<text x="254" y="181" font-family="Arial,Helvetica,sans-serif" font-size="25" fill="#B8D5DE">See the evidence. Share the signal.</text>
+<text x="72" y="302" font-family="Arial,Helvetica,sans-serif" font-size="19" fill="#8EC0CB">Community reporting   /   AI-assisted analysis   /   Human verification</text>
+<text x="72" y="337" font-family="Arial,Helvetica,sans-serif" font-size="14" fill="#6DA4B4">Decision-support prototype · Not an emergency dispatch system</text>
+</svg>

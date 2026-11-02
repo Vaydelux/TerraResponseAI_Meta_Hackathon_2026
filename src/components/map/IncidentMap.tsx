@@ -249,6 +249,8 @@ export function IncidentMap({
     const initLat = reports[0]?.latitude ?? 14.6;
     const initLon = reports[0]?.longitude ?? 121.0;
     lastAlertCenterRef.current = { lat: initLat, lon: initLon };
+    // Existing mount-time fetch intentionally updates request status from its callback.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchRegionalAlertForCoords(initLat, initLon, false);
     return () => {
       alertAbortRef.current?.abort();

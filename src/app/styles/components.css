@@ -47,7 +47,7 @@
   }
   .btn--primary {
     --btn-bg: var(--tide);
-    --btn-fg: #fff;
+    --btn-fg: var(--on-tide);
     --btn-bd: transparent;
     background: var(--grad-primary);
   }
@@ -193,7 +193,13 @@
     white-space: nowrap;
     flex-shrink: 0;
   }
-  .wordmark__mark { width: 22px; height: 22px; }
+  .wordmark__mark { width: 28px; height: 28px; border-radius: 7px; flex: none; }
+  .wordmark__name { letter-spacing: -.025em; }
+  .wordmark__ai { color: var(--tide); letter-spacing: -.01em; }
+  @media (max-width: 460px) {
+    .wordmark { gap: 7px; font-size: 1.05rem; }
+    .wordmark__mark { width: 24px; height: 24px; }
+  }
   /* Square survey-corner glyph: ink stroke, one amber hatch quadrant.
    * Built as inline SVG in the component; the CSS reserves space. */
 
@@ -1041,7 +1047,7 @@
   .mobile-nav-drawer {
     display: none;
   }
-  @media (max-width: 959px) {
+  @media (max-width: 1279px) {
     .topbar {
       gap: var(--s-2);
       padding-inline: 16px;

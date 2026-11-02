@@ -4,36 +4,79 @@
 > Every new AI coding assistant should read [AGENTS.md](AGENTS.md) and ask the owner
 > if confirmation, SMTP and demo-account cleanup have been completed.
 
-# TerraResponse AI
+<p align="center">
+  <img src="public/brand/readme-banner.svg" width="100%" alt="TerraResponse AI — See the evidence. Share the signal." />
+</p>
 
-**Disaster-photo intelligence with human review — a decision-support prototype for emergency response teams.**
+<h1 align="center">TerraResponse AI</h1>
+<p align="center"><strong>See the evidence. Share the signal.</strong><br />
+Community-powered disaster photo reporting, AI-assisted observations and human verification.</p>
 
-> ⚠️ **This is a prototype, not a deployed system.** Every AI observation is labeled
-> "AI-generated, not verified" until a human reviewer confirms, corrects, or rejects it.
-> The platform never automatically dispatches emergency services.
+<p align="center">
+  <a href="docs/DESIGN.md">Design system</a> ·
+  <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="docs/SECURITY.md">Safety and security</a> ·
+  <a href="docs/DEPLOYMENT.md">Deployment guide</a>
+</p>
+
+> **Decision-support prototype — not an emergency alert or dispatch service.**
+> AI classifications are provisional. A human review is required for a verified
+> finding; an urgent review priority does not mean a public warning has been issued.
 
 Built for the [Meta Global AI Developer Hackathon](https://dev.meta.ai/events/global-hackathon).
 
-## What it does
+## A simpler way to report
 
-Authenticated contributors upload disaster photos. The server:
-1. Validates the file (magic bytes + Sharp decode — client MIME never trusted).
-2. Extracts EXIF GPS + creates an EXIF-stripped derivative for AI inference.
-3. Calls **Meta Muse Spark 1.3** via the Chat Completions API with a JSON-schema-constrained response.
-4. Validates the structured output against a second Zod layer.
-5. Routes the report through a human review queue.
-6. A reviewer (who is NOT the contributor) confirms, corrects, or rejects the observation.
-7. Confirmed incidents appear on the incident map with a transparent 5-factor priority score.
+People do **not** need to predict a disaster, create an event, or choose a
+workspace to share relevant evidence. Event organization happens behind the
+scenes; incident threads remain suggestions until reviewed.
 
-Optional: a reviewer can request a **SAM 3.1** segmentation mask via the Responses API for a specific target (e.g., "floodwater", "road debris").
+```mermaid
+flowchart LR
+    A["📷 Send photo"] --> B["🔒 Private evidence"]
+    B --> C["🤖 AI-assisted observation"]
+    C --> D["🧭 Severity and location context"]
+    D --> E["👥 Human review"]
+    E --> F["🗺️ Verified incident awareness"]
+    D -. "Priority only; not verified" .-> E
+```
 
-## Users
+| Stage | What a person sees | What the system does |
+| :-- | :-- | :-- |
+| **Report** | Choose a photo, confirm or skip location, submit | Validates the file and saves private evidence |
+| **Understand** | Track preliminary analysis and report status | Extracts safe derivatives and validates AI observations |
+| **Verify** | Reviewer decision and provenance | Preserves uncertainty; authorized reviewers confirm, correct or reject |
+| **Organize** | Incident threads and context map | Suggests related observations without silently merging evidence |
 
-| Role | What they can do |
-|---|---|
-| **Contributor** | Upload photos, confirm location, view own reports |
-| **Reviewer** | Review AI observations, confirm/correct/flag/reject, view all reports in their events |
-| **Admin** | Everything + manage events, view audit log, purge evidence, override priority |
+### Who can do what
+
+| Role | Main experience |
+| :-- | :-- |
+| **Reporter** | Submit a photo with no event setup; track their authorized reports |
+| **Reviewer** | See authorized review queues, check evidence and record decisions |
+| **Administrator** | Reviewer capabilities plus role oversight, audit tools and privileged controls where enabled |
+
+The platform never automatically dispatches emergency services, and it does not
+treat model-generated severity as human-confirmed evidence.
+
+### Brand and UI
+
+The mark combines a **terrain peak**, a **shared observation horizon** and
+**broadcast arcs**. It is deliberately calm, recognizable at favicon sizes,
+and independent from report-verification symbols.
+
+- **Day** — cool survey-paper surfaces and dark ink.
+- **Mist** — a softer light palette designed for long reading sessions.
+- **Night Ops** — dark field-operations palette with readable bright controls.
+- **Auto** — follows the device color preference.
+
+The vector icon (`public/logo.svg` and `src/app/icon.svg`) is infinitely
+scalable, including 8K exports. The committed multi-resolution
+`src/app/favicon.ico` contains practical browser sizes (16–256 px), not
+a misleading 8192-pixel ICO. Typography uses **Bricolage Grotesque** for
+headings and **Public Sans** for readable UI text. See
+[the design guide](docs/DESIGN.md) for color contrast, tokens, responsive
+behavior and accessible motion.
 
 ## Architecture
 
@@ -59,7 +102,7 @@ Optional: a reviewer can request a **SAM 3.1** segmentation mask via the Respons
 │ Postgres │ │            │ │                │
 │ + RLS    │ │ Muse Spark │ │ Originals      │
 │          │ │ 1.3        │ │ Derivatives    │
-│ 11 tables│ │ SAM 3.1    │ │ Thumbnails     │
+│ RLS data  │ │ SAM 3.1    │ │ Thumbnails     │
 └──────────┘ └────────────┘ └────────────────┘
 ```
 
@@ -174,6 +217,8 @@ This project's owned code is released under the MIT License — see `LICENSE`.
 > Update this section with individual contributor names before the public repo push.
 
 ## Documentation
+
+- `docs/DESIGN.md` — brand consistency, Day/Mist/Night Ops tokens, responsive UI and contrast rules
 
 - `docs/DEPLOYMENT.md` — Vercel + Supabase deployment guide
 - `docs/DEMO_SCRIPT.md` — 3-minute demo script with timestamps

@@ -40,24 +40,24 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "TerraResponse AI — Disaster-Photo Intelligence",
+    default: "TerraResponse AI — Report. Understand. Verify.",
     template: "%s · TerraResponse AI",
   },
   description:
-    "Authenticated disaster-photo upload, AI image analysis, schema-validated human review, explainable prioritization, and an incident map. Built for the Meta Global AI Developer Hackathon.",
+    "Community-powered disaster photo reporting, AI-assisted observations and human verification. A decision-support prototype, not an emergency dispatch system.",
   keywords: [
     "TerraResponse",
     "disaster response",
     "AI image understanding",
     "human review",
     "Supabase Auth",
-    "Prisma",
+    "incident awareness",
     "hackathon",
   ],
   authors: [{ name: "TerraResponse Team" }],
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "32x32", type: "image/x-icon" },
+      { url: "/favicon.ico", sizes: "any", type: "image/x-icon" },
       { url: "/icon.svg", type: "image/svg+xml" },
     ],
     shortcut: "/favicon.ico",
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "TerraResponse AI",
     description:
-      "Disaster-photo intelligence & human review for emergency response teams.",
+      "See the evidence. Share the signal. Community disaster reports with AI-assisted analysis and human verification.",
     siteName: "TerraResponse AI",
     type: "website",
   },
