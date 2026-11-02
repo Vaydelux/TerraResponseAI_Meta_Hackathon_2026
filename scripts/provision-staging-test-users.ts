@@ -36,6 +36,16 @@ async function main() {
   }
 
   const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  // Fail before creating any identity if this QA workspace already exists.
+  // Never alter existing real event membership or overwrite an old run.
+  const { data: existingEvent, error: lookupError } = await supabase
+    .from("events")
+    .select("id")
+    .eq("slug", "hackathon-qa-roles")
+    .maybeSingle();
+  if (lookupError || existingEvent) {
+    throw new Error("The staging QA event already exists or preflight failed. Inspect it instead of re-provisioning.");
+  }
   const createdIds: string[] = [];
   let createdEventId: string | null = null;
   try {
