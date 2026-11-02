@@ -30,6 +30,10 @@
   --tide-hover:   #084E5A;
   --tide-press:   #063C45;
   --tide-wash:    #E1F1F3;
+  --on-tide:      #FFFFFF;   /* label on primary action; accessible contrast */
+  --on-green:     #FFFFFF;   /* label on human-confirmed seal */
+  --brand-signal: #E66A3D;   /* broadcast mark ONLY; not severity */
+  --brand-tile:   #0B2432;
 
   /* Verification states — each means exactly one thing */
   --amber:        #E8A317;   /* AI-generated, not verified (hatch + fills) */
@@ -98,6 +102,8 @@
   --t-fast: 120ms;
   --t-base: 180ms;
   --t-seal: 640ms;
+  --t-theme: 220ms;
+  --ease-theme: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Layout */
   --nav-h: 56px;
@@ -122,6 +128,10 @@
   --tide-hover: #6DC7D6;
   --tide-press: #9AD8E2;
   --tide-wash: #133540;
+  --on-tide: #061D27;
+  --on-green: #061D27;
+  --brand-signal: #FF8552;
+  --brand-tile: #0B2432;
   --amber: #F0B23A;
   --amber-ink: #F6CE7A;
   --amber-wash: #35280D;
@@ -140,8 +150,8 @@
   --sev-5: #7CE0F5;
 
   /* Clean Surface & Action Tokens (Minimalist Precision — Night Ops) */
-  --grad-primary:       #19788A;
-  --grad-primary-hover: #218E9F;
+  --grad-primary:       #48B5C6;
+  --grad-primary-hover: #6DC7D6;
   --grad-amber:         #DF9826;
   --grad-critical:      #C84638;
   --grad-moderate:      #297B8C;
@@ -206,5 +216,43 @@
     --lift:            0 6px 18px -4px rgba(0, 0, 0, 0.45), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
     --lift-primary:    0 1px 3px rgba(0, 0, 0, 0.35);
     --focus: 0 0 0 2px var(--paper), 0 0 0 4px var(--tide);
+  }
+}
+
+/* Mist — optional light variant for bright field conditions. These are
+ * presentation tokens only: all verification colors retain their meaning. */
+:root[data-theme="mist"] {
+  color-scheme: light;
+  --paper: #EAF3F6;
+  --sheet: #FFFFFF;
+  --sheet-sunk: #DDEBF0;
+  --rule: #BED0D8;
+  --rule-strong: #97AFBA;
+  --ink: #0D2635;
+  --ink-2: #314C5C;
+  --ink-3: #536B79;
+  --tide: #0B6272;
+  --tide-hover: #084D5B;
+  --tide-press: #063A46;
+  --tide-wash: #D6EBF0;
+  --on-tide: #FFFFFF;
+  --on-green: #FFFFFF;
+  --grad-primary: #0B6272;
+  --grad-primary-hover: #084D5B;
+  --grad-surface-sheen: #FFFFFF;
+  --grad-aside-wash: #DEEDF2;
+  --glass-bg: rgba(255,255,255,.95);
+  --glass-bg-strong: rgba(255,255,255,.98);
+  --glass-border: #BED0D8;
+  --focus: 0 0 0 2px var(--paper), 0 0 0 4px var(--tide);
+}
+/* Automatic night mode has to preserve the high-contrast action labels.
+ * Explicit day/mist choices are not included in this media override. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="day"]):not([data-theme="mist"]) {
+    --on-tide: #061D27;
+    --on-green: #061D27;
+    --brand-signal: #FF8552;
+    --brand-tile: #0B2432;
   }
 }
