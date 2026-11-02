@@ -1,3 +1,5 @@
+> **Staging status, 2026-11-02:** Migration `0010` has now been successfully installed and recorded in isolated staging `ytfaetqvtbsbmcsdlkvk` through the Supabase migration interface after removing CASE expressions that confused its SQL parser. The `submit_review_atomic` function, request ID column/index, anon-deny and authenticated-execute grants have been verified in the live catalog. **Do not run the manual installer on this staging project again.** The workflow intentionally aborts when the function exists. Continue with role-based integration tests and reconciliation of the connector-generated timestamped migration ledger before using `supabase db push`. Production remains untouched.
+
 # Staging-only review RPC installation — owner-run, guarded
 
 The ordinary Supabase migration executor currently misparses the 0010 review function body. A protected GitHub Actions workflow runs the **unchanged, original** `supabase/migrations/0010_atomic_review_actions.sql` file through PostgreSQL `psql` in one transaction. This avoids relying on a statement splitter. It is **staging-only**, not a production release step.
