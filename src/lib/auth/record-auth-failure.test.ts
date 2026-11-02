@@ -9,13 +9,14 @@ const mocks = vi.hoisted(() => ({
   insert: vi.fn(),
   gte: vi.fn(),
   signInWithPassword: vi.fn(),
+  getUser: vi.fn(),
   headers: vi.fn(),
 }));
 
 vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.createClient }));
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
-    auth: { signInWithPassword: mocks.signInWithPassword },
+    auth: { signInWithPassword: mocks.signInWithPassword, getUser: mocks.getUser },
   }),
 }));
 vi.mock("@/lib/supabase/env", () => ({
@@ -57,6 +58,53 @@ beforeEach(() => {
     "x-forwarded-for": "192.0.2.1, 198.51.100.1",
     "user-agent": "test-browser",
   }));
+});
+
+describe("email-only sign-in and verified redirect", () => {
+  it("rejects a display username before calling Supabase or consuming the rate limiter", async () => {
+    const fd = loginForm();
+    fd.set("email", "Vaydelux");
+    const result = await signInAction(fd);
+    expect(result?.error).toContain("registered email address");
+    expect(mocks.from).not.toHaveBeenCalled();
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("rejects a login without an issued session instead of redirecting to a login loop", async () => {
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { user: { id: "user-1" }, session: null },
+      error: null,
+    });
+    const fd = loginForm();
+    const result = await signInAction(fd);
+    expect(result?.error).toContain("session could not be established");
+    expect(mocks.getUser).not.toHaveBeenCalled();
+  });
+
+  it("refuses redirect when session verification fails", async () => {
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { user: { id: "user-1" }, session: { access_token: "test-only" } },
+      error: null,
+    });
+    mocks.getUser.mockResolvedValue({ data: { user: null }, error: { code: "bad_jwt" } });
+    const fd = loginForm();
+    const result = await signInAction(fd);
+    expect(result?.error).toContain("session could not be verified");
+  });
+
+  it("redirects only after successful authentication and verified identity", async () => {
+    const { redirect } = await import("next/navigation");
+    mocks.signInWithPassword.mockResolvedValue({
+      data: { user: { id: "user-1" }, session: { access_token: "test-only" } },
+      error: null,
+    });
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+    const fd = loginForm();
+    fd.set("callbackUrl", "/dashboard?tab=review");
+    await signInAction(fd);
+    expect(redirect).toHaveBeenCalledWith("/dashboard?tab=review");
+    expect(mocks.getUser).toHaveBeenCalledOnce();
+  });
 });
 
 describe("pre-authentication login protection", () => {
