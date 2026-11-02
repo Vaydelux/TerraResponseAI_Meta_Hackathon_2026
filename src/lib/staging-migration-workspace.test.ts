@@ -38,7 +38,7 @@ function run(
 }
 
 describe("staging connector history reconciliation", () => {
-  it("reproduces all 12 installed staging timestamps without changing source", () => {
+  it("reproduces all 17 installed staging timestamps without changing source", () => {
     const result = run();
     try {
       expect(result.migrations).toHaveLength(readdirSync("supabase/migrations").filter(name => name.endsWith(".sql")).length);
@@ -47,7 +47,12 @@ describe("staging connector history reconciliation", () => {
       expect(result.migrations).toContain("20261102064819_terraresponse_0010_atomic_review_actions.sql");
       expect(result.migrations).toContain("20261102054445_terraresponse_0011_api_grants.sql");
       expect(result.migrations).toContain("20261102054450_terraresponse_0012_privileged_rpc_permissions.sql");
-      expect(result.message).toContain("Isolated staging workspace prepared: 12");
+      expect(result.migrations).toContain("20261102184430_report_first_triage_and_threads_20261103.sql");
+      expect(result.migrations).toContain("20261102185222_community_membership_privacy_20261103.sql");
+      expect(result.migrations).toContain("20261102190055_admin_role_management_20261103.sql");
+      expect(result.migrations).toContain("20261102194542_review_severity_and_publication_guards_20261103.sql");
+      expect(result.migrations).toContain("20261102195717_alert_lifecycle_and_notification_uniqueness_20261103.sql");
+      expect(result.message).toContain("Isolated staging workspace prepared: 17");
       const original = readFileSync("supabase/migrations/0010_atomic_review_actions.sql", "utf8");
       const mapped = readFileSync(join(result.destination, "supabase/migrations/20261102064819_terraresponse_0010_atomic_review_actions.sql"), "utf8");
       expect(mapped).toBe(original);
@@ -77,7 +82,7 @@ describe("staging connector history reconciliation", () => {
       const success = execFileSync(process.execPath, ["scripts/verify-staging-migration-history.mjs", output], {
         cwd: process.cwd(), encoding: "utf8", env,
       });
-      expect(success).toContain("Verified 12 historical staging migrations");
+      expect(success).toContain("Verified 17 historical staging migrations");
 
       writeFileSync(output, ["Local │ Remote │ Time (UTC)", ...versions.map((v, i) =>
         i === 9 ? `${v} │  │ 2026-11-02` : `${v} │ ${v} │ 2026-11-02`
