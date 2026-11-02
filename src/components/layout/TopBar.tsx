@@ -52,7 +52,7 @@ export function TopBar({ ctx, pendingReviewCount = 0, showIncidentNotifications 
   const pathname = usePathname() ?? "";
   const [mobileOpen, setMobileOpen] = useState(false);
   const links = NAV_LINKS.filter((l) => (!l.roles || l.roles.includes(ctx.user.role)) && (!l.triageOnly || showIncidentNotifications));
-  const utilityLinks = [...(showIncidentNotifications ? [{ href: "/notifications", label: "Notifications" }] : []), ...(showRoleManagement && ctx.user.role === "admin" ? [{ href: "/admin/users", label: "User roles" }] : [])];
+  const utilityLinks: NavLink[] = [...(showIncidentNotifications ? [{ href: "/notifications", label: "Notifications" }] : []), ...(showRoleManagement && ctx.user.role === "admin" ? [{ href: "/admin/users", label: "User roles" }] : [])];
 
   return (
     <div style={{ position: "sticky", top: 0, zIndex: 40 }}>
