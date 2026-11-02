@@ -1,6 +1,6 @@
 -- TerraResponse AI: review decisions must be a single atomic transaction.
 -- This forward-only migration deliberately requires staging verification before deployment.
--- A SECURITY DEFINER RPC is necessary because reviewer RLS forbids direct
+-- Supabase CLI statement splitters can misparse function identifiers containing\n-- the substring 'atomic' (supabase/cli#5020); use submit_review_tx instead.\n-- A SECURITY DEFINER RPC is necessary because reviewer RLS forbids direct
 -- UPDATE of report_analyses; all authorization is re-checked inside the function.
 
 alter table public.review_actions
@@ -9,7 +9,7 @@ alter table public.review_actions
 create unique index if not exists review_actions_request_id_unique
   on public.review_actions(request_id) where request_id is not null;
 
-create or replace function public.submit_review_atomic(
+create or replace function public.submit_review_tx(
   p_report_id uuid,
   p_request_id uuid,
   p_action text,
@@ -245,9 +245,9 @@ end;
 $function$;
 
 -- Public functions default to PUBLIC EXECUTE: revoke explicitly.
-revoke all on function public.submit_review_atomic(
+revoke all on function public.submit_review_tx(
   uuid, uuid, text, text, text, jsonb
 ) from public, anon;
-grant execute on function public.submit_review_atomic(
+grant execute on function public.submit_review_tx(
   uuid, uuid, text, text, text, jsonb
 ) to authenticated;
