@@ -48,7 +48,7 @@ import { checkUserUploadRate } from "@/lib/rate-limit";
 import { sanitizeUserText } from "@/lib/ai/prompt-injection";
 import { resolveLocation, validateBounds } from "@/lib/storage/missing-location";
 import { ensureCommunityIntakeMembership, isCommunityIntakeEnabled } from "@/lib/community/intake";
-import { notifyReportSubmitted } from "@/lib/triage/processing";
+import { isTriageEnabled, notifyReportSubmitted } from "@/lib/triage/processing";
 
 // MIME → file extension for the storage path.
 const EXT_BY_TYPE: Record<AllowedImageType, "jpg" | "png" | "webp"> = {
@@ -435,6 +435,7 @@ export async function GET(request: NextRequest) {
   // view uses this for the incident-type filter. Other consumers
   // (dashboard, list) don't pay the JOIN cost when they don't need it.
   const includeAnalysis = url.searchParams.get("include_analysis") === "true";
+  const includeTriage = isTriageEnabled() && url.searchParams.get("include_triage") === "true";
   const limit = Math.min(Number(url.searchParams.get("limit") ?? "50"), 200);
   const offset = Math.max(Number(url.searchParams.get("offset") ?? "0"), 0);
 
@@ -455,9 +456,12 @@ export async function GET(request: NextRequest) {
   // the dashboard's 6 parallel fetches don't pay the JOIN cost.
   const baseSelect =
     "id, event_id, creator_id, status, review_outcome, title, description, latitude, longitude, location_source, location_label, sha256, image_mime_type, image_bytes, captured_at, uploaded_at, priority_score, created_at";
-  const selectClause = includeAnalysis
-    ? `${baseSelect}, report_analyses(structured_observation)`
-    : baseSelect;
+  const selectClause = [
+    baseSelect,
+    ...(includeAnalysis ? ["report_analyses(structured_observation)"] : []),
+    // Only query the new table where its staged migration is installed.
+    ...(includeTriage ? ["report_triage(triage_class,preliminary_severity,verification_status)"] : []),
+  ].join(", ");
   let query = supabase
     .from("reports")
     .select(selectClause)
