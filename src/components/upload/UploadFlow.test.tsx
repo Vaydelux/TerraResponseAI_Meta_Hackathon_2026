@@ -67,7 +67,7 @@ describe("upload → authenticated analysis handoff", () => {
     vi.stubGlobal("XMLHttpRequest", FakeXMLHttpRequest);
     vi.stubGlobal("fetch", modelCall);
 
-    render(<UploadFlow eventId="b2222222-2222-4222-8222-222222222222" />);
+    render(<UploadFlow />);
     fireEvent.click(screen.getByRole("button", { name: "Choose test photo" }));
     const continueButton = screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement;
     await waitFor(() => expect(continueButton.disabled).toBe(false));
@@ -96,7 +96,7 @@ describe("upload → authenticated analysis handoff", () => {
     const modelCall = vi.fn();
     vi.stubGlobal("XMLHttpRequest", LinkedXMLHttpRequest);
     vi.stubGlobal("fetch", modelCall);
-    render(<UploadFlow eventId="b2222222-2222-4222-8222-222222222222" />);
+    render(<UploadFlow />);
     fireEvent.click(screen.getByRole("button", { name: "Choose test photo" }));
     const continueButton = screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement;
     await waitFor(() => expect(continueButton.disabled).toBe(false));
@@ -115,7 +115,7 @@ describe("upload → authenticated analysis handoff", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: false, status: 503, json: async () => ({ error: { code: "NOT_CONFIGURED" } }),
     }));
-    render(<UploadFlow eventId="b2222222-2222-4222-8222-222222222222" />);
+    render(<UploadFlow />);
     fireEvent.click(screen.getByRole("button", { name: "Choose test photo" }));
     const continueButton = screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement;
     await waitFor(() => expect(continueButton.disabled).toBe(false));
