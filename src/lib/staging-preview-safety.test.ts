@@ -14,6 +14,7 @@ describe("Supabase staging preview safety", () => {
     expect(workflow).toContain("version: 2.72.7");
     expect(workflow).toContain("github.ref == 'refs/heads/main'");
     expect(workflow).toContain("environment: staging");
+    expect(workflow).toContain("vars.PRODUCTION_SUPABASE_PROJECT_REF || 'ywopsafppyykhwrejliz'");
     expect(workflow).toContain('supabase link --project-ref "$SUPABASE_PROJECT_REF"');
     expect(workflow).toContain("supabase migration list --linked");
     expect(workflow).toContain("supabase db push --dry-run --linked");
