@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { serviceRoleKey, supabaseUrl } from "@/lib/supabase/env";
 import type { Observation } from "@/lib/ai/observation-schema";
 import { decideTriage, TRIAGE_POLICY_VERSION } from "./policy";
+import { readPersistedTriage } from "./persisted-snapshot";
 
 export function isTriageEnabled(): boolean {
   return process.env.REPORT_FIRST_TRIAGE_ENABLED === "true";
@@ -112,23 +113,28 @@ export async function processReportTriage(args: {
   const publicationEnabled = process.env.REPORT_FIRST_CRITICAL_PUBLICATION_ENABLED === "true" &&
     authenticInference;
   const decision = decideTriage(args.observation, hasLocation, publicationEnabled);
-  const { data: existing, error: lookupError } = await db.from("report_triage")
-    .select("report_id,triage_class").eq("report_id", args.reportId).maybeSingle();
-  if (lookupError) throw new Error("Cannot read previous triage.");
-  if (!existing) {
-    const { error } = await db.from("report_triage").insert({
-      report_id: args.reportId,
-      incident_type: args.observation.incident_type,
-      preliminary_severity: args.observation.preliminary_severity,
-      triage_class: decision.triageClass,
-      reason_code: decision.reasonCode,
-      triage_policy_version: TRIAGE_POLICY_VERSION,
-      verification_status: decision.verificationStatus,
-      publication_status: decision.publicationStatus,
-      model_id: args.modelId,
-    });
-    if (error && error.code !== "23505") throw new Error("Cannot persist AI triage.");
-  }
+  // INSERT ... ON CONFLICT DO NOTHING: a second worker or a retry must
+  // never overwrite the first classification or an intervening human review.
+  const { error: insertError } = await db.from("report_triage").upsert({
+    report_id: args.reportId,
+    incident_type: args.observation.incident_type,
+    preliminary_severity: args.observation.preliminary_severity,
+    triage_class: decision.triageClass,
+    reason_code: decision.reasonCode,
+    triage_policy_version: TRIAGE_POLICY_VERSION,
+    verification_status: decision.verificationStatus,
+    publication_status: decision.publicationStatus,
+    model_id: args.modelId,
+  }, { onConflict: "report_id", ignoreDuplicates: true });
+  if (insertError) throw new Error("Cannot persist AI triage.");
+
+  // Always read back the committed row, including after a concurrent insert.
+  // The caller's latest inferred observation is not authoritative on retry.
+  const { data: persisted, error: lookupError } = await db.from("report_triage")
+    .select("incident_type,triage_class,verification_status,publication_status,reason_code,triage_policy_version")
+    .eq("report_id", args.reportId).single();
+  if (lookupError || !persisted) throw new Error("Cannot read saved triage.");
+  const stored = readPersistedTriage(persisted);
 
   // Thread resolution: same hazard + event + bounded recency +
   // nearby PostGIS candidates. The association is always "suggested"
@@ -139,8 +145,8 @@ export async function processReportTriage(args: {
   if (!link) {
     let incidentId: string | null = null;
     let distanceM: number | null = null;
-    if (hasLocation && !["other", "unclear"].includes(args.observation.incident_type)) {
-      const radius = args.observation.incident_type === "flooding" ? 10000 : 5000;
+    if (hasLocation && !["other", "unclear"].includes(stored.incidentType)) {
+      const radius = stored.incidentType === "flooding" ? 10000 : 5000;
       const { data: candidates, error: candidateError } = await db.rpc(
         "find_community_incident_candidates", {
           p_event_id: args.eventId, p_type: args.observation.incident_type,
@@ -157,8 +163,8 @@ export async function processReportTriage(args: {
       const { data: newThread, error: threadError } = await db.from("incident_threads")
         .insert({
           event_id: args.eventId,
-          incident_type: args.observation.incident_type,
-          title: "Possible " + args.observation.incident_type.replaceAll("_", " "),
+          incident_type: stored.incidentType,
+          title: "Possible " + stored.incidentType.replaceAll("_", " "),
           latitude: hasLocation ? report.latitude : null,
           longitude: hasLocation ? report.longitude : null,
         }).select("id").single();
@@ -177,17 +183,19 @@ export async function processReportTriage(args: {
     }
   }
 
-  await notifyRecipients(db, {
-    reportId: args.reportId, eventId: args.eventId,
-    // High and critical are admin-only; reviewer notifications are reserved
-    // for low/moderate triage. Each recipient is also checked against RLS.
-    kind: decision.priority === "critical" ? "critical_provisional"
-      : decision.priority === "high" ? "triage_completed" : "review_required",
-    title: decision.priority === "critical" ? "Urgent provisional disaster observation" :
-      decision.priority === "high" ? "High-priority observation requires review" :
-      "New report requires moderation",
-    body: "AI triage: " + decision.triageClass.replaceAll("_", " ") +
-      ". Not human-confirmed. Open the review workbench.",
-  });
-  return { ...decision, policyVersion: TRIAGE_POLICY_VERSION };
+  // After a human review, retries must not resurrect an actionable
+  // AI review notification or change the final verification state.
+  if (stored.verificationStatus === "awaiting_human") {
+    await notifyRecipients(db, {
+      reportId: args.reportId, eventId: args.eventId,
+      kind: stored.priority === "critical" ? "critical_provisional"
+        : stored.priority === "high" ? "triage_completed" : "review_required",
+      title: stored.priority === "critical" ? "Urgent provisional disaster observation" :
+        stored.priority === "high" ? "High-priority observation requires review" :
+        "New report requires moderation",
+      body: "AI triage: " + stored.triageClass.replaceAll("_", " ") +
+        ". Not human-confirmed. Open the review workbench.",
+    });
+  }
+  return stored;
 }
