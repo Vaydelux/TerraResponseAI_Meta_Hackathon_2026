@@ -130,7 +130,7 @@ describe("secrets remain server-only (no NEXT_PUBLIC_ prefix on secrets)", () =>
     // the template should have "" or a placeholder.
     for (const secret of SECRETS) {
       // Match lines like `SECRET="value"` or `SECRET=value`.
-      const re = new RegExp(`^${secret}=["']?([^"'\\r\\n]*)["']?[ \\t]*$\`, "m");
+      const re = new RegExp(`^${secret}=["']?([^"'\\r\\n]*)["']?[ \\t]*$`, "m");
       const match = envExample.match(re);
       if (match) {
         const value = match[1];
