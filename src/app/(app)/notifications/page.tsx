@@ -4,6 +4,7 @@ import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server
 import { getAuthContext } from "@/lib/auth/profile";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { isTriageEnabled } from "@/lib/triage/processing";
+import { markNotificationRead, markAllNotificationsRead } from "./actions";
 
 export const metadata = { title: "Notifications | TerraResponse AI" };
 
@@ -30,6 +31,9 @@ export default async function NotificationsPage() {
     .limit(100);
   return <section className="tr-page">
     <PageHeader title="Notifications" subtitle="Audit-linked incident and moderation activity visible to your account."/>
+    {!error && (data ?? []).some(n => !n.read_at) && <form action={markAllNotificationsRead}>
+      <button className="btn" type="submit">Mark all as read</button>
+    </form>}
     {error ? <div className="panel" role="alert">Notifications could not be loaded. Please retry.</div> :
       (data ?? []).length===0 ? <div className="panel"><p>No notifications yet.</p></div> :
       <div className="tr-stack">
@@ -37,7 +41,13 @@ export default async function NotificationsPage() {
           <h2 style={{ fontSize:"var(--step-1)" }}>{n.title}</h2>
           <p className="t-meta">{n.body}</p>
           <p className="t-meta">{new Date(n.created_at).toLocaleString()} · {n.read_at ? "Read":"Unread"}</p>
-          {n.report_id && <Link href={`/reports/${n.report_id}`} className="btn">Open report</Link>}
+          <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:10}}>
+            {n.report_id && <Link href={`/reports/${n.report_id}`} className="btn">Open report</Link>}
+            {!n.read_at && <form action={markNotificationRead}>
+              <input type="hidden" name="notificationId" value={n.id}/>
+              <button className="btn" type="submit">Mark as read</button>
+            </form>}
+          </div>
         </article>)}
       </div>}
   </section>;
