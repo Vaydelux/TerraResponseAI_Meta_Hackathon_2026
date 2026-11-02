@@ -22,6 +22,7 @@ import { requireServerUser } from "@/lib/supabase/server";
 import { getAuthContext } from "@/lib/auth/profile";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { isTriageEnabled, notifyReviewCompleted } from "@/lib/triage/processing";
 
 const reviewActionSchema = z.object({
   action: z.enum(["confirm", "flag", "reject", "resolve", "request_info", "correct", "comment"]),
@@ -149,6 +150,17 @@ export async function POST(
       { error: { code: "REVIEW_FAILED", message: "Review result could not be confirmed." } },
       { status: 503 },
     );
+  }
+  // The database RPC commits first. Notification failure must not
+  // re-run a successful review transaction, or users may submit again.
+  if (isTriageEnabled()) {
+    try {
+      const { data: reviewed } = await supabase.from("reports")
+        .select("event_id").eq("id", id).single();
+      if (reviewed?.event_id) await notifyReviewCompleted(id, reviewed.event_id, body.action);
+    } catch {
+      console.error("[notification] Review committed; notification unavailable.");
+    }
   }
   return NextResponse.json(data);
 }

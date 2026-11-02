@@ -8,7 +8,8 @@
 import { z } from "zod";
 
 export const reportUploadMetaSchema = z.object({
-  eventId: z.string().uuid(),
+  // Optional ONLY for server-selected, feature-gated community intake.
+  eventId: z.string().uuid().optional(),
   title: z.string().max(200).optional(),
   description: z.string().max(5000).optional(),
   // The contributor can pre-declare the location if they didn't get
