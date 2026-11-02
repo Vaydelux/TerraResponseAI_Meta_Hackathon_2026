@@ -118,7 +118,7 @@ bun run dev    # http://localhost:3000
 bun run lint && bun run typecheck && bun run test && bun run build
 ```
 
-**Database migration safety:** The existing production and staging projects have different migration histories. Do not run `supabase db push` against either without reconciling the remote migration ledger and verifying the target. Staging has source migrations 0001–0009 and 0011–0012 applied, but migration 0010's reviewer RPC remains blocked. See [staging issue #30](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/30) and [the staging verification guide](docs/LIVE_STAGING_VERIFICATION.md).
+**Database migration safety:** The existing production and staging projects have different migration histories. Do not run `supabase db push` against either without reconciling the remote migration ledger and verifying the target. Staging has source migrations 0001–0012 installed, including the reviewer RPC. The connector-generated remote migration versions still do not match the repository's four-digit names; do not run a blind `db push`. Distinct-role end-to-end tests remain outstanding. See [staging issue #30](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/30) and [the staging verification guide](docs/LIVE_STAGING_VERIFICATION.md).
 
 See `docs/DEPLOYMENT.md` for the full Vercel + Supabase deployment guide, and [the hackathon submission kit](docs/HACKATHON_SUBMISSION_2026.md) for an evidence-based three-minute demo and release criteria.
 
