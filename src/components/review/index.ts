@@ -12,3 +12,5 @@ export { UncertaintyList, type UncertaintyListProps } from "./UncertaintyList";
 export { CorrectionForm, type CorrectionFormProps } from "./CorrectionForm";
 export { ReviewActionBar, type ReviewActionBarProps } from "./ReviewActionBar";
 export { ReviewQueueTable, type ReviewQueueTableProps, type ReviewQueueRow } from "./ReviewQueueTable";
+export { ContextualIntelligenceCard, type ContextualIntelligenceCardProps } from "./ContextualIntelligenceCard";
+

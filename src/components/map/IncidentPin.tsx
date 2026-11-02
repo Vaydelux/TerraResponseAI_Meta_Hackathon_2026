@@ -1,16 +1,12 @@
+"use client";
+
 // src/components/map/IncidentPin.tsx
 //
-// A single incident map pin. The state comes from `stateFromReport`
-// (the pin's verification state); the severity from `toSeverityLevel`
-// (1–5 ring weight). Size is constant (per the design thesis: pins
-// never imply triage — only verification + severity).
-//
-// This is a server-renderable HTML element used by the IncidentMap
-// for <300 incidents (the HTML-marker code path). Clicking calls
-// the parent's `onSelect`.
-//
-// Server-component friendly (it's just a styled button).
+// A single incident map pin with Framer Motion staggered scale-in
+// entrance animation when filters are toggled or the temporal
+// scrubber is moved.
 
+import { motion } from "framer-motion";
 import { stateFromReport, type VerificationState } from "@/lib/design/status";
 import { toSeverityLevel } from "@/lib/design/severity";
 import { cn } from "@/lib/utils";
@@ -21,6 +17,8 @@ export interface IncidentPinProps {
   reviewOutcome: string | null;
   severity?: number | null;
   selected?: boolean;
+  /** Optional 0-based index for staggered entrance animation. */
+  index?: number;
   onSelect?: (id: string) => void;
   className?: string;
 }
@@ -31,13 +29,14 @@ export function IncidentPin({
   reviewOutcome,
   severity,
   selected,
+  index = 0,
   onSelect,
   className,
 }: IncidentPinProps) {
-  const state: VerificationState = stateFromReport({ status, reviewOutcome: reviewOutcome });
+  const state: VerificationState = stateFromReport({ status, reviewOutcome });
   const sev = toSeverityLevel(severity);
   return (
-    <button
+    <motion.button
       type="button"
       className={cn("pin", className)}
       data-state={state}
@@ -45,6 +44,15 @@ export function IncidentPin({
       data-selected={selected || undefined}
       aria-label={`Incident ${state}, severity ${sev}`}
       onClick={() => onSelect?.(id)}
+      initial={{ opacity: 0, scale: 0.35 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.4 }}
+      transition={{
+        type: "spring",
+        stiffness: 360,
+        damping: 24,
+        delay: Math.min(index * 0.035, 0.45),
+      }}
     />
   );
 }

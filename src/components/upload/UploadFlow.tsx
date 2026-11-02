@@ -23,6 +23,7 @@ import { Dropzone } from "./Dropzone";
 import { FileCheckList, type FileCheckItem } from "./FileCheckList";
 import { LocationConfirm, type LocationChoice } from "./LocationConfirm";
 import { UploadProgress } from "./UploadProgress";
+import { VoiceDictationControl } from "./VoiceDictationControl";
 import { StatusTimeline } from "@/components/report/StatusTimeline";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Field, Input, Textarea, Button, toast } from "@/components/ui-tr";
@@ -266,8 +267,32 @@ export function UploadFlow({ className }: UploadFlowProps) {
           <Field label="Title (optional)" htmlFor="up-title">
             <Input id="up-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Flooded road near Brgy San Roque" />
           </Field>
-          <Field label="Description (optional)" htmlFor="up-desc">
-            <Textarea id="up-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+          <Field
+            label="Description (optional)"
+            htmlFor="up-desc"
+            hint="Type situational details or use Voice Dictation to speak hands-free in the field."
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-2, 8px)" }}>
+              <VoiceDictationControl
+                disabled={state.kind === "uploading"}
+                onTranscript={(spokenText) => {
+                  setDescription((prev) => {
+                    const trimmedPrev = prev.trim();
+                    const combined = trimmedPrev
+                      ? `${trimmedPrev} ${spokenText}`
+                      : spokenText;
+                    return combined.slice(0, 2000);
+                  });
+                }}
+              />
+              <Textarea
+                id="up-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe visible hazards, water depth, road passability, or urgent risks…"
+                rows={3}
+              />
+            </div>
           </Field>
           <div className="tr-cluster" style={{ justifyContent: "flex-end" }}>
             <Button

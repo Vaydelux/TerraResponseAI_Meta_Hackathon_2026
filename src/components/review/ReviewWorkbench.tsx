@@ -27,6 +27,8 @@ import { type SamOverlay } from "./MaskControl";
 import { ObservationPanel, type ObservationData } from "./ObservationPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { WeatherContext } from "./WeatherContext";
+import { ContextualIntelligenceCard } from "./ContextualIntelligenceCard";
+import type { ContextualIntelligenceData } from "@/lib/ai/contextual-intelligence";
 import { SealBadge } from "@/components/seal/SealBadge";
 import { StatusTimeline } from "@/components/report/StatusTimeline";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -235,6 +237,9 @@ export function ReviewWorkbench({
   }
 
   const observation = readObservation(detail);
+  const rawStructuredObs = (detail.report_analyses?.[0]?.structured_observation ?? {}) as Record<string, unknown>;
+  const initialContextualIntelligence =
+    (rawStructuredObs.contextual_intelligence as ContextualIntelligenceData | undefined) ?? null;
   const state: VerificationState = detail.status === "reviewed" && reviewWasCorrected
     ? "corrected"
     : stateFromReport({ status: detail.status, reviewOutcome: detail.review_outcome });
@@ -292,32 +297,42 @@ export function ReviewWorkbench({
             initialOverlay={overlay}
           />
         </div>
-        <ObservationPanel
-          status={detail.status}
-          reviewOutcome={detail.review_outcome}
-          reviewerName={reviewerName}
-          reviewedAt={reviewedAt}
-          resolving={resolving}
-          observation={observation}
-          priorityScore={priority.score}
-          priorityFactors={priorityFactors}
-          actionBar={
-            !readOnly &&
-            (currentUserRole === "reviewer" || currentUserRole === "admin") && (
-              <ReviewActionBar
-                reportId={reportId}
-                isOwnReport={isOwnReport}
-                isLastInQueue={isLastInQueue}
-                queuePosition={queuePosition ?? { current: 1, total: 1 }}
-                status={detail.status}
-                reviewOutcome={detail.review_outcome}
-                observation={observation}
-                onResolvingChange={setResolving}
-                nextHref={nextReportId ? `/review/${nextReportId}` : null}
-              />
-            )
-          }
-        />
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-4, 16px)", minWidth: 0 }}>
+          <ObservationPanel
+            status={detail.status}
+            reviewOutcome={detail.review_outcome}
+            reviewerName={reviewerName}
+            reviewedAt={reviewedAt}
+            resolving={resolving}
+            observation={observation}
+            priorityScore={priority.score}
+            priorityFactors={priorityFactors}
+            actionBar={
+              !readOnly &&
+              (currentUserRole === "reviewer" || currentUserRole === "admin") && (
+                <ReviewActionBar
+                  reportId={reportId}
+                  isOwnReport={isOwnReport}
+                  isLastInQueue={isLastInQueue}
+                  queuePosition={queuePosition ?? { current: 1, total: 1 }}
+                  status={detail.status}
+                  reviewOutcome={detail.review_outcome}
+                  observation={observation}
+                  onResolvingChange={setResolving}
+                  nextHref={nextReportId ? `/review/${nextReportId}` : null}
+                />
+              )
+            }
+          />
+          <ContextualIntelligenceCard
+            reportId={reportId}
+            initialContext={initialContextualIntelligence}
+            locationLabel={detail.location_label}
+            latitude={detail.latitude}
+            longitude={detail.longitude}
+            incidentType={observation.incidentType}
+          />
+        </div>
       </div>
       <section style={{ marginTop: "var(--s-6)" }}>
         <h2 className="t-label" style={{ fontSize: "var(--step-1)", marginBottom: "var(--s-3)" }}>Pipeline</h2>

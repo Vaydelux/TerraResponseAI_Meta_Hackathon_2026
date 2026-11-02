@@ -236,10 +236,10 @@ export function HazardSummaryChart({
           <defs>
             <linearGradient id="d3-grad-confirmed" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="var(--tide)" />
-              <stop offset="100%" stopColor="var(--green)" />
+              <stop offset="100%" stopColor="var(--tide)" />
             </linearGradient>
             <linearGradient id="d3-grad-pending" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#D98A2B" />
+              <stop offset="0%" stopColor="var(--amber)" />
               <stop offset="100%" stopColor="var(--amber)" />
             </linearGradient>
           </defs>

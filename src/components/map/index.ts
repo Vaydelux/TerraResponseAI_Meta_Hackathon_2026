@@ -25,3 +25,5 @@ export {
   type ClusterPinNode,
   type MapPinOrClusterNode,
 } from "./d3Cluster";
+export { RegionalAlertOverlay, type RegionalAlertOverlayProps } from "./RegionalAlertOverlay";
+

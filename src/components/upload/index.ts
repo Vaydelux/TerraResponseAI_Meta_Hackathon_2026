@@ -7,3 +7,5 @@ export { Dropzone, type DropzoneProps } from "./Dropzone";
 export { FileCheckList, type FileCheckListProps, type FileCheckItem } from "./FileCheckList";
 export { LocationConfirm, type LocationConfirmProps, type LocationChoice } from "./LocationConfirm";
 export { UploadProgress, type UploadProgressProps } from "./UploadProgress";
+export { VoiceDictationControl, type VoiceDictationControlProps } from "./VoiceDictationControl";
+

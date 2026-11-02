@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { animate } from "framer-motion";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
@@ -39,6 +40,8 @@ import {
   type PendingFilterMode,
 } from "./MapFilterBar";
 import { TemporalScrubber } from "./TemporalScrubber";
+import { RegionalAlertOverlay } from "./RegionalAlertOverlay";
+import type { RegionalHazardAlert } from "@/app/api/map/alerts/route";
 import { clusterIncidentsWithD3 } from "./d3Cluster";
 import { stateFromReport } from "@/lib/design/status";
 import { toSeverityLevel } from "@/lib/design/severity";
@@ -197,6 +200,61 @@ export function IncidentMap({
   });
   const [snapshotStatus, setSnapshotStatus] = useState<"idle" | "rendering" | "saved">("idle");
 
+  // Localized weather/seismic alert state fetched from Google Search Grounding on region pan
+  const [regionalAlert, setRegionalAlert] = useState<RegionalHazardAlert | null>(null);
+  const [alertLoading, setAlertLoading] = useState<boolean>(false);
+  const [alertDismissed, setAlertDismissed] = useState<boolean>(false);
+  const lastAlertCenterRef = useRef<{ lat: number; lon: number } | null>(null);
+  const alertAbortRef = useRef<AbortController | null>(null);
+
+  const fetchRegionalAlertForCoords = useCallback(
+    async (lat: number, lon: number, forceShow = false) => {
+      alertAbortRef.current?.abort();
+      const ctrl = new AbortController();
+      alertAbortRef.current = ctrl;
+
+      setAlertLoading(true);
+      if (forceShow) {
+        setAlertDismissed(false);
+      }
+
+      try {
+        const params = new URLSearchParams({
+          lat: lat.toFixed(4),
+          lon: lon.toFixed(4),
+        });
+        const res = await fetch(`/api/map/alerts?${params.toString()}`, {
+          signal: ctrl.signal,
+        });
+        if (!res.ok) return;
+        const body = await res.json();
+        if (!ctrl.signal.aborted && body?.ok && body.alert) {
+          setRegionalAlert(body.alert as RegionalHazardAlert);
+          setAlertDismissed(false);
+          lastAlertCenterRef.current = { lat, lon };
+        }
+      } catch {
+        // Ignore aborted or network errors
+      } finally {
+        if (!ctrl.signal.aborted) {
+          setAlertLoading(false);
+        }
+      }
+    },
+    [],
+  );
+
+  // Fetch initial regional alert on mount
+  useEffect(() => {
+    const initLat = reports[0]?.latitude ?? 14.6;
+    const initLon = reports[0]?.longitude ?? 121.0;
+    lastAlertCenterRef.current = { lat: initLat, lon: initLon };
+    void fetchRegionalAlertForCoords(initLat, initLon, false);
+    return () => {
+      alertAbortRef.current?.abort();
+    };
+  }, [eventId, reports, fetchRegionalAlertForCoords]);
+
   // Clear selected incident and stale pins when the active event changes.
   useEffect(() => {
     queueMicrotask(() => {
@@ -291,6 +349,13 @@ export function IncidentMap({
     [visibleReports, mapZoom],
   );
 
+  // Composite key tracking filter & temporal scrubber changes to trigger staggered Framer Motion pin entrance
+  const filterAnimationKey = useMemo(
+    () =>
+      `${pendingMode}|${selectedHazards.join(",")}|${selectedSeverities.join(",")}|${Math.round(scrubberPct)}`,
+    [pendingMode, selectedHazards, selectedSeverities, scrubberPct],
+  );
+
   // Sync the 2D gradient heatmap overlay whenever visibleReports, showHeatmap, or camera changes
   const renderHeatmapCanvas = useCallback(() => {
     const canvas = heatmapCanvasRef.current;
@@ -375,6 +440,15 @@ export function IncidentMap({
         } catch {
           // ignore — keep the previous reports
         }
+
+        // Check if the user panned to a new region (>= 0.012 deg ~1.3 km shift)
+        const prevAlertCenter = lastAlertCenterRef.current;
+        const dist = prevAlertCenter
+          ? Math.hypot(c.lat - prevAlertCenter.lat, c.lng - prevAlertCenter.lon)
+          : Infinity;
+        if (dist >= 0.012) {
+          void fetchRegionalAlertForCoords(c.lat, c.lng, true);
+        }
       }, 400);
     }
 
@@ -416,18 +490,22 @@ export function IncidentMap({
     };
   }, [eventId, reports]);
 
-  // Render HTML markers (single pins + D3 cluster markers) when clusteredNodes change.
+  // Render HTML markers (single pins + D3 cluster markers) with Framer Motion
+  // staggered scale-in entrance animation when filters or temporal scrubber change.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
-    for (const node of clusteredNodes) {
+    const activeAnimations: Array<{ stop: () => void }> = [];
+
+    clusteredNodes.forEach((node, idx) => {
       const el = document.createElement("div");
       el.style.position = "absolute";
-      el.style.opacity = "0";
-      el.style.transition = "opacity 200ms ease";
+
+      // Staggered entrance delay (35ms per pin, capped at 450ms)
+      const staggerDelay = Math.min(idx * 0.035, 0.45);
 
       if (node.kind === "cluster") {
         const button = document.createElement("button");
@@ -435,6 +513,7 @@ export function IncidentMap({
         button.className = "cluster";
         button.dataset.sev = String(node.maxSeverity);
         button.dataset.hasPending = node.pendingCount > 0 ? "true" : "false";
+        button.dataset.staggerIndex = String(idx);
         button.setAttribute(
           "aria-label",
           `${node.count} incidents consolidated (${node.confirmedCount} confirmed, ${node.pendingCount} pending) — click to zoom in`,
@@ -463,6 +542,22 @@ export function IncidentMap({
           .setLngLat([node.longitude, node.latitude])
           .addTo(map);
         markersRef.current.push(marker);
+
+        try {
+          const controls = animate(
+            button,
+            { opacity: [0, 1], scale: [0.35, 1.08, 1] },
+            {
+              duration: 0.36,
+              delay: staggerDelay,
+              ease: [0.16, 1, 0.3, 1],
+            },
+          );
+          activeAnimations.push(controls);
+        } catch {
+          button.style.opacity = "1";
+          button.style.transform = "scale(1)";
+        }
       } else {
         const r = node.report;
         // Create DOM safely without interpolating API data into innerHTML.
@@ -473,6 +568,7 @@ export function IncidentMap({
         button.className = "pin";
         button.dataset.state = state;
         button.dataset.sev = String(sev);
+        button.dataset.staggerIndex = String(idx);
         if (selected?.id === r.id) {
           button.setAttribute("aria-selected", "true");
         }
@@ -493,13 +589,29 @@ export function IncidentMap({
           .setLngLat([r.longitude, r.latitude])
           .addTo(map);
         markersRef.current.push(marker);
-      }
 
-      requestAnimationFrame(() => {
-        el.style.opacity = "1";
-      });
-    }
-  }, [clusteredNodes, selected?.id]);
+        try {
+          const controls = animate(
+            button,
+            { opacity: [0, 1], scale: [0.35, 1.08, 1] },
+            {
+              duration: 0.36,
+              delay: staggerDelay,
+              ease: [0.16, 1, 0.3, 1],
+            },
+          );
+          activeAnimations.push(controls);
+        } catch {
+          button.style.opacity = "1";
+          button.style.transform = "scale(1)";
+        }
+      }
+    });
+
+    return () => {
+      activeAnimations.forEach((ctrl) => ctrl.stop());
+    };
+  }, [clusteredNodes, selected?.id, filterAnimationKey]);
 
   function focusReportOnMap(r: IncidentMapReport) {
     setSelected(r);
@@ -785,6 +897,17 @@ export function IncidentMap({
                 : ""}
               {showHeatmap ? " · Heatmap On" : ""}
             </div>
+
+            {/* Dismissible Regional Weather & Seismic Alert Overlay (Google Search Grounding) */}
+            <RegionalAlertOverlay
+              alert={regionalAlert}
+              loading={alertLoading}
+              dismissed={alertDismissed}
+              onDismiss={() => setAlertDismissed(true)}
+              onRefreshRegion={() =>
+                void fetchRegionalAlertForCoords(mapCenter.lat, mapCenter.lon, true)
+              }
+            />
 
             <MapLegend showPending={pendingMode === "all"} />
 
