@@ -18,8 +18,8 @@ describe("role-scoped notification UI and reviewer transactions", () => {
   it("shows navigation only in feature-enabled environments", () => {
     expect(layout).toContain("showIncidentNotifications={isTriageEnabled()}");
     expect(shell).toContain("showIncidentNotifications={showIncidentNotifications}");
-    expect(topbar).toContain("showIncidentNotifications &&");
-    expect(topbar).toContain('href="/notifications"');
+    expect(topbar).toContain("showIncidentNotifications ?");
+    expect(topbar).toContain('href: "/notifications"');
   });
   it("notifies after the verified atomic review succeeds", () => {
     expect(processing).toContain("export async function notifyReviewCompleted");
