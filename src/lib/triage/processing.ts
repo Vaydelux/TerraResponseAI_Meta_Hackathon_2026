@@ -55,6 +55,18 @@ async function notifyRecipients(
   }
 }
 
+/** An audit-backed admin inbox event for a completed human review. */
+export async function notifyReviewCompleted(reportId: string, eventId: string, action: string) {
+  if (!isTriageEnabled()) return;
+  const allowed = new Set(["confirm", "flag", "reject", "resolve", "request_info", "correct", "comment"]);
+  if (!allowed.has(action)) throw new Error("Unrecognized review action");
+  await notifyRecipients(serviceDatabase(), {
+    reportId, eventId, kind: "review_completed",
+    title: "Human review completed",
+    body: "An authorized reviewer performed: " + action.replaceAll("_", " ") + ".",
+  });
+}
+
 /** Notifications are durable and server-only, not browser event callbacks. */
 export async function notifyReportSubmitted(reportId: string, eventId: string) {
   if (!isTriageEnabled()) return;
