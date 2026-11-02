@@ -116,7 +116,7 @@ export async function POST(
   // If any part fails, the entire transaction rolls back.
   // The request ID makes retries safe after a lost network response.
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("submit_review_atomic", {
+  const { data, error } = await supabase.rpc("submit_review_tx", {
     p_report_id: id,
     p_request_id: body.requestId ?? crypto.randomUUID(),
     p_action: body.action,
