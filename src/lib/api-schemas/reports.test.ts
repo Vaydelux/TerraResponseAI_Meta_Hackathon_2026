@@ -44,9 +44,12 @@ describe("reportUploadMetaSchema", () => {
     expect(r.success).toBe(false);
   });
 
-  it("rejects a missing eventId", () => {
-    const r = reportUploadMetaSchema.safeParse({ title: "Missing event" });
-    expect(r.success).toBe(false);
+  it("accepts a missing eventId for server-selected, feature-gated intake", () => {
+    const r = reportUploadMetaSchema.safeParse({ title: "Community report" });
+    expect(r.success).toBe(true);
+    // Server decides the intake event and enforces membership; the client
+    // cannot select arbitrary private event IDs.
+    if (r.success) expect(r.data.eventId).toBeUndefined();
   });
 
   it("rejects title over 200 chars", () => {
