@@ -1,10 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-  <title id="title">TerraResponse AI survey corner</title>
-  <rect width="64" height="64" rx="14" fill="#17323d"/>
-  <path d="M11.5 27V11.5H27M37 11.5H52.5V27M52.5 37V52.5H37M27 52.5H11.5V37"
-        fill="none" stroke="#f2f6f4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M16 16H31V31H16Z" fill="#deaa50"/>
-  <path d="M16 23l7-7M16 30l14-14M23 31l8-8"
-        fill="none" stroke="#7e561f" stroke-width="2.2" stroke-linecap="square"/>
-  <path d="M33.5 32H46M40 25.5V38.5" stroke="#f2f6f4" stroke-width="3.5" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">TerraResponse AI</title>
+  <desc id="desc">A white terrain peak crossed by a teal horizon, with coral signal arcs broadcasting from its summit.</desc>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17394B"/>
+      <stop offset="1" stop-color="#071D2B"/>
+    </linearGradient>
+    <linearGradient id="horizon" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#27B7CC"/>
+      <stop offset="1" stop-color="#69DADD"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="62" height="62" rx="14" fill="url(#tile)"/>
+  <rect x="1" y="1" width="62" height="62" rx="14" fill="none" stroke="#376071" stroke-opacity=".65" stroke-width="1.3"/>
+  <path d="M14.8 43.2 29.5 17.4c1.1-2 3.4-2.1 4.5-.1L46 39.3h-7.7l-6.8-12.8-8.8 16.7z" fill="#F7FBFB"/>
+  <path d="M14.1 48c11.6-5.8 25.1-7.5 37-3.2" fill="none" stroke="url(#horizon)" stroke-width="4.4" stroke-linecap="round"/>
+  <path d="M41 13.2c8.2 1.5 13.2 7 14.1 14.8M41.4 20.2c4.4 1.3 6.7 4 7 8" fill="none" stroke="#FF8552" stroke-width="3.5" stroke-linecap="round"/>
 </svg>
