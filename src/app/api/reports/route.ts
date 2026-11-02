@@ -48,6 +48,7 @@ import { checkUserUploadRate } from "@/lib/rate-limit";
 import { sanitizeUserText } from "@/lib/ai/prompt-injection";
 import { resolveLocation, validateBounds } from "@/lib/storage/missing-location";
 import { ensureCommunityIntakeMembership, isCommunityIntakeEnabled } from "@/lib/community/intake";
+import { notifyReportSubmitted } from "@/lib/triage/processing";
 
 // MIME → file extension for the storage path.
 const EXT_BY_TYPE: Record<AllowedImageType, "jpg" | "png" | "webp"> = {
@@ -357,6 +358,14 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 },
     );
+  }
+
+  // Keep the completed upload successful even when notification
+  // delivery is unavailable; never cause a duplicate upload retry.
+  try {
+    await notifyReportSubmitted(inserted.id, eventId);
+  } catch {
+    console.error("[notification] Report committed; admin notification unavailable.");
   }
 
   // 14. Success. Return the report id + the extracted EXIF so the
