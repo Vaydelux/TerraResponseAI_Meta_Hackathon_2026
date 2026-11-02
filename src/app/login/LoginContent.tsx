@@ -47,7 +47,7 @@ export function LoginContent({ configured }: { configured: boolean }) {
           <div className="panel">
             <h1 style={{ fontSize: "var(--step-2)" }}>Sign in</h1>
             <p className="t-meta" style={{ marginTop: "var(--s-2)", marginBottom: "var(--s-4)" }}>
-              Authenticate with your Supabase email and password.
+              Use your registered email address and password to continue.
             </p>
             {pending && <AuthLoadingBanner mode="login" />}
             <form action={formAction} aria-busy={pending} style={{ display: "grid", gap: "var(--s-3)" }}>
@@ -57,9 +57,12 @@ export function LoginContent({ configured }: { configured: boolean }) {
                 </div>
               )}
               <input type="hidden" name="callbackUrl" value={callbackUrl} />
-              <Field label="Email" htmlFor="email">
-                <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required disabled={pending} />
+              <Field label="Email address" htmlFor="email">
+                <Input id="email" name="email" type="email" autoComplete="email" inputMode="email" aria-describedby="login-email-hint" placeholder="you@example.com" required disabled={pending} />
               </Field>
+              <p id="login-email-hint" className="t-meta" style={{ marginTop: "calc(var(--s-2) * -1)" }}>
+                Enter the email used at registration, not your display username.
+              </p>
               <Field label="Password" htmlFor="password">
                 <div style={{ position: "relative" }}>
                   <Input
