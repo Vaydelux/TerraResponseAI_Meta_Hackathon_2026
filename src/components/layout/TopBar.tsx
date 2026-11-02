@@ -25,6 +25,7 @@ export interface TopBarProps {
   /** Number of reports in the pending review queue (the count badge). */
   pendingReviewCount?: number;
   showIncidentNotifications?: boolean;
+  showRoleManagement?: boolean;
   className?: string;
 }
 
@@ -47,7 +48,7 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function TopBar({ ctx, pendingReviewCount = 0, showIncidentNotifications = false, className }: TopBarProps) {
+export function TopBar({ ctx, pendingReviewCount = 0, showIncidentNotifications = false, showRoleManagement = false, className }: TopBarProps) {
   const pathname = usePathname() ?? "";
   const links = NAV_LINKS.filter((l) => !l.roles || l.roles.includes(ctx.user.role));
   return (
@@ -77,6 +78,12 @@ export function TopBar({ ctx, pendingReviewCount = 0, showIncidentNotifications 
         <Link href="/notifications" className="nav__link"
           aria-current={isActive(pathname, "/notifications") ? "page" : undefined}>
           Notifications
+        </Link>
+      )}
+      {showRoleManagement && ctx.user.role === "admin" && (
+        <Link href="/admin/users" className="nav__link"
+          aria-current={isActive(pathname, "/admin/users") ? "page" : undefined}>
+          User roles
         </Link>
       )}
       <div className="topbar__spacer" />

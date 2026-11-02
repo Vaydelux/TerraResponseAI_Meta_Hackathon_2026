@@ -29,11 +29,20 @@ export async function ensureCommunityIntakeMembership(userId: string): Promise<s
   if (eventError || !event || event.status !== "active") {
     throw new Error("Community intake is unavailable.");
   }
+  // Global Reviewer and Admin identities must receive an appropriate
+  // community event role; otherwise newly joined reviewers would be
+  // blocked from moderating reports despite their authorized app role.
+  const { data: profile, error: profileError } = await db
+    .from("profiles").select("role").eq("id", userId).single();
+  if (profileError || !profile) throw new Error("Community reporter profile unavailable.");
+  const memberRole = profile.role === "admin" ? "coordinator"
+    : profile.role === "reviewer" ? "reviewer" : "contributor";
+
   // Upsert with ignoreDuplicates prevents demoting existing reviewer
   // or coordinator memberships. DB unique(event_id,user_id) serializes
   // two concurrent first reports from the same person.
   const { error } = await db.from("event_members")
-    .upsert({ event_id: event.id, user_id: userId, role: "contributor" }, {
+    .upsert({ event_id: event.id, user_id: userId, role: memberRole }, {
       onConflict: "event_id,user_id",
       ignoreDuplicates: true,
     });

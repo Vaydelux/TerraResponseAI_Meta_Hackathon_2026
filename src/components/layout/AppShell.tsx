@@ -18,13 +18,14 @@ export interface AppShellProps {
   ctx: AuthContext;
   pendingReviewCount?: number;
   showIncidentNotifications?: boolean;
+  showRoleManagement?: boolean;
   children: ReactNode;
 }
 
-export function AppShell({ ctx, pendingReviewCount, showIncidentNotifications, children }: AppShellProps) {
+export function AppShell({ ctx, pendingReviewCount, showIncidentNotifications, showRoleManagement, children }: AppShellProps) {
   return (
     <div className="tr-shell">
-      <TopBar ctx={ctx} pendingReviewCount={pendingReviewCount} showIncidentNotifications={showIncidentNotifications} />
+      <TopBar ctx={ctx} pendingReviewCount={pendingReviewCount} showIncidentNotifications={showIncidentNotifications} showRoleManagement={showRoleManagement} />
       <DemoBanner />
       <main id="main-content" tabIndex={-1}>
         {children}

@@ -18,6 +18,8 @@ describe("report-first workflow security and compatibility", () => {
   it("only enrolls in one server-selected intake, never in client-selected private events", () => {
     expect(intake).toContain('COMMUNITY_INTAKE_SLUG = "community-intake"');
     expect(intake).toContain("ignoreDuplicates: true");
+    expect(intake).toContain('profile.role === "admin" ? "coordinator"');
+    expect(intake).toContain('profile.role === "reviewer" ? "reviewer" : "contributor"');
     expect(intake).toContain('onConflict: "event_id,user_id"');
     expect(upload).toContain("communityEventId === eventId");
     expect(upload).toContain("ctx.events.find");
