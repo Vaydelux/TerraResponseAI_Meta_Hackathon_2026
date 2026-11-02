@@ -7,6 +7,14 @@ const review=readFileSync("src/app/api/reports/[id]/review/route.ts","utf8");
 const processing=readFileSync("src/lib/triage/processing.ts","utf8");
 
 describe("role-scoped notification UI and reviewer transactions", () => {
+  it("prevents reporter enumeration of community event members", () => {
+    const sql=readFileSync("supabase/migrations/20261103121000_community_membership_privacy.sql","utf8");
+    expect(sql).toContain("event_members_select_member_or_admin");
+    expect(sql).toContain("user_id = (select auth.uid())");
+    expect(sql).toContain("public.is_event_reviewer_or_higher(event_id)");
+    expect(sql).toContain("public.is_admin()");
+    expect(sql).not.toContain("or public.is_event_member(event_id)");
+  });
   it("shows navigation only in feature-enabled environments", () => {
     expect(layout).toContain("showIncidentNotifications={isTriageEnabled()}");
     expect(shell).toContain("showIncidentNotifications={showIncidentNotifications}");
