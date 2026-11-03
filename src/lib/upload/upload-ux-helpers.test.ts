@@ -53,94 +53,66 @@ describe("upload UX and AI Telemetry helpers", () => {
     expect(itemsAtStep1AfterStep2Done[2]?.reachable).toBe(true);
   });
 
-  it("surfaces Meta AI Vision model and hazard tags in deriveClientMetaAiPreTriage", () => {
-    const floodPreview = deriveClientMetaAiPreTriage({
-      fileName: "baha.jpg",
-      fileSize: 245_000,
+  it("does not classify or invent confidence before a real server response", () => {
+    const hint = deriveClientMetaAiPreTriage({
+      fileName: "critical_flood_10m_water.jpg",
+      fileSize: 500_000,
       mimeType: "image/jpeg",
       hasExifGps: false,
-      titleHint: "Baha sa Pasig",
+      titleHint: "Emergency rescue immediately",
     });
-    expect(floodPreview.modelId).toBe("Llama-4-Maverick-17B-128E-Instruct-FP8");
-    expect(floodPreview.incidentType).toBe("flooding");
-    expect(floodPreview.preliminarySeverity).toBe(4);
-    expect(floodPreview.detectedTags).toContain("Needs Pin Confirmation");
-
-    const treePreview = deriveClientMetaAiPreTriage({
-      fileName: "fallen_tree_marcos.png",
-      fileSize: 512_000,
-      mimeType: "image/png",
-      hasExifGps: true,
-    });
-    expect(treePreview.incidentType).toBe("debris");
-    expect(treePreview.detectedTags).toContain("EXIF GPS Verified");
+    expect(hint.confidencePct).toBeNull();
+    expect(hint.preliminarySeverity).toBeNull();
+    expect(hint.incidentType).toBe("other");
+    expect(hint.detectedTags).toEqual([]);
+    expect(hint.suggestedDescription).toBe("");
+    expect(hint.suggestedTitle).toBe("");
+    expect(hint.modelId).not.toMatch(/Llama|Muse/i);
   });
 
-  it("updates AI Telemetry status card snapshot in real-time across scanning, pre-triage, and server completion", () => {
-    const standby = deriveAiTelemetrySnapshot({
-      hasFile: false,
-      isScanningClient: false,
-      preTriage: null,
-      locationChoice: null,
-      uploadProgress: null,
-      serverStatus: "idle",
+  it("shows only local file state and location before inference", () => {
+    const hint = deriveClientMetaAiPreTriage({
+      fileName: "fire_blast.jpg", fileSize: 300_000,
+      mimeType: "image/jpeg", hasExifGps: true,
     });
-    expect(standby.phase).toBe("standby");
-    expect(standby.confidencePct).toBeNull();
+    for (const status of ["idle", "requesting", "processing", "unavailable"] as const) {
+      const state = deriveAiTelemetrySnapshot({
+        hasFile: true, isScanningClient: false,
+        preTriage: hint, locationChoice: "manual", uploadProgress: null,
+        serverStatus: status,
+      });
+      expect(state.confidencePct).toBeNull();
+      expect(state.preliminarySeverity).toBeNull();
+      expect(state.hazardLabels).not.toContain("Fire");
+      expect(state.modelId).toContain("Awaiting");
+    }
+  });
 
+  it("only renders real model evidence after a saved server response", () => {
     const preTriage = deriveClientMetaAiPreTriage({
-      fileName: "baha_pasig.jpg",
-      fileSize: 320_000,
-      mimeType: "image/jpeg",
-      hasExifGps: false,
+      fileName: "random.png", fileSize: 320_000,
+      mimeType: "image/png", hasExifGps: false,
     });
-
-    const scanning = deriveAiTelemetrySnapshot({
-      hasFile: true,
-      isScanningClient: true,
-      scanStepLabel: "Stage 2/2 · Extracting hazard vectors…",
-      preTriage,
-      locationChoice: null,
-      uploadProgress: null,
-      serverStatus: "idle",
-    });
-    expect(scanning.phase).toBe("scanning");
-    expect(scanning.isProcessing).toBe(true);
-    expect(scanning.confidencePct).toBeLessThan(preTriage.confidencePct);
-
-    const ready = deriveAiTelemetrySnapshot({
-      hasFile: true,
-      isScanningClient: false,
-      preTriage,
-      locationChoice: "manual",
-      uploadProgress: null,
-      serverStatus: "idle",
-    });
-    expect(ready.phase).toBe("pre_triage_ready");
-    expect(ready.confidencePct).toBeGreaterThanOrEqual(preTriage.confidencePct);
-    expect(ready.hazardLabels).toContain("Manual Pin Confirmed");
-
-    const completed = deriveAiTelemetrySnapshot({
-      hasFile: true,
-      isScanningClient: false,
-      preTriage,
-      locationChoice: "manual",
-      uploadProgress: null,
+    const state = deriveAiTelemetrySnapshot({
+      hasFile: true, isScanningClient: false,
+      preTriage, locationChoice: "unknown", uploadProgress: null,
       serverStatus: "review_ready",
       serverTelemetry: {
-        modelId: "Llama-4-Maverick-17B-128E-Instruct-FP8",
+        modelId: "muse-spark-1.3",
         incidentType: "flooding",
-        preliminarySeverity: 5,
-        visibleEvidence: ["Submerged primary roadway", "Stranded vehicles in floodwater"],
-        uncertainties: [],
+        preliminarySeverity: 4,
+        visibleEvidence: ["Standing water covers the road"],
+        uncertainties: ["Depth cannot be inferred"],
         latencyMs: 640,
       },
     });
-    expect(completed.phase).toBe("complete");
-    expect(completed.isProcessing).toBe(false);
-    expect(completed.confidencePct).toBeGreaterThanOrEqual(90);
-    expect(completed.hazardLabels).toContain("Submerged primary roadway");
-    expect(completed.latencyMs).toBe(640);
+    expect(state.phase).toBe("complete");
+    expect(state.modelId).toBe("muse-spark-1.3");
+    expect(state.preliminarySeverity).toBe(4);
+    expect(state.hazardLabels).toContain("Standing water covers the road");
+    expect(state.confidencePct).toBeNull();
+    expect(state.latencyMs).toBe(640);
   });
+
 });
 
