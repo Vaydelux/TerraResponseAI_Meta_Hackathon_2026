@@ -14,6 +14,7 @@
 import Link from "next/link";
 import { SealBadge } from "@/components/seal/SealBadge";
 import { ReportThumb } from "@/components/report/ReportThumb";
+import { ShareReportButton } from "@/components/report/ShareReportButton";
 import { stateFromReport } from "@/lib/design/status";
 import { toSeverityLevel } from "@/lib/design/severity";
 import { formatRelativeTime } from "@/lib/design/format";
@@ -77,13 +78,24 @@ export function IncidentPanel({ report, reviewerName, onClose, className }: Inci
           Severity {sev} · Priority {report.priority_score ?? "—"}
         </div>
         <div className="t-meta">{formatRelativeTime(report.uploaded_at)}</div>
-        <Link
-          href={`/reports/${report.id}`}
-          className="btn btn--primary"
-          style={{ marginTop: "var(--s-2)", justifySelf: "start" }}
+        <div
+          style={{
+            marginTop: "var(--s-2)",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--s-2)",
+            flexWrap: "wrap",
+          }}
         >
-          View full report
-        </Link>
+          <Link
+            href={`/reports/${report.id}`}
+            className="btn btn--primary"
+            style={{ flex: 1 }}
+          >
+            View full report
+          </Link>
+          <ShareReportButton reportId={report.id} title={title} variant="quiet" size="md" />
+        </div>
       </div>
     </aside>
   );

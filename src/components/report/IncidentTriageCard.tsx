@@ -11,6 +11,7 @@ import Link from "next/link";
 import { MapPin, ArrowRight } from "lucide-react";
 import { SealBadge } from "@/components/seal/SealBadge";
 import { ReportThumb } from "./ReportThumb";
+import { ShareReportButton } from "./ShareReportButton";
 import { stateFromReport } from "@/lib/design/status";
 import { toSeverityLevel } from "@/lib/design/severity";
 import { formatRelativeTime } from "@/lib/design/format";
@@ -127,14 +128,24 @@ export function IncidentTriageCard({
           )}
         </div>
 
-        <div style={{ marginTop: "auto", paddingTop: 4 }}>
+        <div
+          style={{
+            marginTop: "auto",
+            paddingTop: 4,
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--s-2)",
+          }}
+        >
           <Link
             href={targetHref}
-            className={`btn ${isPending && canReview ? "btn--primary" : ""} btn--block`}
+            className={`btn ${isPending && canReview ? "btn--primary" : ""}`}
+            style={{ flex: 1 }}
           >
             <span>{ctaLabel}</span>
             <ArrowRight size={15} aria-hidden="true" />
           </Link>
+          <ShareReportButton reportId={report.id} title={title} variant="quiet" size="md" />
         </div>
       </div>
     </article>

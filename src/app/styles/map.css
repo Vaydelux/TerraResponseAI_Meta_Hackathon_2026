@@ -178,6 +178,60 @@
     transform: translate(-50%, 0) scale(1);
   }
 
+  /* Custom Hazard Type Text Label displayed on pins when zoomed in */
+  .pin-hazard-label {
+    position: absolute;
+    left: calc(100% + 6px);
+    top: 50%;
+    transform: translateY(-50%) scale(0.92);
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--sheet);
+    border: 1px solid var(--rule-strong);
+    border-left: 3px solid var(--tide);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
+    box-shadow: 0 2px 6px rgba(11, 20, 26, 0.18);
+    transition:
+      opacity 180ms ease,
+      transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: 16;
+  }
+  .pin-hazard-label[data-visible="true"],
+  .map[data-zoomed-labels="true"] .pin-hazard-label,
+  .pin[aria-selected="true"] .pin-hazard-label {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+  .pin-hazard-label[data-hazard="fire"],
+  .pin-hazard-label[data-hazard="medical"],
+  .pin-hazard-label[data-hazard="visible_structural_damage"] {
+    border-left-color: var(--brick);
+  }
+  .pin-hazard-label[data-hazard="blocked_road"],
+  .pin-hazard-label[data-hazard="debris"] {
+    border-left-color: var(--amber);
+  }
+  .pin-hazard-label[data-hazard="flooding"] {
+    border-left-color: var(--tide);
+  }
+
+  /* Share Deep Link Button visual confirmation state */
+  .share-report-btn--copied {
+    border-color: var(--green) !important;
+    color: var(--green-ink) !important;
+    background: var(--green-wash) !important;
+  }
+
   .legend {
     position: absolute;
     left: var(--s-4);

@@ -32,7 +32,9 @@ import {
 } from "lucide-react";
 import { MapLegend } from "./MapLegend";
 import { IncidentPanel, type IncidentPanelData } from "./IncidentPanel";
+import { PIN_HAZARD_SHORT_LABEL } from "./IncidentPin";
 import { HazardSummaryChart } from "./HazardSummaryChart";
+import { ShareReportButton } from "@/components/report/ShareReportButton";
 import {
   MapFilterBar,
   resolveHazardCategory,
@@ -48,6 +50,9 @@ import { toSeverityLevel } from "@/lib/design/severity";
 import { formatRelativeTime } from "@/lib/design/format";
 import { readInitialTheme, resolveIsNight } from "@/components/layout/ThemeToggle";
 import { cn } from "@/lib/utils";
+
+/** Zoom threshold at or above which custom hazard type text labels are shown on map pins. */
+const ZOOM_HAZARD_LABEL_THRESHOLD = 12;
 
 export interface IncidentMapReport {
   id: string;
@@ -565,11 +570,18 @@ export function IncidentMap({
         // Create DOM safely without interpolating API data into innerHTML.
         const state = stateFromReport({ status: r.status, reviewOutcome: r.review_outcome });
         const sev = toSeverityLevel(r.severity);
+        const hazardCategory = resolveHazardCategory(r);
+        const hazardLabelText =
+          PIN_HAZARD_SHORT_LABEL[hazardCategory] ?? hazardCategory.toUpperCase();
+        const isZoomedInForLabels =
+          mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD || selected?.id === r.id;
+
         const button = document.createElement("button");
         button.type = "button";
         button.className = "pin";
         button.dataset.state = state;
         button.dataset.sev = String(sev);
+        button.dataset.hazard = hazardCategory;
         button.dataset.staggerIndex = String(idx);
         if (selected?.id === r.id) {
           button.setAttribute("aria-selected", "true");
@@ -578,7 +590,18 @@ export function IncidentMap({
           r.location_label ||
           r.title ||
           `${r.latitude.toFixed(3)}° N, ${r.longitude.toFixed(3)}° E`;
-        button.setAttribute("aria-label", `${r.title || "Incident"}; ${state}; severity ${sev}`);
+        button.setAttribute(
+          "aria-label",
+          `${r.title || "Incident"}; ${hazardLabelText}; ${state}; severity ${sev}`,
+        );
+
+        // Custom hazard-type text label displayed on pins when zoomed in
+        const hazardSpan = document.createElement("span");
+        hazardSpan.className = "pin-hazard-label";
+        hazardSpan.dataset.hazard = hazardCategory;
+        hazardSpan.dataset.visible = isZoomedInForLabels ? "true" : "false";
+        hazardSpan.textContent = hazardLabelText;
+        button.append(hazardSpan);
 
         const badge = document.createElement("span");
         badge.className = "pin-context-badge";
@@ -613,7 +636,7 @@ export function IncidentMap({
     return () => {
       activeAnimations.forEach((ctrl) => ctrl.stop());
     };
-  }, [clusteredNodes, selected?.id, filterAnimationKey]);
+  }, [clusteredNodes, selected?.id, filterAnimationKey, mapZoom]);
 
   function focusReportOnMap(r: IncidentMapReport) {
     setSelected(r);
@@ -756,6 +779,9 @@ export function IncidentMap({
         const rep = node.report;
         const st = stateFromReport({ status: rep.status, reviewOutcome: rep.review_outcome });
         const sev = toSeverityLevel(rep.severity);
+        const hazardCategory = resolveHazardCategory(rep);
+        const hazardLabelText =
+          PIN_HAZARD_SHORT_LABEL[hazardCategory] ?? hazardCategory.toUpperCase();
 
         workingCtx.save();
         workingCtx.beginPath();
@@ -766,6 +792,26 @@ export function IncidentMap({
         workingCtx.lineWidth = Math.max(1.5, sev) * scale;
         workingCtx.strokeStyle = isNight ? "#EBF1F4" : "#13222C";
         workingCtx.stroke();
+
+        if (mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD) {
+          workingCtx.font = `700 ${10 * scale}px sans-serif`;
+          const textW = workingCtx.measureText(hazardLabelText).width;
+          const padX = 5 * scale;
+          const boxH = 16 * scale;
+          const boxX = px + r + 5 * scale;
+          const boxY = py - boxH / 2;
+
+          workingCtx.fillStyle = isNight ? "rgba(17, 31, 41, 0.94)" : "rgba(255, 255, 255, 0.94)";
+          workingCtx.fillRect(boxX, boxY, textW + padX * 2, boxH);
+          workingCtx.strokeStyle = isNight ? "#334E5E" : "#B8C4BA";
+          workingCtx.lineWidth = 1 * scale;
+          workingCtx.strokeRect(boxX, boxY, textW + padX * 2, boxH);
+
+          workingCtx.fillStyle = isNight ? "#EBF1F4" : "#13222C";
+          workingCtx.textAlign = "left";
+          workingCtx.textBaseline = "middle";
+          workingCtx.fillText(hazardLabelText, boxX + padX, py);
+        }
         workingCtx.restore();
       }
     }
@@ -876,7 +922,11 @@ export function IncidentMap({
       {/* Main Responsive Grid: Map Canvas Stage + Right Situational Rail */}
       <div className="tactical-map-grid">
         <div className="tactical-map-stage">
-          <div className={cn("map", className)} ref={containerRef}>
+          <div
+            className={cn("map", className)}
+            ref={containerRef}
+            data-zoomed-labels={mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD ? "true" : "false"}
+          >
             {/* Gradient Density Heatmap Canvas Overlay */}
             <canvas
               ref={heatmapCanvasRef}
@@ -897,6 +947,7 @@ export function IncidentMap({
               {clusteredNodes.length < visibleReports.length
                 ? ` (${clusteredNodes.length} markers · D3 clustered)`
                 : ""}
+              {mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD ? " · Hazard Labels On" : ""}
               {showHeatmap ? " · Heatmap On" : ""}
             </div>
 
@@ -975,10 +1026,11 @@ export function IncidentMap({
                 <div className="t-meta num">
                   {topAdvisory.location_label || `${topAdvisory.latitude.toFixed(4)}° N, ${topAdvisory.longitude.toFixed(4)}° E`}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--s-2)" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--s-2)" }}>
                   <button
                     type="button"
                     className="btn btn--primary"
+                    style={{ flex: 1 }}
                     onClick={() => focusReportOnMap(topAdvisory)}
                   >
                     <Navigation size={14} aria-hidden="true" />
@@ -991,10 +1043,21 @@ export function IncidentMap({
                         : `/reports/${topAdvisory.id}`
                     }
                     className="btn"
+                    style={{ flex: 1 }}
                   >
                     Open Report
                     <ArrowUpRight size={14} aria-hidden="true" />
                   </Link>
+                  <ShareReportButton
+                    reportId={topAdvisory.id}
+                    title={
+                      topAdvisory.incidentType
+                        ? INCIDENT_LABEL[topAdvisory.incidentType] ?? topAdvisory.incidentType
+                        : topAdvisory.title
+                    }
+                    variant="quiet"
+                    size="md"
+                  />
                 </div>
               </>
             ) : (
