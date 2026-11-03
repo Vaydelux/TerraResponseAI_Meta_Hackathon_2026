@@ -10,6 +10,7 @@
 // user id here and get back a typed profile + role + events list.
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { cache } from "react";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { normalizeEventMemberships, type UserEventMembership } from "@/lib/auth/event-memberships";
 export type { UserEventMembership } from "@/lib/auth/event-memberships";
@@ -39,35 +40,28 @@ export interface AuthContext {
  * getServerUser then getAuthContext — passing the user avoids a
  * second network round-trip to Supabase Auth).
  */
-export async function getAuthContext(user?: { id: string } | null): Promise<AuthContext | null> {
-  if (!isSupabaseConfigured()) return null;
+/**
+ * Profile and workspace reads are independent. Run them concurrently and
+ * memoize the result only for this Server Component render request.
+ * This cache is NEVER shared between users or different HTTP requests.
+ */
+async function loadContextByUserId(userId: string): Promise<AuthContext | null> {
   const supabase = await createSupabaseServerClient();
-  // Reuse the caller's user if provided; otherwise verify server-side.
-  const resolvedUser = user ?? (await supabase.auth.getUser()).data.user;
-  if (!resolvedUser) return null;
-
-  // Profile (global role). RLS: self OR admin (profiles_select_self_or_admin).
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, email, name, role")
-    .eq("id", resolvedUser.id)
-    .single();
+  const [profileResult, membershipResult] = await Promise.all([
+    supabase.from("profiles").select("id, email, name, role").eq("id", userId).single(),
+    supabase.from("event_members")
+      .select("event_id, role, events:event_id(id, name, slug, status)")
+      .eq("user_id", userId),
+  ]);
+  const profile = profileResult.data;
   if (!profile) return null;
 
-  // The events:event_id(...) join is a MANY-TO-ONE embedding: PostgREST
-  // returns an event object, not an array. The old array-only parser
-  // silently hid valid event memberships, blocking photo uploads.
-  const { data: memberships, error: membershipError } = await supabase
-    .from("event_members")
-    .select("event_id, role, events:event_id(id, name, slug, status)")
-    .eq("user_id", resolvedUser.id);
-  if (membershipError) {
-    console.error("[auth] Event membership lookup failed.", { code: membershipError.code ?? "unknown" });
+  if (membershipResult.error) {
+    console.error("[auth] Event membership lookup failed.", {
+      code: membershipResult.error.code ?? "unknown",
+    });
     throw new Error("Unable to load event permissions.");
   }
-
-  const events: UserEventMembership[] = normalizeEventMemberships(memberships);
-
   return {
     user: {
       id: profile.id,
@@ -75,9 +69,20 @@ export async function getAuthContext(user?: { id: string } | null): Promise<Auth
       name: profile.name,
       role: profile.role,
     },
-    events,
-    // activeEventId is resolved client-side via a cookie/localStorage;
-    // the server doesn't pick a default — the events picker does.
+    events: normalizeEventMemberships(membershipResult.data),
     activeEventId: null,
   };
+}
+const cachedContextByUserId = cache(loadContextByUserId);
+
+/** Re-query after the first, server-authorized shared-intake enrollment. */
+export async function reloadAuthContextForUserId(userId: string): Promise<AuthContext | null> {
+  return loadContextByUserId(userId);
+}
+
+export async function getAuthContext(user?: { id: string } | null): Promise<AuthContext | null> {
+  if (!isSupabaseConfigured()) return null;
+  const resolvedUser = user ?? (await (await createSupabaseServerClient()).auth.getUser()).data.user;
+  if (!resolvedUser) return null;
+  return cachedContextByUserId(resolvedUser.id);
 }
