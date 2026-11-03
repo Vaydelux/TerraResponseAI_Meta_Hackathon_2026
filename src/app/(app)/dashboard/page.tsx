@@ -154,16 +154,19 @@ export default async function DashboardPage() {
           details: string | null;
         };
         const actionClean = row.action.replace(/_/g, " ").toUpperCase();
-        const isConfirm = row.action.includes("confirm") || row.action.includes("review");
-        const isFail = row.action.includes("fail") || row.action.includes("reject");
+        // A review was performed is NOT equivalent to human confirmation.
+        // Never label a rejection, flag, or requested correction "VERIFIED".
+        const isConfirm = /(^|_)confirm(ed)?($|_)/.test(row.action);
+        const isReject = /(^|_)reject(ed)?($|_)/.test(row.action);
+        const isFlag = /(^|_)flag(ged)?($|_)/.test(row.action);
         return {
           id: row.id,
           category: actionClean,
           title: row.details || `Activity recorded on ${row.target ?? "report"}`,
           detail: `By ${row.actor_name || row.actor_email || "System"}${row.target ? ` · Ref: ${row.target.slice(0, 8)}` : ""}`,
           timestamp: row.created_at,
-          badge: isConfirm ? "VERIFIED" : isFail ? "FLAGGED" : "LOGGED",
-          tone: isConfirm ? "green" : isFail ? "brick" : "tide",
+          badge: isConfirm ? "CONFIRMED" : isReject ? "REJECTED" : isFlag ? "FLAGGED" : "RECORDED",
+          tone: isConfirm ? "green" : isReject ? "brick" : isFlag ? "amber" : "tide",
         };
       });
     }
@@ -173,6 +176,9 @@ export default async function DashboardPage() {
   if (streamItems.length === 0 && recent.length > 0) {
     streamItems = recent.slice(0, 4).map((r) => {
       const isReviewed = r.status === "reviewed";
+      const isConfirmed = isReviewed && r.review_outcome === "confirmed";
+      const isRejected = isReviewed && r.review_outcome === "rejected";
+      const isFlagged = isReviewed && r.review_outcome === "flagged";
       const isFailed = r.status === "retryable_error";
       return {
         id: r.id,
@@ -180,8 +186,10 @@ export default async function DashboardPage() {
         title: r.title || `Report #TR-${r.id.slice(0, 6).toUpperCase()} (${r.location_label || "Field upload"})`,
         detail: `Status: ${r.status.replace(/_/g, " ")}${r.review_outcome ? ` · ${r.review_outcome}` : ""} · Priority: ${r.priority_score ?? "—"}`,
         timestamp: r.uploaded_at,
-        badge: isReviewed ? "VERIFIED" : isFailed ? "NEEDS RETRY" : "NEEDS REVIEW",
-        tone: isReviewed ? "green" : isFailed ? "brick" : "amber",
+        badge: isConfirmed ? "CONFIRMED" : isRejected ? "REJECTED" : isFlagged ? "FLAGGED"
+          : isReviewed ? "REVIEWED" : isFailed ? "NEEDS RETRY" : "NEEDS REVIEW",
+        tone: isConfirmed ? "green" : isRejected ? "brick" : isFlagged ? "amber"
+          : isReviewed ? "tide" : isFailed ? "brick" : "amber",
       };
     });
   }
