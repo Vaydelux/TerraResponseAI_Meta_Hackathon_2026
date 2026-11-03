@@ -94,10 +94,18 @@ describe("checkUserUploadRate", () => {
     expect(r.ok).toBe(false);
   });
 
-  it("fails OPEN on a count-query error (allows the upload)", async () => {
+  it("fails CLOSED on a count-query error without bypassing storage limits", async () => {
     mockFrom.mockReturnValue(makeCountThenable(null, { message: "DB down" }));
     const r = await checkUserUploadRate("user-1");
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe(COST_CONTROL_ERRORS.USER_UPLOAD_RATE_UNAVAILABLE);
+  });
+
+  it("fails CLOSED when no count is returned even without a database error", async () => {
+    mockFrom.mockReturnValue(makeCountThenable(null));
+    const r = await checkUserUploadRate("user-1");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe(COST_CONTROL_ERRORS.USER_UPLOAD_RATE_UNAVAILABLE);
   });
 });
 
