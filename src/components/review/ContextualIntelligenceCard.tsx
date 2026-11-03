@@ -95,14 +95,14 @@ export function ContextualIntelligenceCard({
   const fallbackCoordLabel =
     locationLabel ||
     (typeof latitude === "number" && typeof longitude === "number"
-      ? `${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E`
-      : "Incident operational sector");
+      ? `Latitude ${latitude.toFixed(4)}, longitude ${longitude.toFixed(4)}`
+      : "Location not provided");
 
   return (
     <aside
       className="panel context-card"
       data-testid="contextual-intelligence-card"
-      aria-label="Contextual Intelligence from Google Search Grounding"
+      aria-label="External situational context and source status"
     >
       {/* Header */}
       <div className="context-card__head">
@@ -119,7 +119,7 @@ export function ContextualIntelligenceCard({
               <span>
                 {contextData?.grounded
                   ? "Google Search Grounded"
-                  : "Search Grounding"}
+                  : "Live sources not verified"}
               </span>
               {incidentType ? (
                 <>
@@ -272,8 +272,9 @@ export function ContextualIntelligenceCard({
       <div className="context-card__foot">
         <ShieldAlert size={14} style={{ flexShrink: 0, marginTop: 2 }} aria-hidden="true" />
         <span>
-          External context retrieved via Google Search grounding — not derived from the
-          uploaded photo. Verify visual evidence independently before confirming.
+          {contextData?.grounded
+            ? "Source-linked external context is separate from the photo observation. Verify each advisory with its publisher before acting."
+            : "No independently retrieved live advisories are available. This panel is not a verified alert or a substitute for official warnings."}
         </span>
       </div>
     </aside>
