@@ -10,14 +10,16 @@
 // table is read-only in this build. The spend ceilings read from
 // /api/admin/ai-usage (the existing route).
 
+import { Suspense } from "react";
 import { getServerUser, isSupabaseConfigured, createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/lib/auth/profile";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AuditLogTable, type AuditEvent } from "@/components/admin/AuditLogTable";
+import { AuditLogFilters } from "@/components/admin/AuditLogFilters";
 import { EventManager, type AdminEvent } from "@/components/admin/EventManager";
 import { SpendCeilings } from "@/components/admin/SpendCeilings";
-import { EmptyState } from "@/components/ui-tr";
+import { EmptyState, SkeletonRow } from "@/components/ui-tr";
 import { AdminTabs } from "./AdminTabs";
 
 export default async function AuditPageRoute() {
@@ -89,12 +91,32 @@ export default async function AuditPageRoute() {
   return (
     <div className="tr-page">
       <PageHeader
-        title="Audit"
+        title="Activity & Audit Ledger"
         subtitle="Append-only record of authentication, uploads, AI analyses, and reviewer decisions."
       />
       <AdminTabs
-        audit={<AuditLogTable events={auditEvents} />}
-        events={ctx.user.role === "admin" ? <EventManager events={adminEvents} /> : <EmptyState title="Admin only" description="Event management is restricted to admins." />}
+        audit={
+          <Suspense
+            fallback={
+              <div className="tr-stack">
+                <SkeletonRow />
+                <SkeletonRow />
+              </div>
+            }
+          >
+            <AuditLogTable events={auditEvents} filters={<AuditLogFilters />} />
+          </Suspense>
+        }
+        events={
+          ctx.user.role === "admin" ? (
+            <EventManager events={adminEvents} />
+          ) : (
+            <EmptyState
+              title="Admin only"
+              description="Event management is restricted to admins."
+            />
+          )
+        }
         spend={<SpendCeilings />}
       />
     </div>

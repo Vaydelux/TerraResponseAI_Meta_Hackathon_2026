@@ -195,8 +195,9 @@ export function IncidentMap({
   const [selectedHazards, setSelectedHazards] = useState<HazardCategoryId[]>([]);
   const [selectedSeverities, setSelectedSeverities] = useState<number[]>([]);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [scrubberPct, setScrubberPct] = useState<number>(100);
-  const [selected, setSelected] = useState<IncidentMapReport | null>(null);
+  const [selected, setSelected] = useState<IncidentMapReport | null>(reports[0] ?? null);
   const [liveReports, setLiveReports] = useState<IncidentMapReport[]>(reports);
   const [mapZoom, setMapZoom] = useState<number>(11);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lon: number }>({
@@ -265,7 +266,7 @@ export function IncidentMap({
   // Clear selected incident and stale pins when the active event changes.
   useEffect(() => {
     queueMicrotask(() => {
-      setSelected(null);
+      setSelected(reports[0] ?? null);
       setLiveReports(reports);
       setScrubberPct(100);
     });
@@ -289,6 +290,7 @@ export function IncidentMap({
     setSelectedHazards([]);
     setSelectedSeverities([]);
     setPendingMode("all");
+    setSearchQuery("");
     setScrubberPct(100);
   }
 
@@ -339,6 +341,11 @@ export function IncidentMap({
         const ts = new Date(r.uploaded_at).getTime();
         if (Number.isFinite(ts) && ts > cutoffTimestamp) return false;
       }
+      if (searchQuery.trim() !== "") {
+        const q = searchQuery.trim().toLowerCase();
+        const hay = `${r.title ?? ""} ${r.description ?? ""} ${r.location_label ?? ""} ${r.incidentType ?? ""} ${r.id}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
       return true;
     });
   }, [
@@ -348,6 +355,7 @@ export function IncidentMap({
     selectedSeverities,
     scrubberPct,
     cutoffTimestamp,
+    searchQuery,
   ]);
 
   // Consolidate overlapping pins at lower zoom levels using D3 quadtree clustering
@@ -893,11 +901,12 @@ export function IncidentMap({
     selectedSeverities.length > 0 ||
     pendingMode !== "all" ||
     scrubberPct < 100 ||
-    showHeatmap;
+    showHeatmap ||
+    searchQuery.trim() !== "";
 
   return (
     <div className="tactical-map-shell">
-      {/* Persistent Top Filter Bar: Hazard Category + Severity Level + Heatmap + Verification Mode */}
+      {/* Persistent Top Filter Bar: Search + Hazard Category + Severity Level + Heatmap + Verification Mode */}
       <MapFilterBar
         reports={liveReports}
         visibleCount={visibleReports.length}
@@ -912,6 +921,8 @@ export function IncidentMap({
         onChangePendingMode={setPendingMode}
         showHeatmap={showHeatmap}
         onToggleHeatmap={() => setShowHeatmap((prev) => !prev)}
+        searchQuery={searchQuery}
+        onChangeSearchQuery={setSearchQuery}
         hasActiveFilters={hasActiveFilters}
         onResetAllFilters={() => {
           handleResetAllFilters();
@@ -966,7 +977,11 @@ export function IncidentMap({
 
             {/* Selected Incident Floating Panel */}
             {panelReport && (
-              <IncidentPanel report={panelReport} onClose={() => setSelected(null)} />
+              <IncidentPanel
+                report={panelReport}
+                canReview={canReview}
+                onClose={() => setSelected(null)}
+              />
             )}
 
             {/* Bottom Temporal Scrubber filtering pins by `uploaded_at` */}

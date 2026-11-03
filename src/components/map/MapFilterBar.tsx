@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
   RotateCcw,
   FlameKindling,
+  Search,
 } from "lucide-react";
 import { Segmented } from "@/components/ui-tr/Segmented";
 import { COPY } from "@/lib/design/copy";
@@ -59,12 +60,6 @@ export const MAP_HAZARD_CATEGORIES: HazardCategoryDef[] = [
   { id: "debris", label: "Debris", shortLabel: "Debris", icon: Construction },
 ];
 
-/**
- * Classifies an incident report into one of the map hazard categories.
- * Uses the structured `incidentType` when available and also inspects
- * title/description/summary text for Fire, Medical, or Flood keywords
- * so field reports match intuitive responder categories.
- */
 export function resolveHazardCategory(report: IncidentMapReport): HazardCategoryId {
   const rawType = (report.incidentType ?? "").toLowerCase().trim();
   if (rawType === "flooding" || rawType === "flood") return "flooding";
@@ -126,6 +121,8 @@ export interface MapFilterBarProps {
   onChangePendingMode: (mode: PendingFilterMode) => void;
   showHeatmap: boolean;
   onToggleHeatmap: () => void;
+  searchQuery?: string;
+  onChangeSearchQuery?: (q: string) => void;
   hasActiveFilters: boolean;
   onResetAllFilters: () => void;
 }
@@ -144,6 +141,8 @@ export function MapFilterBar({
   onChangePendingMode,
   showHeatmap,
   onToggleHeatmap,
+  searchQuery = "",
+  onChangeSearchQuery,
   hasActiveFilters,
   onResetAllFilters,
 }: MapFilterBarProps) {
@@ -160,13 +159,34 @@ export function MapFilterBar({
       aria-label="Persistent map incident filter bar"
       data-testid="map-filter-bar"
     >
-      {/* Row 1: Hazard Category Toggles + Heatmap Toggle + Verification State */}
+      {/* Row 1: Search Input + Hazard Category Toggles + Heatmap Toggle + Verification State */}
       <div className="map-filter-bar__row">
-        <div className="map-filter-bar__group">
-          <span className="map-filter-bar__group-label">
-            <Layers size={14} aria-hidden="true" style={{ color: "var(--tide)" }} />
-            <span>Hazard Category:</span>
-          </span>
+        <div className="map-filter-bar__group" style={{ flex: "1 1 auto" }}>
+          {onChangeSearchQuery && (
+            <div style={{ position: "relative", minWidth: 220, maxWidth: 290, flex: "1 1 220px" }}>
+              <Search
+                size={14}
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  left: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "var(--ink-3)",
+                  pointerEvents: "none",
+                }}
+              />
+              <input
+                type="search"
+                className="input"
+                value={searchQuery}
+                onChange={(e) => onChangeSearchQuery(e.target.value)}
+                placeholder="Search location, street, or incident #…"
+                aria-label="Search map incidents by location or keyword"
+                style={{ minHeight: 32, padding: "4px 10px 4px 30px", fontSize: "0.78rem" }}
+              />
+            </div>
+          )}
 
           <div
             className="tactical-layer-bar"

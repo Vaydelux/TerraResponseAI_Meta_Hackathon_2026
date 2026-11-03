@@ -1860,4 +1860,10 @@
     font-weight: 600;
     color: var(--brick-ink);
   }
+
+  @media (max-width: 1039px) {
+    .dashboard-ops-grid {
+      grid-template-columns: 1fr !important;
+    }
+  }
 }

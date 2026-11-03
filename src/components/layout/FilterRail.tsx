@@ -22,6 +22,8 @@ export interface FilterRailProps {
   className?: string;
   /** Labels for the status select. Override the defaults if needed. */
   statusOptions?: Array<{ value: string; label: string }>;
+  /** Whether to show the 'Only mine' toggle (defaults to true). */
+  showMine?: boolean;
 }
 
 const DEFAULT_STATUS_OPTIONS = [
@@ -34,11 +36,11 @@ const DEFAULT_STATUS_OPTIONS = [
 
 const DEFAULT_SEVERITY_OPTIONS = [
   { value: "", label: "Any severity" },
-  { value: "5", label: "Critical" },
-  { value: "4", label: "High" },
-  { value: "3", label: "Moderate" },
-  { value: "2", label: "Low" },
-  { value: "1", label: "Minimal" },
+  { value: "5", label: "Critical (5)" },
+  { value: "4", label: "High (4)" },
+  { value: "3", label: "Moderate (3)" },
+  { value: "2", label: "Low (2)" },
+  { value: "1", label: "Minimal (1)" },
 ];
 
 /**
@@ -61,43 +63,94 @@ export function useFilterParam(key: string): [string, (next: string) => void] {
   return [current, setParam];
 }
 
-export function FilterRail({ children, className, statusOptions }: FilterRailProps) {
+export function FilterRail({
+  children,
+  className,
+  statusOptions,
+  showMine = true,
+}: FilterRailProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [status, setStatus] = useFilterParam("status");
   const [severity, setSeverity] = useFilterParam("severity");
   const [mine, setMine] = useFilterParam("mine");
   const statusOpts = statusOptions ?? DEFAULT_STATUS_OPTIONS;
+  const hasActiveFilters = Boolean(status || severity || mine);
 
   return (
-    <aside className={cn("filter-rail panel", className)} aria-label="Filters">
-      <div className="panel__head">
-        <h2 className="t-label" style={{ fontSize: "var(--step-0)" }}>Filters</h2>
+    <aside
+      className={cn("filter-rail panel", className)}
+      aria-label="Filters"
+      data-testid="filter-rail"
+    >
+      <div
+        className="panel__head"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <h2 className="t-label" style={{ fontSize: "var(--step-0)", margin: 0 }}>
+          Filters
+        </h2>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            className="btn btn--sm"
+            onClick={() => router.replace(pathname)}
+            style={{ minHeight: 26, paddingInline: 8, fontSize: "0.72rem" }}
+          >
+            Reset
+          </button>
+        )}
       </div>
-      <Field label="Status" htmlFor="filter-status">
-        <Select id="filter-status" value={status} onChange={(e) => setStatus(e.target.value)}>
-          {statusOpts.map((o) => (
-            <option key={o.value || "any"} value={o.value}>{o.label}</option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Severity" htmlFor="filter-severity">
-        <Select id="filter-severity" value={severity} onChange={(e) => setSeverity(e.target.value)}>
-          {DEFAULT_SEVERITY_OPTIONS.map((o) => (
-            <option key={o.value || "any"} value={o.value}>{o.label}</option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Only mine to review" htmlFor="filter-mine">
-        <Segmented<string>
-          aria-label="Only mine to review"
-          block
-          options={[
-            { value: "", label: "Anyone's" },
-            { value: "1", label: "Mine only" },
-          ]}
-          value={mine}
-          onChange={setMine}
-        />
-      </Field>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "var(--s-3)",
+          alignItems: "end",
+        }}
+      >
+        <Field label="Status" htmlFor="filter-status">
+          <Select id="filter-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+            {statusOpts.map((o) => (
+              <option key={o.value || "any"} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Severity" htmlFor="filter-severity">
+          <Select
+            id="filter-severity"
+            value={severity}
+            onChange={(e) => setSeverity(e.target.value)}
+          >
+            {DEFAULT_SEVERITY_OPTIONS.map((o) => (
+              <option key={o.value || "any"} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        {showMine && (
+          <Field label="Ownership scope" htmlFor="filter-mine">
+            <Segmented<string>
+              aria-label="Only mine to review"
+              block
+              options={[
+                { value: "", label: "Anyone's" },
+                { value: "1", label: "Mine only" },
+              ]}
+              value={mine}
+              onChange={setMine}
+            />
+          </Field>
+        )}
+      </div>
       {children}
     </aside>
   );

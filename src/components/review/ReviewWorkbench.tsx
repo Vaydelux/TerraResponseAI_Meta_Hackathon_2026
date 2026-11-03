@@ -29,6 +29,7 @@ import { ReviewActionBar } from "./ReviewActionBar";
 import { WeatherContext } from "./WeatherContext";
 import { ContextualIntelligenceCard } from "./ContextualIntelligenceCard";
 import type { ContextualIntelligenceData } from "@/lib/ai/contextual-intelligence";
+import { PriorityOverride } from "@/components/admin/PriorityOverride";
 import { SealBadge } from "@/components/seal/SealBadge";
 import { StatusTimeline } from "@/components/report/StatusTimeline";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -150,8 +151,15 @@ export function ReviewWorkbench({
   const [reviewedAt, setReviewedAt] = useState<string | null>(null);
   const [reviewWasCorrected, setReviewWasCorrected] = useState(false);
   const [resolving, setResolving] = useState(false);
-  const [priority, setPriority] = useState<{ score: number; factors: PriorityResponse["factors"] }>({
+  const [priority, setPriority] = useState<{
+    score: number;
+    computedScore: number;
+    override: { new_score: number; reason: string } | null;
+    factors: PriorityResponse["factors"];
+  }>({
     score: 0,
+    computedScore: 0,
+    override: null,
     factors: [],
   });
   const [overlay, setOverlay] = useState<SamOverlay | null>(null);
@@ -189,8 +197,11 @@ export function ReviewWorkbench({
           return;
         }
         if (priorityBody?.ok) {
+          const comp = priorityBody.computedScore ?? priorityBody.displayedScore ?? 0;
           setPriority({
-            score: priorityBody.displayedScore ?? priorityBody.computedScore ?? 0,
+            score: priorityBody.displayedScore ?? comp,
+            computedScore: comp,
+            override: priorityBody.override ?? null,
             factors: priorityBody.factors ?? [],
           });
         }
@@ -328,6 +339,20 @@ export function ReviewWorkbench({
               )
             }
           />
+          {!readOnly && (currentUserRole === "reviewer" || currentUserRole === "admin") && (
+            <PriorityOverride
+              reportId={reportId}
+              computedScore={priority.computedScore}
+              currentOverride={priority.override}
+              onOverridden={(newScore, reason) =>
+                setPriority((prev) => ({
+                  ...prev,
+                  score: newScore,
+                  override: { new_score: newScore, reason },
+                }))
+              }
+            />
+          )}
           {(currentUserRole === "reviewer" || currentUserRole === "admin") && (
             <ContextualIntelligenceCard
               reportId={reportId}
