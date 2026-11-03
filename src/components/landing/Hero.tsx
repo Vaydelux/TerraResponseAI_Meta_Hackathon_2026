@@ -57,8 +57,8 @@ export function Hero({ signedIn = false, className }: HeroProps) {
     setConfirmedAt(null);
   }
 
-  const ctaHref = signedIn ? "/review" : "#how-it-works";
-  const uploadHref = signedIn ? "/reports/new" : "/login";
+  const ctaHref = signedIn ? "/reports/new" : "#how-it-works";
+  const uploadHref = signedIn ? "/reports" : "/login";
 
   return (
     <section
@@ -159,7 +159,7 @@ export function Hero({ signedIn = false, className }: HeroProps) {
             style={{ marginTop: "var(--s-5)", gap: "var(--s-3)" }}
           >
             <Button variant="primary" size="lg" href={ctaHref}>
-              {signedIn ? "Open review queue" : "Explore how it works"}
+              {signedIn ? "Upload a photo" : "Explore how it works"}
             </Button>
             <a
               href={uploadHref}
@@ -180,7 +180,7 @@ export function Hero({ signedIn = false, className }: HeroProps) {
                 transition: "background 120ms",
               }}
             >
-              Upload a photo
+              {signedIn ? "View your reports" : "Sign in to report"}
             </a>
           </div>
 
