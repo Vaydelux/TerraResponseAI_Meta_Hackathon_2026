@@ -64,6 +64,7 @@ export function Dialog({
     <dialog
       ref={ref}
       className={cn("dialog", className)}
+      aria-modal="true"
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
     >

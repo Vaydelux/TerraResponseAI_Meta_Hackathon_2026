@@ -22,7 +22,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogActions, Field, Input, Textarea, Select, Segmented } from "@/components/ui-tr";
 import { Button } from "@/components/ui-tr";
 import { toast } from "@/components/ui-tr/Toast";
@@ -63,18 +63,6 @@ export function CorrectionForm({
   const abortRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const inFlightRef = useRef(false);
-
-  // Reset when the drawer reopens with a new observation.
-  useEffect(() => {
-    if (!open) return;
-    setIncidentType(observation.incidentType ?? "unclear");
-    setSeverity(observation.severity ?? 3);
-    setSummary(observation.summary ?? "");
-    setEvidence(observation.visibleEvidence);
-    setUncertainties(observation.uncertainties);
-    setReason("");
-    requestIdRef.current = null;
-  }, [open, observation]);
 
   async function handleSubmit() {
     if (submitting || inFlightRef.current) return;

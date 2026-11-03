@@ -115,23 +115,25 @@
  * .dark class, or prefers-color-scheme (when [data-theme] is not "day"). */
 :root[data-theme="night"],
 :root.dark:not([data-theme="day"]) {
-  --paper: #0B1217;
-  --sheet: #111C24;
-  --sheet-sunk: #172530;
-  --rule: #223442;
-  --rule-strong: #324C5E;
-  --ink: #ECF2F5;
-  --ink-2: #B5C4CE;
-  --ink-3: #8799A6;
-  --ink-inverse: #0B1217;
-  --tide: #48B5C6;
-  --tide-hover: #6DC7D6;
-  --tide-press: #9AD8E2;
-  --tide-wash: #133540;
-  --on-tide: #061D27;
-  --on-green: #061D27;
-  --brand-signal: #FF8552;
-  --brand-tile: #0B2432;
+  --paper: #07070A;
+  --sheet: #0E141C;
+  --sheet-sunk: #131C27;
+  --rule: #243241;
+  --rule-strong: #3A5062;
+  --ink: #F4F4F7;
+  --ink-2: #C4C7D0;
+  --ink-3: #9298A5;
+  --ink-inverse: #07070A;
+  --tide: #49C5D6;
+  --tide-hover: #75D8E5;
+  --tide-press: #A1E8F0;
+  --tide-wash: #102F39;
+  --on-tide: #061319;
+  --on-green: #061319;
+  --brand-signal: #FF416C;
+  --brand-tile: #0A202C;
+  --accent-violet: #7B2CBF;
+  --accent-crimson: #FF416C;
   --amber: #F0B23A;
   --amber-ink: #F6CE7A;
   --amber-wash: #35280D;
@@ -150,20 +152,20 @@
   --sev-5: #7CE0F5;
 
   /* Clean Surface & Action Tokens (Minimalist Precision — Night Ops) */
-  --grad-primary:       #48B5C6;
-  --grad-primary-hover: #6DC7D6;
+  --grad-primary:       linear-gradient(135deg, #36AEBF 0%, #49C5D6 100%);
+  --grad-primary-hover: linear-gradient(135deg, #49C5D6 0%, #75D8E5 100%);
   --grad-amber:         #DF9826;
   --grad-critical:      #C84638;
   --grad-moderate:      #297B8C;
   --grad-surface-sheen: #111C24;
-  --grad-banner-wash:   linear-gradient(180deg, rgba(72, 181, 198, 0.06) 0%, rgba(72, 181, 198, 0) 100%);
-  --grad-aside-wash:    #0E1820;
+  --grad-banner-wash:   linear-gradient(135deg, rgba(73, 197, 214, 0.12), rgba(123, 44, 191, 0.06) 52%, transparent 100%);
+  --grad-aside-wash:    #0A1119;
 
-  --glass-bg:        rgba(17, 28, 36, 0.94);
-  --glass-bg-strong: rgba(17, 28, 36, 0.97);
-  --glass-border:    #223442;
+  --glass-bg:        rgba(14, 20, 28, 0.84);
+  --glass-bg-strong: rgba(14, 20, 28, 0.96);
+  --glass-border:    rgba(73, 197, 214, 0.24);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  --lift:            0 6px 18px -4px rgba(0, 0, 0, 0.45), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
+  --lift:            0 18px 45px -18px rgba(0, 0, 0, 0.78), 0 4px 14px -4px rgba(0, 0, 0, 0.36);
   --lift-primary:    0 1px 3px rgba(0, 0, 0, 0.35);
   --focus: 0 0 0 2px var(--paper), 0 0 0 4px var(--tide);
 }

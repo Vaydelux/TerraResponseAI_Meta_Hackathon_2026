@@ -805,6 +805,35 @@
   }
 }
 
+@layer components {
+  .map {
+    background:
+      radial-gradient(circle at 18% 14%, color-mix(in srgb, var(--tide) 18%, transparent), transparent 28rem),
+      linear-gradient(135deg, var(--paper), var(--sheet-sunk));
+    border-top: 1px solid color-mix(in srgb, var(--tide) 24%, var(--rule));
+  }
+
+  .map-panel {
+    background: color-mix(in srgb, var(--sheet) 88%, transparent);
+    border-color: color-mix(in srgb, var(--tide) 28%, var(--rule));
+    backdrop-filter: blur(20px) saturate(135%);
+    -webkit-backdrop-filter: blur(20px) saturate(135%);
+  }
+
+  .map-filter-bar,
+  .tactical-layer-bar,
+  .tactical-scrubber,
+  .legend {
+    border-color: color-mix(in srgb, var(--tide) 25%, var(--rule));
+    background: color-mix(in srgb, var(--sheet) 88%, transparent);
+    box-shadow: var(--lift);
+    backdrop-filter: blur(16px) saturate(130%);
+    -webkit-backdrop-filter: blur(16px) saturate(130%);
+  }
+
+  .tactical-map-stage { border-radius: clamp(14px, 1.4vw, 20px); overflow: hidden; box-shadow: 0 26px 70px -32px rgba(0, 0, 0, .78); }
+}
+
 /*
  * MapLibre style tokens (applied in the style JSON, not as CSS):
  *   land       #E9EDE8

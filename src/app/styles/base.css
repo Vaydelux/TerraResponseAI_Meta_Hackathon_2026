@@ -24,6 +24,10 @@
     font-feature-settings: "tnum" 1, "kern" 1;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(circle at 92% -10%, color-mix(in srgb, var(--accent-violet, transparent) 12%, transparent), transparent 34rem),
+      radial-gradient(circle at -8% 28%, color-mix(in srgb, var(--tide) 7%, transparent), transparent 30rem);
+    background-attachment: fixed;
   }
   h1, h2, h3, .t-display {
     font-family: var(--font-display); color: var(--ink);

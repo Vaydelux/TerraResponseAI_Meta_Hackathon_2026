@@ -25,7 +25,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <div className="tr-shell" style={{ gridTemplateRows: "var(--nav-h) auto 1fr auto" }}>
+    <div className="tr-shell command-shell" style={{ gridTemplateRows: "var(--nav-h) auto 1fr auto" }}>
       <TopBar
         ctx={ctx}
         pendingReviewCount={pendingReviewCount}

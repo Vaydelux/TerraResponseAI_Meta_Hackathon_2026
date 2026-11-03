@@ -6,7 +6,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, LogOut, User as UserIcon } from "lucide-react";
 import { signOutAction } from "@/lib/auth/actions";
 import type { UserProfile } from "@/lib/auth/profile";
@@ -23,10 +23,32 @@ export interface UserMenuProps {
 
 export function UserMenu({ user }: UserMenuProps) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    function closeOnOutside(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+    window.addEventListener("pointerdown", closeOnOutside);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutside);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
   const initials = (user.name || user.email).slice(0, 1).toUpperCase();
   return (
-    <div className="ui-tr-popover">
+    <div className="ui-tr-popover" ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         className="ui-tr-popover__trigger"
         aria-haspopup="dialog"
@@ -56,7 +78,12 @@ export function UserMenu({ user }: UserMenuProps) {
         <ChevronDown size={14} aria-hidden="true" />
       </button>
       {open && (
-        <div className="ui-tr-popover__body ui-tr-popover__body--bottom-right" role="dialog">
+        <div
+          className="ui-tr-popover__body ui-tr-popover__body--bottom-right"
+          role="dialog"
+          aria-modal="false"
+          aria-label="Account menu"
+        >
           <div style={{ padding: "8px 10px 6px", display: "grid", gap: 2 }}>
             <span style={{ fontWeight: 700 }}>{user.name || "User"}</span>
             <span className="t-meta" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>

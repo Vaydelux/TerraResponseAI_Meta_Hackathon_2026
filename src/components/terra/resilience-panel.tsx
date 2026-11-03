@@ -82,26 +82,34 @@ export function ResiliencePanel({
 
   // Fetch the retention state when the panel mounts + when the user
   // opens the delete affordance.
-  async function refreshRetention() {
+  async function getRetention(signal?: AbortSignal) {
     try {
-      const res = await fetch(`/api/reports/${reportId}/retention`);
-      if (!res.ok) return;
+      const res = await fetch(`/api/reports/${reportId}/retention`, { signal });
+      if (!res.ok) return null;
       const body = await res.json();
-      if (body?.ok && body.retention) {
-        setRetentionState(body.retention.retention_state ?? "active");
-        setRetentionWindowEndsAt(body.retention.retention_window_ends_at ?? null);
-      }
+      return body?.ok && body.retention ? body.retention : null;
     } catch {
-      // Silent — the retention state is best-effort.
+      return null;
     }
   }
 
-  // Refresh retention state on mount. useEffect is the React-idiomatic
-  // way to fire a side-effect once; the previous useState(() => {...})
-  // pattern was an abuse (and double-invoked in StrictMode dev).
+  async function refreshRetention() {
+    const retention = await getRetention();
+    if (retention) {
+      setRetentionState(retention.retention_state ?? "active");
+      setRetentionWindowEndsAt(retention.retention_window_ends_at ?? null);
+    }
+  }
+
   useEffect(() => {
-    refreshRetention();
-  }, []);
+    const controller = new AbortController();
+    void getRetention(controller.signal).then((retention) => {
+      if (controller.signal.aborted || !retention) return;
+      setRetentionState(retention.retention_state ?? "active");
+      setRetentionWindowEndsAt(retention.retention_window_ends_at ?? null);
+    });
+    return () => controller.abort();
+  }, [reportId]);
 
   async function handleReanalyze() {
     setBusy("reanalyze");

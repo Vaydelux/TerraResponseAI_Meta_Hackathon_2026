@@ -21,7 +21,7 @@ export interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, actions, className }: PageHeaderProps) {
   return (
-    <header className={cn("page-header", className)}>
+    <header className={cn("page-header command-page-header", className)}>
       <div>
         <h1>{title}</h1>
         {subtitle && <p className="page-header__sub">{subtitle}</p>}

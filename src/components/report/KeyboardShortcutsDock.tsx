@@ -14,7 +14,7 @@
 //   - ? : Toggle the full Keyboard Shortcuts dialog
 //   - Escape: Close the dialog when open
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Keyboard, X, ChevronUp, ChevronDown, ShieldCheck } from "lucide-react";
@@ -39,12 +39,13 @@ export function KeyboardShortcutsDock({
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeKeyFlash, setActiveKeyFlash] = useState<string | null>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   const normalizedRole = role.toLowerCase();
   const canReview = normalizedRole === "reviewer" || normalizedRole === "admin";
   const isAdmin = normalizedRole === "admin";
 
-  const primaryShortcuts: ShortcutItem[] = [
+  const primaryShortcuts = useMemo<ShortcutItem[]>(() => [
     {
       key: "F1",
       label: "Upload Photo",
@@ -91,7 +92,7 @@ export function KeyboardShortcutsDock({
           href: "/profile",
           roles: ["reporter"],
         },
-  ];
+  ], [canReview, isAdmin, pendingReviewCount]);
 
   const workbenchShortcuts: Array<{ key: string; label: string; detail: string }> = canReview
     ? [
@@ -123,6 +124,7 @@ export function KeyboardShortcutsDock({
       if (e.key === "Escape" && dialogOpen) {
         e.preventDefault();
         setDialogOpen(false);
+        toggleRef.current?.focus();
         return;
       }
 
@@ -142,7 +144,7 @@ export function KeyboardShortcutsDock({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  });
+  }, [dialogOpen, primaryShortcuts, router]);
 
   const roleBadgeLabel =
     normalizedRole === "admin"
@@ -159,9 +161,11 @@ export function KeyboardShortcutsDock({
       {/* Expanded Floating Dialog */}
       {dialogOpen && (
         <div
+          id="shortcuts-dialog"
           role="dialog"
           aria-modal="false"
           aria-labelledby="shortcuts-dialog-title"
+          aria-describedby="shortcuts-dialog-description"
           className="shortcuts-dialog"
         >
           <div className="shortcuts-dialog__head">
@@ -196,6 +200,9 @@ export function KeyboardShortcutsDock({
           </div>
 
           <div className="shortcuts-dialog__body">
+            <p id="shortcuts-dialog-description" className="sr-only">
+              Keyboard commands available in this workspace.
+            </p>
             <div>
               <div className="t-label" style={{ fontSize: "0.75rem", color: "var(--ink-3)", marginBottom: 8 }}>
                 Dashboard &amp; Workspace Navigation
@@ -287,9 +294,11 @@ export function KeyboardShortcutsDock({
         </div>
 
         <button
+          ref={toggleRef}
           type="button"
           className="shortcuts-bar__toggle"
           aria-expanded={dialogOpen}
+          aria-controls="shortcuts-dialog"
           onClick={() => setDialogOpen((v) => !v)}
         >
           <span>{dialogOpen ? "Hide" : "All shortcuts"}</span>

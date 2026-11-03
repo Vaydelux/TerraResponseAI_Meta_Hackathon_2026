@@ -47,3 +47,35 @@
     .tr-page { padding-bottom: 112px; } /* clearance for fixed action bar */
   }
 }
+
+@layer layout {
+  .command-shell {
+    position: relative;
+    isolation: isolate;
+    background: var(--paper);
+  }
+
+  .command-shell > main {
+    min-width: 0;
+    position: relative;
+    z-index: 0;
+  }
+
+  .tr-page {
+    container-type: inline-size;
+    container-name: workspace;
+    padding-block: clamp(24px, 4vw, 48px);
+  }
+
+  .tr-page > * {
+    min-width: 0;
+  }
+
+  @container workspace (min-width: 1100px) {
+    .tr-page { padding-inline: clamp(32px, 4vw, 64px); }
+  }
+
+  @media (max-width: 767px) {
+    .tr-page { padding-block: 20px 88px; }
+  }
+}

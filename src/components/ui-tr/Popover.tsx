@@ -41,10 +41,14 @@ export function Popover({
   const [internalOpen, setInternalOpen] = useState(false);
   const open = openProp ?? internalOpen;
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   function setOpen(next: boolean) {
     setInternalOpen(next);
     onOpenChange?.(next);
+    if (!next) {
+      triggerRef.current?.focus();
+    }
   }
 
   useEffect(() => {
@@ -56,7 +60,10 @@ export function Popover({
       }
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setOpen(false);
+      }
     }
     window.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("keydown", onKey);
@@ -69,6 +76,7 @@ export function Popover({
   return (
     <div className={cn("ui-tr-popover", className)} ref={ref}>
       <button
+        ref={triggerRef}
         type="button"
         className="ui-tr-popover__trigger"
         aria-haspopup="dialog"
@@ -79,7 +87,12 @@ export function Popover({
         {trigger}
       </button>
       {open && (
-        <div className={`ui-tr-popover__body ui-tr-popover__body--${side}`} role="dialog">
+        <div
+          className={`ui-tr-popover__body ui-tr-popover__body--${side}`}
+          role="dialog"
+          aria-modal="false"
+          aria-label={ariaLabel}
+        >
           {children}
         </div>
       )}

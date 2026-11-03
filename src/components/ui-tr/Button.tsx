@@ -98,12 +98,14 @@ export function Button(props: ButtonProps) {
 
   const {
     type = "button",
+    disabled,
     ...buttonRest
   } = rest as ButtonHTMLAttributes<HTMLButtonElement>;
   return (
     <button
       className={cls}
       type={type}
+      disabled={busy || disabled}
       aria-busy={busy || undefined}
       aria-disabled={busy || undefined}
       {...buttonRest}

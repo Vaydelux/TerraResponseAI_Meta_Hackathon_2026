@@ -15,7 +15,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type ToastKind = "default" | "confirmed" | "error";
@@ -74,19 +74,30 @@ const KIND_ICON: Record<ToastKind, ReactNode> = {
 
 export function ToastRegion() {
   const [items, setItems] = useState<ToastItem[]>([]);
+  const timersRef = useRef(new Map<string, number>());
+
+  function dismiss(id: string) {
+    const timer = timersRef.current.get(id);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      timersRef.current.delete(id);
+    }
+    setItems((prev) => prev.filter((item) => item.id !== id));
+  }
 
   useEffect(() => {
     function onItem(item: ToastItem) {
       setItems((prev) => [...prev, item]);
       if (item.ttl && item.ttl > 0) {
-        window.setTimeout(() => {
-          setItems((prev) => prev.filter((i) => i.id !== item.id));
-        }, item.ttl);
+        const timer = window.setTimeout(() => dismiss(item.id), item.ttl);
+        timersRef.current.set(item.id, timer);
       }
     }
     listeners.add(onItem);
     return () => {
       listeners.delete(onItem);
+      for (const timer of timersRef.current.values()) window.clearTimeout(timer);
+      timersRef.current.clear();
     };
   }, []);
 
@@ -111,7 +122,7 @@ export function ToastRegion() {
                 try {
                   item.action?.onClick();
                 } finally {
-                  setItems((prev) => prev.filter((i) => i.id !== item.id));
+                  dismiss(item.id);
                 }
               }}
             >
@@ -122,7 +133,7 @@ export function ToastRegion() {
             type="button"
             className="icon-btn icon-btn--sm"
             aria-label="Dismiss"
-            onClick={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
+            onClick={() => dismiss(item.id)}
           >
             <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
               <path d="M3 3 11 11M11 3 3 11" strokeLinecap="round" />

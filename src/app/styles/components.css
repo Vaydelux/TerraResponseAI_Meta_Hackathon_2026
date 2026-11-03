@@ -1855,3 +1855,146 @@
     }
   }
 }
+
+/* Premium command-center presentation layer. These overrides intentionally
+ * operate on existing semantic classes so data flow and interaction handlers
+ * remain unchanged. */
+@layer components {
+  .topbar {
+    position: relative;
+    overflow: hidden;
+    min-height: var(--nav-h);
+    background: color-mix(in srgb, var(--sheet) 88%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--tide) 24%, var(--rule));
+    box-shadow: 0 12px 35px -24px rgba(0, 0, 0, .7);
+    backdrop-filter: blur(18px) saturate(135%);
+    -webkit-backdrop-filter: blur(18px) saturate(135%);
+  }
+
+  .topbar__depth {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 2px;
+    transform-origin: left center;
+    transform: scaleX(calc(var(--reading-depth, 0%) / 100));
+    background: linear-gradient(90deg, var(--tide), var(--accent-violet, #7B2CBF));
+    box-shadow: 0 0 16px color-mix(in srgb, var(--tide) 70%, transparent);
+    pointer-events: none;
+  }
+
+  .wordmark { letter-spacing: -0.035em; }
+  .wordmark__mark { box-shadow: 0 0 0 1px color-mix(in srgb, var(--tide) 30%, transparent), 0 8px 24px -12px var(--tide); }
+
+  .nav { gap: 2px; }
+  .nav__link {
+    padding: 8px 11px;
+    border: 1px solid transparent;
+    transition: transform var(--t-base) var(--ease-out), background-color var(--t-base), border-color var(--t-base), color var(--t-base);
+  }
+  .nav__link:hover { transform: translateY(-1px); border-color: var(--rule); }
+  .nav__link[aria-current="page"] {
+    border-color: color-mix(in srgb, var(--tide) 30%, var(--rule));
+    background: color-mix(in srgb, var(--tide-wash) 74%, var(--sheet));
+    color: var(--ink);
+  }
+  .nav__link[aria-current="page"]::after { bottom: -1px; left: 12px; right: 12px; border-radius: 999px; box-shadow: 0 0 12px var(--tide); }
+
+  .page-header {
+    align-items: end;
+    gap: var(--s-5);
+    margin-bottom: var(--s-2);
+  }
+  .command-page-header h1 { font-size: clamp(2rem, 1.4rem + 2.4vw, 3.8rem); letter-spacing: -0.055em; }
+  .page-header__sub { max-width: 64ch; color: var(--ink-2); }
+  .page-header__actions { flex-shrink: 0; }
+
+  .panel {
+    position: relative;
+    border-color: color-mix(in srgb, var(--tide) 13%, var(--rule));
+    border-radius: clamp(12px, 1.2vw, 18px);
+    box-shadow: var(--lift);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--sheet) 96%, transparent), color-mix(in srgb, var(--sheet-sunk) 28%, var(--sheet)));
+  }
+  .panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(120deg, rgba(255,255,255,.08), transparent 25%, transparent 75%, rgba(73,197,214,.04));
+    opacity: .6;
+  }
+  .panel--flush::before { display: none; }
+
+  .kpi-card, .report-card, .triage-card, .filter-rail, .obs, .context-card, .mask-control {
+    container-type: inline-size;
+    container-name: telemetry;
+  }
+  .kpi-card, .report-card, .triage-card { transition: transform var(--t-base) var(--ease-out), border-color var(--t-base), box-shadow var(--t-base); }
+  .kpi-card:hover, .report-card:hover, .triage-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--tide) 45%, var(--rule)); box-shadow: 0 22px 42px -26px color-mix(in srgb, var(--tide) 42%, transparent), var(--lift); }
+  .kpi-card__value { letter-spacing: -0.06em; }
+
+  .btn { border-radius: 10px; font-weight: 650; transition: transform var(--t-base) var(--ease-out), background-color var(--t-base), border-color var(--t-base), box-shadow var(--t-base); }
+  .btn:hover { transform: translateY(-1px); }
+  .btn--primary { box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--tide) 90%, transparent); }
+  .btn--primary:hover { box-shadow: 0 14px 30px -14px color-mix(in srgb, var(--tide) 95%, transparent); }
+
+  .input, .select, .textarea { border-radius: 10px; background: color-mix(in srgb, var(--sheet) 78%, var(--paper)); }
+  .input:focus-visible, .select:focus-visible, .textarea:focus-visible { transform: translateY(-1px); }
+
+  .tr-status-footer {
+    border-top-color: color-mix(in srgb, var(--tide) 18%, var(--rule));
+    background: color-mix(in srgb, var(--sheet) 80%, transparent);
+    backdrop-filter: blur(14px);
+  }
+
+  .dashboard-ops-grid { container-type: inline-size; container-name: dashboard; }
+  @container dashboard (max-width: 760px) {
+    .dashboard-ops-grid { grid-template-columns: 1fr !important; }
+  }
+
+  .toast-region { bottom: max(16px, env(safe-area-inset-bottom)); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .topbar, .nav__link, .btn, .input, .select, .textarea, .kpi-card, .report-card, .triage-card { transition: none !important; }
+    .topbar__depth { box-shadow: none; }
+  }
+
+  .welcome-hero-banner {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--tide) 28%, var(--rule));
+    border-radius: clamp(16px, 2vw, 24px);
+    background: var(--grad-banner-wash), linear-gradient(135deg, var(--sheet), var(--sheet-sunk));
+    box-shadow: var(--lift);
+  }
+  .welcome-hero-banner::after {
+    content: "";
+    position: absolute;
+    width: 22rem;
+    height: 22rem;
+    right: -8rem;
+    top: -12rem;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--accent-violet, var(--tide)) 16%, transparent);
+    filter: blur(24px);
+    pointer-events: none;
+  }
+
+  .filter-rail { background: color-mix(in srgb, var(--sheet) 92%, transparent); }
+  .table { border-radius: 14px; overflow: hidden; border-color: color-mix(in srgb, var(--tide) 18%, var(--rule)); }
+  .table th { background: color-mix(in srgb, var(--sheet-sunk) 72%, var(--sheet)); color: var(--ink-2); }
+  .table tbody tr { transition: background-color var(--t-fast), transform var(--t-fast); }
+  .table tbody tr:hover { background: color-mix(in srgb, var(--tide-wash) 45%, transparent); }
+
+  .report-row { border-color: color-mix(in srgb, var(--tide) 15%, var(--rule)); border-radius: 14px; background: color-mix(in srgb, var(--sheet) 92%, transparent); transition: transform var(--t-base) var(--ease-out), border-color var(--t-base), box-shadow var(--t-base); }
+  .report-row:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--tide) 42%, var(--rule)); box-shadow: var(--lift); }
+  .obs { background: linear-gradient(145deg, color-mix(in srgb, var(--sheet) 94%, transparent), var(--sheet-sunk)); }
+  .obs__type { color: var(--tide); letter-spacing: .02em; }
+  .mask-control { background: color-mix(in srgb, var(--sheet) 90%, transparent); border-color: color-mix(in srgb, var(--tide) 23%, var(--rule)); }
+
+  @container telemetry (max-width: 420px) {
+    .kpi-card__top { align-items: flex-start; }
+    .triage-card__body { padding-inline: var(--s-4); }
+  }
+}

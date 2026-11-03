@@ -21,7 +21,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Segmented } from "@/components/ui-tr/Segmented";
 import { toast } from "@/components/ui-tr/Toast";
 import { cn } from "@/lib/utils";
@@ -69,15 +69,6 @@ export function MaskControl({
   const [visible, setVisible] = useState(true);
   const [opacity, setOpacity] = useState(45);
   const abortRef = useRef<AbortController | null>(null);
-
-  // When the parent passes a new initial overlay (e.g. the page
-  // re-fetches after a navigation), sync it.
-  useEffect(() => {
-    setOverlay(initialOverlay);
-    if (initialOverlay) {
-      setVisible(true);
-    }
-  }, [initialOverlay]);
 
   async function handleRequest() {
     if (!samAvailable || streaming) return;

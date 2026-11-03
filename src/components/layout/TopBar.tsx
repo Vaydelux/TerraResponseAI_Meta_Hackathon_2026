@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, PlusCircle } from "lucide-react";
@@ -55,6 +55,35 @@ export function TopBar({
 }: TopBarProps) {
   const pathname = usePathname() ?? "";
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setMobileOpen(false);
+      mobileToggleRef.current?.focus();
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const updateReadingDepth = () => {
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = scrollable > 0 ? Math.min(1, Math.max(0, window.scrollY / scrollable)) : 0;
+      root.style.setProperty("--reading-depth", `${progress * 100}%`);
+    };
+    updateReadingDepth();
+    window.addEventListener("scroll", updateReadingDepth, { passive: true });
+    window.addEventListener("resize", updateReadingDepth);
+    return () => {
+      window.removeEventListener("scroll", updateReadingDepth);
+      window.removeEventListener("resize", updateReadingDepth);
+    };
+  }, []);
 
   const links = NAV_LINKS.filter(
     (l) =>
@@ -71,6 +100,7 @@ export function TopBar({
   return (
     <div style={{ position: "sticky", top: 0, zIndex: 40 }}>
       <header className={`topbar${className ? ` ${className}` : ""}`}>
+        <span className="topbar__depth" aria-hidden="true" />
         <Wordmark href="/dashboard" />
         <nav className="nav" aria-label="Primary">
           {links.map((l) => {
@@ -127,9 +157,11 @@ export function TopBar({
         <UserMenu user={ctx.user} />
 
         <button
+          ref={mobileToggleRef}
           type="button"
           className="topbar__mobile-toggle"
           aria-expanded={mobileOpen}
+          aria-controls="mobile-navigation"
           aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
           onClick={() => setMobileOpen((v) => !v)}
         >
@@ -138,7 +170,12 @@ export function TopBar({
       </header>
 
       {mobileOpen && (
-        <div className="mobile-nav-drawer" role="region" aria-label="Mobile navigation">
+        <div
+          id="mobile-navigation"
+          className="mobile-nav-drawer"
+          role="region"
+          aria-label="Mobile navigation"
+        >
           <nav className="mobile-nav-drawer__links" aria-label="Mobile primary">
             {[...links, ...utilityLinks].map((l) => {
               const active = isNavHrefActive(pathname, l.href);

@@ -72,6 +72,7 @@ export function EvidenceViewer({
   const [maskVisible, setMaskVisible] = useState(true);
   const viewerRef = useRef<HTMLDivElement>(null);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestAbortRef = useRef<AbortController | null>(null);
 
   // The seal state for the "Unverified" chip + the chip text.
   const state = stateFromReport({ status, reviewOutcome: reviewOutcome });
@@ -80,14 +81,16 @@ export function EvidenceViewer({
   // Fetch the signed URL on mount + on visibilitychange + on error.
   useEffect(() => {
     if (retentionState !== "active") return;
-    let aborted = false;
+    const controller = new AbortController();
+    requestAbortRef.current?.abort();
+    requestAbortRef.current = controller;
 
     function refresh() {
-      if (aborted) return;
+      if (controller.signal.aborted) return;
       fetch(`/api/reports/${reportId}/evidence?kind=derivative`)
         .then((r) => r.json())
         .then((body) => {
-          if (aborted) return;
+          if (controller.signal.aborted) return;
           if (body?.ok && body.signedUrl) {
             setSignedUrl(body.signedUrl);
             setUrlError(null);
@@ -97,7 +100,11 @@ export function EvidenceViewer({
             setUrlError(body.error.message ?? "Could not load photo.");
           }
         })
-        .catch(() => !aborted && setUrlError("Network error while loading the photo."));
+        .catch((error: unknown) => {
+          if (!(error instanceof DOMException && error.name === "AbortError") && !controller.signal.aborted) {
+            setUrlError("Network error while loading the photo.");
+          }
+        });
     }
 
     refresh();
@@ -108,7 +115,8 @@ export function EvidenceViewer({
     }
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      aborted = true;
+      controller.abort();
+      if (requestAbortRef.current === controller) requestAbortRef.current = null;
       document.removeEventListener("visibilitychange", onVisible);
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
     };
@@ -118,15 +126,21 @@ export function EvidenceViewer({
     // The signed URL likely expired — refresh after a 1s debounce.
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
     refreshTimer.current = setTimeout(() => {
-      fetch(`/api/reports/${reportId}/evidence?kind=derivative`)
+      requestAbortRef.current?.abort();
+      const controller = new AbortController();
+      requestAbortRef.current = controller;
+      fetch(`/api/reports/${reportId}/evidence?kind=derivative`, { signal: controller.signal })
         .then((r) => r.json())
         .then((body) => {
-          if (body?.ok && body.signedUrl) {
+          if (!controller.signal.aborted && body?.ok && body.signedUrl) {
             setSignedUrl(body.signedUrl);
             toast(COPY.signedUrlExpired);
           }
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          if (requestAbortRef.current === controller) requestAbortRef.current = null;
+        });
     }, 1000);
   }
 
@@ -297,8 +311,9 @@ export function EvidenceViewer({
           </div>
         </div>
       </div>
-      <MaskControl
-        reportId={reportId}
+          <MaskControl
+            key={reportId}
+            reportId={reportId}
         analysisTarget={analysisTarget}
         samAvailable={samAvailable}
         initialOverlay={initialOverlay}

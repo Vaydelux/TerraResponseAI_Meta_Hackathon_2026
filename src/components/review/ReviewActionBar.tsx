@@ -206,6 +206,7 @@ export function ReviewActionBar({
       </div>
 
       <CorrectionForm
+        key={`${reportId}-${drawerOpen ? "open" : "closed"}`}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         reportId={reportId}
