@@ -145,7 +145,9 @@
     padding: 3px;
     gap: 2px;
     background: var(--sheet-sunk);
+    border: 1px solid var(--rule);
     border-radius: var(--r-ctl);
+    max-width: 100%;
   }
   .segmented__btn {
     min-height: 34px;
@@ -156,12 +158,30 @@
     font: 600 var(--step--1)/1 var(--font-ui);
     color: var(--ink-2);
     cursor: pointer;
+    white-space: nowrap;
+    transition: background-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
   }
   .segmented__btn[aria-pressed="true"] {
     background: var(--sheet);
     color: var(--ink);
     box-shadow: 0 0 0 1px var(--rule);
   }
+  .segmented__btn:hover { color: var(--ink); background: color-mix(in srgb, var(--sheet) 65%, transparent); }
+  .segmented--block { width: 100%; grid-auto-columns: 1fr; }
+  .segmented__btn--block { width: 100%; }
+
+  .location-map-preview { isolation: isolate; }
+  .location-map-preview__water,
+  .location-map-preview__road,
+  .location-map-preview__district { position: absolute; pointer-events: none; }
+  .location-map-preview__water { inset: -20% 47% -20% 30%; background: color-mix(in srgb, var(--tide) 12%, transparent); transform: rotate(18deg); border-inline: 1px solid color-mix(in srgb, var(--tide) 25%, transparent); }
+  .location-map-preview__road { height: 9px; background: color-mix(in srgb, var(--amber) 38%, var(--sheet)); border-block: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); opacity: .8; }
+  .location-map-preview__road--one { width: 120%; left: -10%; top: 58%; transform: rotate(-14deg); }
+  .location-map-preview__road--two { width: 80%; left: 20%; top: 30%; transform: rotate(42deg); }
+  .location-map-preview__district { z-index: 0; color: var(--ink-3); font: 700 .62rem/1 var(--font-ui); letter-spacing: .08em; }
+  .location-map-preview__district--north { top: 26%; right: 8%; }
+  .location-map-preview__district--east { top: 61%; right: 12%; }
+  .location-map-preview__district--south { bottom: 12%; left: 8%; }
 
   /* ─────────────────────────────────────────────────────────────────
    * §7.3 Top bar, banner, panels
@@ -820,6 +840,7 @@
     display: grid;
     gap: var(--s-2);
     width: min(380px, calc(100vw - 32px));
+    pointer-events: none;
   }
   .toast {
     display: grid;
@@ -832,6 +853,8 @@
     color: var(--ink-inverse);
     box-shadow: var(--lift);
     animation: toast-in var(--t-base) var(--ease-out);
+    pointer-events: auto;
+    min-height: 56px;
   }
   .toast[data-kind="confirmed"] { border-left: 4px solid var(--green); }
   .toast[data-kind="error"]     { border-left: 4px solid var(--brick); }
@@ -1191,35 +1214,6 @@
     font-size: var(--step--1);
     line-height: 1.45;
   }
-  .track-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--s-2);
-  }
-  .track-card {
-    text-align: left;
-    padding: 12px 14px;
-    border-radius: var(--r-ctl);
-    border: 1px solid var(--rule);
-    background: var(--sheet-sunk);
-    color: var(--ink);
-    cursor: pointer;
-    display: grid;
-    gap: 4px;
-    transition: border-color var(--t-fast), background-color var(--t-fast), transform var(--t-fast);
-  }
-  .track-card:hover {
-    border-color: var(--tide);
-  }
-  .track-card[aria-pressed="true"] {
-    background: var(--grad-primary);
-    border-color: transparent;
-    color: #FFFFFF;
-    box-shadow: var(--glass-highlight), var(--lift-primary);
-  }
-  .track-card[aria-pressed="true"] .t-meta {
-    color: rgba(255, 255, 255, 0.9);
-  }
   @media (max-width: 899px) {
     .auth-portal {
       grid-template-columns: 1fr;
@@ -1234,12 +1228,6 @@
       border-top: 1px solid var(--rule);
     }
   }
-  @media (max-width: 540px) {
-    .track-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
   /* Dashboard Welcome Hero Banner */
   .welcome-hero-banner {
     background: var(--sheet);

@@ -24,7 +24,12 @@
 // model sees it without a public URL. The server reads the derivative
 // from private storage, base64-encodes it, and passes it inline.
 
-import { observationSchema, jsonSchemaForModel, type Observation } from "./observation-schema";
+import {
+  observationSchema,
+  jsonSchemaForModel,
+  OBSERVATION_SCHEMA_VERSION,
+  type Observation,
+} from "./observation-schema";
 import { SYSTEM_PROMPT, USER_PROMPT, PROMPT_VERSION } from "./prompt";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -202,7 +207,7 @@ export async function analyzeImage(
       },
       modelId: model,
       promptVersion: PROMPT_VERSION,
-      schemaVersion: "v1",
+      schemaVersion: OBSERVATION_SCHEMA_VERSION,
     };
   } catch (err) {
     clearTimeout(timeoutId);

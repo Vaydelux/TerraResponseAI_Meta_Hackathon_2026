@@ -42,9 +42,9 @@ bun run scripts/seed-demo.ts
 ```
 
 Required env vars:
-- `NEXT_PUBLIC_SUPABASE_URL` — the Supabase project URL (must be a
-  localhost URL — the script refuses to seed a non-local project
-  unless `ALLOW_DEMO_SEED_ON_PRODUCTION=1` is set).
+- `NEXT_PUBLIC_SUPABASE_URL` — the Supabase project URL. Local URLs are
+  allowed; for non-local use, it must exactly match the isolated staging
+  project identified by `STAGING_SUPABASE_PROJECT_REF`.
 - `SUPABASE_SERVICE_ROLE_KEY` — bypasses RLS (server-only; the
   script uses the Supabase Auth admin API + the service-role client).
 - `DEMO_SEED_ADMIN_PASSWORD` — a strong password for the demo admin
@@ -52,12 +52,13 @@ Required env vars:
   `openssl rand -base64 24`.
 - `DEMO_SEED_REVIEWER_PASSWORD` — a strong password for the demo
   reviewer (>= 12 chars). NO DEFAULT is shipped.
+- `STAGING_SUPABASE_PROJECT_REF` and `PRODUCTION_SUPABASE_PROJECT_REF` —
+  required for non-local seeding; the refs must differ. There is no
+  production override.
 
 Optional env vars:
 - `DEMO_SEED_ADMIN_EMAIL` — defaults to `admin@terra.ai`.
 - `DEMO_SEED_REVIEWER_EMAIL` — defaults to `reviewer@terra.ai`.
-- `ALLOW_DEMO_SEED_ON_PRODUCTION` — set to `1` to permit seeding
-  against a non-local Supabase URL (dev/demo project only).
 
 > **Production first-admin setup**: do NOT use `seed-demo.ts`. Use
 > `scripts/bootstrap-admin.ts <email>` AFTER the user signs up at
@@ -81,7 +82,7 @@ The script creates 5 reports across 2 demo events:
 
 | Brief requirement | Where |
 |---|---|
-| 3-5 rights-cleared example incident reports | 5 reports (the rights-cleared aspect: the reports don't include any real disaster imagery; the storage keys point to non-existent objects; the `image_bytes` is 0; the title + description are clearly prefixed with "DEMO:") |
+| 3-5 rights-cleared example incident reports | 5 reports with synthetic JPEG evidence uploaded to private buckets; each image is visibly labeled "DEMONSTRATION DATA" and each title + description is prefixed with "DEMO:" |
 | A realistic mix of known and unknown locations | Reports 1, 2, 4, 5 have known locations (GPS or manual pin); Report 3 has an unknown location (no GPS, no manual pin — appears in the Unlocated list ONLY) |
 | At least one reviewed report | Report 4 (status = reviewed, review_outcome = confirmed; the seed inserts a review_actions row for the audit trail) |
 | One intentionally failed analysis | Report 5 (status = retryable_error; last_error = "DEMO: simulated transient failure for demo purposes.") |
@@ -293,13 +294,11 @@ deployment with real incident reports):
 
 ## 6. Known limitations
 
-1. **The demo reports don't have real image bytes.** The seed
-   script doesn't upload to storage (the storage keys point to
-   non-existent objects; `image_bytes` is 0). The report-detail
-   UI's signed-URL fetch returns 404 — the UI surfaces this as
-   "evidence not available" (no silent failure). For a demo with
-   real images, run the upload flow manually with rights-cleared
-   stock photos.
+1. **The demo reports use synthetic image bytes.** The seed script
+   uploads visibly labeled synthetic JPEGs to the private buckets.
+   The seeded evidence is demonstration data, not real disaster imagery.
+   The report-detail view fetches the seeded private evidence normally.
+
 2. **No default demo admin password.** The seed script refuses to
    run unless `DEMO_SEED_ADMIN_PASSWORD` is set to a strong value
    (>= 12 chars). Production first-admin setup uses the secure

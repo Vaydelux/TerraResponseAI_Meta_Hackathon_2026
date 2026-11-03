@@ -2,7 +2,7 @@
 -- TerraResponse AI — RLS test suite (negative + positive)
 -- ============================================================================
 -- Prerequisite: 0001_schema.sql + 0002_rls.sql + 0003_storage.sql +
--- supabase/seed.sql all applied.
+-- supported Auth Admin API fixture provisioning completed in isolated staging.
 --
 -- This script verifies the RLS policies by simulating different users
 -- via `set local role authenticated` + `set local request.jwt.claim.sub`
@@ -16,7 +16,7 @@
 -- The script prints PASS/FAIL lines to stdout. A non-zero count of
 -- FAIL lines at the end means the RLS policies have a gap.
 --
--- Test users (from seed.sql):
+-- Test users (provisioned through the protected staging Auth Admin workflow):
 --   Alice  11111111-1111-1111-1111-111111111111  reporter, contributor in Event A
 --   Bob    22222222-2222-2222-2222-222222222222  reviewer, reviewer in Event A
 --   Carol  33333333-3333-3333-3333-333333333333  admin, coordinator in Event B
@@ -219,7 +219,8 @@ end $$;
 -- ===========================================================================
 -- TEST 9: Bob CANNOT insert a review_action on a report in Event B
 --         (he's not a reviewer there). Uses the real Event B report R2
---         (eeeeeeee-...) seeded in seed.sql so this is a real test, not
+--         (eeeeeeee-...) provisioned by the isolated staging fixture so this
+--         is a real test, not
 --         a vacuous no-op.
 -- ===========================================================================
 do $$
@@ -470,7 +471,8 @@ end $$;
 -- 0005_postgis.sql: `if not public.is_event_member(p_event_id) then
 -- raise exception 'You are not a member of this event'`).
 --
--- Run this test ONLY on a DB with the seed applied (supabase/seed.sql).
+-- Run this test ONLY on an isolated DB with the protected staging fixture
+-- provisioned. Never use a SQL seed that inserts into auth.users.
 -- It uses fixed UUIDs from the seed:
 --   Dave (Event B contributor)  44444444-...
 --   Event A                      aaaaaaaa-...

@@ -19,19 +19,6 @@ import { signUpAction, type SignUpState } from "@/lib/auth/actions";
 
 const initialState: SignUpState = { status: "idle" };
 
-interface OperationalTrack {
-  id: string;
-  label: string;
-  sub: string;
-}
-
-const OPERATIONAL_TRACKS: OperationalTrack[] = [
-  { id: "field_logistics", label: "Field Contributor", sub: "Upload ground disaster photos" },
-  { id: "incident_command", label: "Response Coordinator", sub: "Track verified map updates" },
-  { id: "medical_triage", label: "Damage & Safety", sub: "Document road & building hazards" },
-  { id: "gis_sensor", label: "Mapping & GIS", sub: "Geospatial & location support" },
-];
-
 export function SignUpContent({ configured }: { configured: boolean }) {
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
@@ -39,8 +26,9 @@ export function SignUpContent({ configured }: { configured: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [selectedTrack, setSelectedTrack] = useState<string>("field_logistics");
-  const [agreedTerms, setAgreedTerms] = useState(true);
+  // Safety acknowledgement must be an explicit user action, not an
+  // implicit opt-in from a pre-checked control.
+  const [agreedTerms, setAgreedTerms] = useState(false);
 
   const rules = passwordChecklist(password, username, email);
   const [state, formAction, pending] = useActionState<SignUpState, FormData>(
@@ -241,26 +229,6 @@ export function SignUpContent({ configured }: { configured: boolean }) {
                         invalid={state.status === "error" && state.field === "email"}
                       />
                     </Field>
-                  </div>
-
-                  {/* Friendly Focus Area Selector (Visual orientation only; never alters server role) */}
-                  <div style={{ display: "grid", gap: 6 }}>
-                    <span className="field__label">How do you plan to use TerraResponse? (Optional orientation)</span>
-                    <div className="track-grid" role="group" aria-label="Primary focus area">
-                      {OPERATIONAL_TRACKS.map((track) => (
-                        <button
-                          key={track.id}
-                          type="button"
-                          className="track-card"
-                          aria-pressed={selectedTrack === track.id}
-                          onClick={() => setSelectedTrack(track.id)}
-                          disabled={pending}
-                        >
-                          <span style={{ fontWeight: 700, fontSize: "var(--step--1)" }}>{track.label}</span>
-                          <span className="t-meta" style={{ fontSize: "0.78rem" }}>{track.sub}</span>
-                        </button>
-                      ))}
-                    </div>
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "var(--s-3)" }}>

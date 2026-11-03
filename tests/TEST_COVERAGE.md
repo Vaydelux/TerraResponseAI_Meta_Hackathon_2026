@@ -15,8 +15,8 @@ which are available in the sandbox/CI environment. The critical
 path's logic is verified at three layers:
 
 1. **Unit tests** (Vitest, mocked): every pure function in
-   `src/lib/` is tested. 351 tests pass + 2 skipped (the opt-in
-   smoke tests), across 28 Vitest files.
+   `src/lib/` is tested. The current suite reports 624 tests passing
+   and 2 skipped opt-in smoke tests across 79 Vitest files.
 2. **Integration tests** (Vitest, mocked Supabase + mocked model):
    the analyze route handler's state transitions, ceiling
    enforcement, and telemetry logging. 12 tests in
@@ -24,16 +24,21 @@ path's logic is verified at three layers:
 3. **E2E tests** (Playwright, real dev server): the login page's
    accessibility, keyboard nav, mobile viewport, loading/empty
    states; the API endpoints' 503 NOT_CONFIGURED responses; the
-   protected routes' redirect-to-login behavior. 43 tests across
-   3 spec files, run on both the chromium-desktop and chromium-
-   mobile projects → 86 E2E test runs total.
+   protected routes' redirect-to-login behavior across the baseline
+   specs, run on both the chromium-desktop and
+   chromium-mobile projects, plus an opt-in authenticated staging spec.
+   The authenticated cases skip unless protected staging variables are
+   present.
 
 The full UI flow (login → upload → analyze → review → map with a
-real backend) is verified manually by the developer before each
-release, following the 3-minute demo script in
-`docs/BUILD_PLAN.md` §8.
+real backend) has an authenticated Playwright acceptance spec in
+`tests/e2e/authenticated-flow.spec.ts`. It is intentionally opt-in and
+must run only against owner-approved staging with separate reporter and
+reviewer credentials, a synthetic image, and live model configuration.
+The 3-minute demo script remains presentation guidance, not evidence of
+live backend verification.
 
-## Test inventory (28 Vitest files, 351 passing + 2 skipped tests)
+## Test inventory (79 Vitest files, 624 passing + 2 skipped tests)
 
 ### Pure-function unit tests (no DB, no network)
 
@@ -90,6 +95,7 @@ automatically in the default `bun run test` run.
 | `tests/e2e/happy-path.spec.ts` | 15 desktop + 0 mobile | Login page (Setup state) renders brand + Setup card; API endpoints return 503 NOT_CONFIGURED; protected routes redirect to /login |
 | `tests/e2e/failure-cases.spec.ts` | 15 desktop + 0 mobile | Invalid file (503), invalid GPS (503), duplicate upload (503), schema mismatch (503), 429/timeout (503), SAM failure (503/404), wrong-event access (503), expired-session (6 routes redirect to /login), unknown-location (503) |
 | `tests/e2e/accessibility.spec.ts` | 13 desktop + 13 mobile | Document.title, single h1, brand heading text, accessible Setup card, monospace env-vars, keyboard-navigable (Tab), no focus traps, mobile viewport (no horizontal scroll, env-vars readable), loading < 5s, no unexpected console errors, no unhandled promise rejections |
+| `tests/e2e/authenticated-flow.spec.ts` | 1 desktop + 1 mobile (opt-in; skipped by default) | Reporter login, private upload, 60-second signed derivative URL, non-demo live analysis, separate reviewer confirmation, persisted audit action/status, reviewed map pin, synthetic report cleanup |
 
 Run with `bun run test:e2e`. The Playwright config auto-starts the
 dev server (`bun run dev` on :3000) and runs the desktop + mobile
@@ -97,7 +103,7 @@ projects serially (single worker to share the dev server).
 
 ## Known limitations
 
-### 1. Full happy-path E2E flow not automated (manual-only)
+### 1. Authenticated happy-path E2E is protected and opt-in
 
 The complete **login → upload → manual pin → analyze → review → map**
 flow requires:
@@ -107,13 +113,14 @@ flow requires:
 - A real `MODEL_API_KEY` for the analyze step.
 - Seeded events + reports.
 
-These are NOT available in the sandbox / CI environment. The
-Playwright E2E tests verify the **no-backend state** (the Setup
-card, the 503 NOT_CONFIGURED responses, the redirect-to-login
-behavior). The full flow is verified manually by the developer
-before each release, following the 3-minute demo script in
-`docs/BUILD_PLAN.md` §8.
-
+These are not available in the default sandbox / CI environment. The
+authenticated spec skips safely without all required variables and
+refuses to target production by checking distinct staging/production
+references and URLs. It must run as a protected staging acceptance job
+with `E2E_REQUIRE_AUTHENTICATED=1` before claiming the complete workflow
+is verified. The no-backend
+Playwright tests still cover the Setup card, 503 NOT_CONFIGURED
+responses, and redirect-to-login behavior.
 **Mitigation**: the integration tests in
 `route.integration.test.ts` mock the Supabase client + the model
 transport + the auth context, exercising the analyze route's full
@@ -150,7 +157,7 @@ The Playwright config uses `workers: 1` so the desktop + mobile
 projects share a single dev server. The total E2E run takes ~30s
 desktop + ~12s mobile = ~45s. Increasing workers would require
 multiple dev servers (one per worker), which isn't worth the
-complexity for 43 tests.
+complexity for the baseline E2E cases.
 
 ### 5. The vitest suite uses jsdom by default; sharp/exifr tests use Node
 

@@ -233,6 +233,8 @@ export async function POST(
     const cached = await lookupCachedAnalysis({
       eventId: report.event_id,
       sha256: report.sha256,
+      promptVersion: PROMPT_VERSION,
+      schemaVersion: OBSERVATION_SCHEMA_VERSION,
     });
     if (cached) {
       // First, CAS transition to needs_review (only if still uploaded

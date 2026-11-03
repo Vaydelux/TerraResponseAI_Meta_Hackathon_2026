@@ -7,7 +7,9 @@ const preview = get(".github/workflows/supabase-staging-preview.yml");
 const verify = get(".github/workflows/staging-integration-verification.yml");
 const provision = get("scripts/provision-staging-test-users.ts");
 const grants = get("supabase/migrations/0011_explicit_data_api_grants.sql");
-const rpc = get("supabase/migrations/0012_restrict_definer_rpc_access.sql");
+const rpc = get("supabase/migrations/20261104120000_restrict_internal_definer_rpc_execute.sql");
+const legacyRpc = get("supabase/migrations/0012_restrict_definer_rpc_access.sql");
+const sqlSeed = get("supabase/seed.sql");
 
 describe("staging isolation hardening", () => {
   it("refuses the production project even with overridden staging inputs", () => {
@@ -39,6 +41,12 @@ describe("staging isolation hardening", () => {
 });
 
 describe("safe follow-on PostgreSQL permissions", () => {
+  it("does not provide a direct auth.users or preconfirmed-user seed path", () => {
+    expect(sqlSeed).not.toMatch(/insert\s+into\s+auth\.users/i);
+    expect(sqlSeed).not.toMatch(/email_confirmed_at\s*=|email_confirmed_at\s*,/i);
+    expect(sqlSeed.toLowerCase()).toContain("intentionally empty");
+  });
+
   it("never grants table-wide report UPDATE to authenticated", () => {
     expect(grants).not.toMatch(/grant\s+select\s*,\s*insert\s*,\s*update\s*,\s*delete\s+on\s+public\.reports\s+to\s+authenticated/i);
     expect(grants).toMatch(/revoke\s+update\s+on\s+public\.reports\s+from\s+authenticated/i);
@@ -56,11 +64,16 @@ describe("safe follow-on PostgreSQL permissions", () => {
     expect(grants).toMatch(/public\.ai_usage_log, public\.evidence_signed_url_log, public\.report_retention\s+to service_role/);
   });
   it("restricts public privileged RPCs and protects cross-user membership", () => {
-    expect(rpc).toContain("p_user_id = auth.uid() or public.is_admin()");
+    expect(legacyRpc).toContain("p_user_id = auth.uid() or public.is_admin()");
     expect(rpc).toContain("where n.nspname = 'public' and p.prosecdef");
-    expect(rpc).toContain("from public, anon, authenticated");
-    expect(rpc).toContain("to authenticated, service_role");
-    expect(rpc).toContain("alter function public.set_updated_at()");
+    expect(rpc).toContain("from public, anon");
+    expect(rpc).toContain("from authenticated");
+    expect(rpc).toContain("grant execute on function public.event_role(uuid, uuid)");
+    expect(rpc).toContain("grant execute on function public.storage_event_member(text)");
+    expect(rpc).toContain("grant execute on function public.submit_review_atomic(");
+    expect(rpc).toContain("grant execute on function public.write_audit_event(");
+    expect(rpc).not.toContain("grant execute on function %s");
+    expect(legacyRpc).toContain("alter function public.set_updated_at()");
   });
 });
 

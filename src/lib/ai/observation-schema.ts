@@ -44,8 +44,8 @@ export const observationSchema = z.object({
   visible_evidence: z
     .array(z.string().max(500))
     .min(1)
-    .max(20)
-    .describe("Short factual observations of what is visible in the image"),
+    .max(8)
+    .describe("2–8 short, concrete, factual observations of what is visible; use one truthful readability limitation when the image cannot be assessed"),
   preliminary_severity: z
     .number()
     .int()
@@ -141,4 +141,4 @@ export const jsonSchemaForModel = {
   additionalProperties: false,
 } as const;
 
-export const OBSERVATION_SCHEMA_VERSION = "v1";
+export const OBSERVATION_SCHEMA_VERSION = "v2";

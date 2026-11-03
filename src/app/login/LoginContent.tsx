@@ -22,7 +22,6 @@ export function LoginContent({ configured }: { configured: boolean }) {
   const params = useSearchParams();
 
   const [showPw, setShowPw] = useState(false);
-  const [rememberStation, setRememberStation] = useState(false);
 
   const cbParam = params.get("callbackUrl");
   const callbackUrl = safeAuthPath(cbParam ?? "/dashboard");
@@ -252,18 +251,6 @@ export function LoginContent({ configured }: { configured: boolean }) {
                   </button>
                 </div>
               </Field>
-
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--s-2)", flexWrap: "wrap" }}>
-                <label className="t-meta" style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={rememberStation}
-                    onChange={(e) => setRememberStation(e.target.checked)}
-                    disabled={pending || Boolean(redirectTo)}
-                  />
-                  Keep me signed in on this device
-                </label>
-              </div>
 
               <Button
                 type="submit"

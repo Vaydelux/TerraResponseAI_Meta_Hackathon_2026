@@ -587,7 +587,7 @@ console.log("--- [UNVERIFIED] Triggers + column privileges --------------");
 for (const t of EXPECTED_TRIGGERS) {
   record(`trigger ${t.name} on ${t.table}`, "UNVERIFIED", true,
     undefined,
-    `run scripts/_run_sql_tests.ts (executes supabase/tests/phase18_security_tests.sql against a real Postgres)`);
+    `run supabase/tests/phase18_security_tests.sql with psql against isolated staging after supported Auth Admin fixture provisioning`);
 }
 record("reports column-level UPDATE privileges (evidence immutability)", "UNVERIFIED", true,
   undefined,
@@ -647,8 +647,8 @@ if (failCount > 0) {
 } else {
   console.log("");
   console.log("Available live checks passed; some checks remain UNVERIFIED. Use direct psql");
-  console.log("access (catalog tables); run scripts/_run_sql_tests.ts to");
-  console.log("exercise them against a real Postgres.");
+  console.log("access (catalog tables) and run the SQL security suite against isolated staging");
+  console.log("after supported Auth Admin fixture provisioning.");
   console.log("");
   console.log("The verify script is READ-ONLY — no destructive actions were taken.");
   console.log("No API key fragments were printed. No credentials were echoed.");

@@ -44,7 +44,7 @@ describe.skipIf(SKIP)("muse-spark live smoke test", () => {
     expect(result.observation.visible_evidence.length).toBeGreaterThan(0);
     expect(result.modelId).toBe("muse-spark-1.3");
     expect(result.promptVersion).toBe("v1");
-    expect(result.schemaVersion).toBe("v1");
+    expect(result.schemaVersion).toBe("v2");
 
     console.log("[smoke] Validated observation received (content withheld from CI logs).");
     console.log("[smoke] usage:", result.usageMetadata);

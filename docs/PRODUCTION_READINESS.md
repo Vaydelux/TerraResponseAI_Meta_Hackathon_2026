@@ -1,7 +1,7 @@
-# Production Readiness — TerraResponse AI
+# Production Readiness Assessment — TerraResponse AI
 
 **Last updated:** 2026-10-29  
-**Purpose:** Maps the TerraResponse AI implementation against the five pillars of production-grade web system design, identifying what is implemented, what is partial, and what would be needed for full production operation.
+**Purpose:** Maps the TerraResponse AI implementation against production-engineering pillars. This is an internal assessment, not a release approval or claim of production readiness; the open auth/SMTP/staging gate remains authoritative.
 
 ---
 
@@ -177,7 +177,7 @@
 | **Security** | Can introduce user friction (MFA) and latency | No MFA (acceptable for MVP). Auth adds ~70ms per request (bcrypt + Supabase getUser). Fail-open rate limits avoid blocking users on DB errors. |
 | **Performance** | Complex caching invalidation + optimization time | Dedup cache avoids redundant model calls. PostGIS GiST index avoids full-table scans. No Redis (DB-based cache sufficient for MVP traffic). |
 | **Scalability** | Increases infrastructure costs + system complexity | Vercel + Supabase handle scaling (managed services). No manual instance management. Stateless app tier. |
-| **Maintainability** | Slower initial development + high test overhead | 368 tests + 86 E2E tests (written alongside features, not retrofitted). Pure functions are independently testable. 12 docs document every decision. |
+| **Maintainability** | Slower initial development + high test overhead | 623 unit/integration tests passed in the latest local run. Authenticated staging E2E is opt-in and unverified. Pure functions are independently testable. |
 
 ---
 

@@ -29,9 +29,9 @@ psql "$DB_URL" -f supabase/rollbacks/0001_rollback.sql
 - `delete from storage.buckets` is blocked by Supabase (the
   `supabase_storage_admin` role owns the table). Use the Storage
   API or the dashboard to remove buckets.
-- `auth.users` direct INSERTs require the `service_role` key +
-  bypass RLS. Use `supabase.auth.admin.createUser()` in a JS
-  script instead (see `scripts/seed-demo.ts`).
+- Never insert directly into `auth.users`, even with `service_role`.
+  Use `supabase.auth.admin.createUser()` only in a protected, isolated
+  staging workflow (see `scripts/provision-staging-test-users.ts`).
 - Never run rollbacks against a production database without a
   backup. The forward migrations are designed to be forward-only;
   rollbacks are a dev convenience.

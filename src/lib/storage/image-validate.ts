@@ -11,8 +11,6 @@
 // Allowed types: JPEG, PNG, WebP. WebP is added per the brief
 // ("Support JPEG, PNG, and WebP").
 
-import sharp from "sharp";
-
 export type AllowedImageType = "image/jpeg" | "image/png" | "image/webp";
 
 export const ALLOWED_IMAGE_TYPES: AllowedImageType[] = [
@@ -144,6 +142,9 @@ export async function validateImageFile(
   // 2. Sharp decode check — catches truncated / corrupted files that
   // pass the magic-byte check but aren't real images.
   try {
+    // Load the native decoder only after route configuration/authentication
+    // gates have passed, so unrelated 503/health responses remain reliable.
+    const { default: sharp } = await import("sharp");
     const metadata = await sharp(Buffer.from(buf)).metadata();
     if (!metadata.width || !metadata.height || metadata.width < 1 || metadata.height < 1) {
       return {

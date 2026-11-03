@@ -23,7 +23,8 @@ API is unavailable: the seeded data renders without a model call.
 - The demo seed has been run: `bun run scripts/seed-demo.ts`
   (requires `DEMO_SEED_ADMIN_PASSWORD` to be set; the script refuses
   to use a default password and refuses to seed a non-local Supabase
-  URL unless `ALLOW_DEMO_SEED_ON_PRODUCTION=1` is set).
+  URL unless it exactly matches the explicitly configured isolated
+  staging project (with a staging ref distinct from production).
 - Sign in as `admin@terra.ai` / <password from DEMO_SEED_ADMIN_PASSWORD>.
 
 ## Demo flow (3:00 total)

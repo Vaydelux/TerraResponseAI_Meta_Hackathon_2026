@@ -10,7 +10,7 @@ The production Supabase project ref is `ywopsafppyykhwrejliz`. Do not apply pend
 
 **Current isolated staging mapping (2026-11-02):** All source migrations 0001–0012 were installed and verified on staging `ytfaetqvtbsbmcsdlkvk`. Supabase recorded timestamped versions rather than the repository's four-digit filenames. The protected staging preview/apply workflows now build an **ephemeral timestamp-aligned migration workspace** using `scripts/prepare-staging-migration-workspace.mjs`. They do not alter the source-controlled migrations or the remote migration ledger. Future staging migrations must use timestamped Supabase filenames with a version newer than `20261102064819`. Inspect the linked CLI migration list and dry run before any manual staging push. This mapping is **staging-only** and must not be applied to production `ywopsafppyykhwrejliz`.
 
-The read-only REST verifier cannot necessarily read `supabase_migrations.schema_migrations` because it is not an exposed Data API schema. An API failure **does not** mean zero migrations are applied. The linked CLI migration list is the version-history authority; SQL catalog and role probes separately verify database effects.
+The read-only REST verifier cannot necessarily read `supabase_migrations.schema_migrations` because it is not an exposed Data API schema. An API failure **does not** mean zero migrations are applied. The linked CLI migration list is the version-history authority; SQL catalog and role probes separately verify database effects. The permissions follow-up is the forward-only `20261104120000_restrict_internal_definer_rpc_execute.sql`; review and dry-run it on isolated staging only. Do not edit or replay the already-recorded `0012` history entry.
 
 ## 1. Run the staging migration preview first
 
@@ -42,6 +42,29 @@ You can alternatively supply the reference in the workflow form. Never paste key
 The smoke tests use repository demo imagery and validate that a real model returned a successful response. The smoke runs do **not** prove human review, storage authorization, or the browser flow.
 
 ## 4. Browser end-to-end acceptance (still required)
+
+The repository now contains an opt-in authenticated Playwright acceptance
+test at `tests/e2e/authenticated-flow.spec.ts`. It skips unless all protected
+inputs are present and the target is explicitly identified as staging. Run it
+against a staging deployment with protected runner environment variables:
+
+```bash
+PLAYWRIGHT_BASE_URL=https://<staging-deployment> \
+PRODUCTION_BASE_URL=https://<production-deployment> \
+STAGING_SUPABASE_PROJECT_REF=<staging-ref> \
+PRODUCTION_SUPABASE_PROJECT_REF=<production-ref> \
+E2E_REPORTER_EMAIL=<protected-secret> \
+E2E_REPORTER_PASSWORD=<protected-secret> \
+E2E_REVIEWER_EMAIL=<protected-secret> \
+E2E_REVIEWER_PASSWORD=<protected-secret> \
+E2E_IMAGE_PATH=<runner-local-synthetic-image> \
+bunx playwright test tests/e2e/authenticated-flow.spec.ts --project=chromium-desktop
+```
+
+Do not place the values above in Git, workflow output, traces, screenshots,
+issues, or chat. The test asserts a 60-second signed URL, a non-`demo-mock-v1`
+persisted observation, a different reviewer identity, an audited confirmation,
+and the resulting map pin. A skipped test is not evidence of completion.
 
 On a **dedicated staging deployment and test event only**:
 

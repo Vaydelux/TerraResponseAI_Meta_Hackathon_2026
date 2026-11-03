@@ -72,8 +72,8 @@ describe("analyzeImage (mocked transport)", () => {
       expect(result.observation.needs_review).toBe(true);
       expect(result.usageMetadata.total_tokens).toBe(300);
       expect(result.modelId).toBe("muse-spark-1.3");
-      expect(result.promptVersion).toBe("v1");
-      expect(result.schemaVersion).toBe("v1");
+      expect(result.promptVersion).toBe("v2");
+      expect(result.schemaVersion).toBe("v2");
     }
   });
 

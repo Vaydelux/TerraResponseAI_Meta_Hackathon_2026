@@ -436,7 +436,8 @@ manually trigger a redeploy in the Vercel dashboard).
 3. Sign in with the demo admin (email: `admin@terra.ai`, password:
    the value you set in `DEMO_SEED_ADMIN_PASSWORD` — the seed script
    refuses to use a default and refuses to seed against a non-local
-   Supabase URL unless `ALLOW_DEMO_SEED_ON_PRODUCTION=1` is set).
+   Supabase URL unless it exactly matches the explicitly configured isolated
+   staging project (with a staging ref distinct from production).
 4. The dashboard should show 5 reports received, 4 awaiting review
    (the failed analysis is 1 of the 4), 1 reviewed, 1 unlocated.
 5. The map should show 3 pins (the 2 known-location reports + the

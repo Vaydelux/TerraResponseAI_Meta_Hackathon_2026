@@ -71,6 +71,9 @@ export interface CachedAnalysis {
 export async function lookupCachedAnalysis(args: {
   eventId: string;
   sha256: string;
+  /** Only reuse an analysis produced by the current inference contract. */
+  promptVersion?: string;
+  schemaVersion?: string;
 }): Promise<CachedAnalysis | null> {
   const supabase = await createSupabaseServerClient();
   // Find a report in this event with the same sha256 that has a
@@ -99,6 +102,8 @@ export async function lookupCachedAnalysis(args: {
   if (analyses.length === 0) return null;
   const a = analyses[0];
   if (!a || a.processing_status !== "succeeded") return null;
+  if (args.promptVersion && a.prompt_version !== args.promptVersion) return null;
+  if (args.schemaVersion && a.schema_version !== args.schemaVersion) return null;
   return {
     reportId: report.id,
     modelId: a.model_id,

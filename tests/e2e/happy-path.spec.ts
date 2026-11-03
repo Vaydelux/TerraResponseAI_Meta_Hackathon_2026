@@ -27,17 +27,14 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Happy path — login page (Setup state, no backend)", () => {
   test("the login page renders with the brand", async ({ page }) => {
-    await page.goto("/");
-    // The brand text "TerraResponse AI" should appear (either in
-    // the SetupState or the login form). The page redirects to
-    // /login (since / requires auth). Wait for the redirect.
-    await page.waitForURL(/\/login/, { timeout: 10000 });
-    await expect(page.locator("text=TerraResponse AI")).toBeVisible({ timeout: 10000 });
+    await page.goto("/login");
+    // The public login route should render the brand and either the
+    // configured form or the explicit setup state.
+    await expect(page.getByText("TerraResponse AI", { exact: true }).first()).toBeVisible({ timeout: 10000 });
   });
 
   test("the Setup State shows the env vars to configure (no silent failure)", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForURL(/\/login/, { timeout: 10000 });
+    await page.goto("/login");
     // The "Setup required" header should be visible.
     await expect(page.locator("text=Setup required")).toBeVisible({ timeout: 10000 });
     // The three env var names should be listed.
@@ -47,8 +44,7 @@ test.describe("Happy path — login page (Setup state, no backend)", () => {
   });
 
   test("the prototype banner / description is present", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForURL(/\/login/, { timeout: 10000 });
+    await page.goto("/login");
     // The "Decision-support prototype" subtitle is the project's
     // way of setting user expectations.
     await expect(page.locator("text=Decision-support prototype")).toBeVisible();

@@ -44,8 +44,8 @@
 //   DEMO_SEED_REVIEWER_PASSWORD       — MUST be set; no default.
 //
 // Environment guard (scripts/_seed-guard.ts):
-//   * Refuses to run against a non-local Supabase URL unless
-//     ALLOW_DEMO_SEED_ON_PRODUCTION=1 is set.
+//   * Refuses to run against any non-local URL unless it exactly matches
+//     STAGING_SUPABASE_PROJECT_REF and differs from production.
 //   * Refuses to use any default / short password — the operator
 //     must generate a strong one (e.g. `openssl rand -base64 24`).
 //
@@ -59,6 +59,8 @@
 // when no admin exists yet).
 
 import { createClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
+import sharp from "sharp";
 import {
   assertSeedEnvironmentAllowed,
   requireSeedPassword,
@@ -113,16 +115,61 @@ const REPORT_UNKNOWN = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const REPORT_REVIEWED = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 const REPORT_FAILED = "11111111-2222-4333-8333-333333333333";
 
-const DEMO_ADMIN_ID = "33333333-3333-4333-8333-333333333333"; // matches supabase/seed.sql
-const DEMO_REVIEWER_ID = "22222222-2222-4222-8222-222222222222"; // matches supabase/seed.sql
+const DEMO_ADMIN_ID = "33333333-3333-4333-8333-333333333333";
+const DEMO_REVIEWER_ID = "22222222-2222-4222-8222-222222222222";
 
-// SHA-256 of a small empty-content placeholder. The reports don't
-// have real image bytes (the seed script doesn't upload to storage);
-// the storage keys point to non-existent objects. The report-detail
-// UI's signed-URL fetch will return 404 — the UI surfaces this as
-// "evidence not available" (no silent failure). For a demo with real
-// images, run the upload flow manually (see docs/DEMO_MODE.md).
-const DEMO_SHA256 = "0000000000000000000000000000000000000000000000000000000000000000";
+// Seeded evidence is synthetic and visibly labeled inside the image. It is
+// uploaded to the same private buckets as normal reports so the demo does
+// not reference missing storage objects or silently show an unavailable image.
+const DEMO_IMAGE_WIDTH = 800;
+const DEMO_IMAGE_HEIGHT = 600;
+
+async function makeDemoEvidence(reportId: string, title: string) {
+  const safeTitle = title.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;",
+  }[character] ?? character));
+  const svg = `<svg width="${DEMO_IMAGE_WIDTH}" height="${DEMO_IMAGE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100%" height="100%" fill="#dce9e5"/>
+    <rect x="28" y="28" width="744" height="544" rx="18" fill="#f7faf7" stroke="#315b60" stroke-width="4"/>
+    <text x="60" y="105" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#173b42">TERRA RESPONSE AI</text>
+    <text x="60" y="160" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#a33d31">DEMONSTRATION DATA</text>
+    <text x="60" y="215" font-family="Arial, sans-serif" font-size="22" fill="#173b42">Synthetic evidence — not a live incident</text>
+    <text x="60" y="300" font-family="Arial, sans-serif" font-size="22" fill="#315b60">${safeTitle}</text>
+    <text x="60" y="350" font-family="monospace" font-size="18" fill="#567277">Report ${reportId.slice(0, 8)}</text>
+    <text x="60" y="510" font-family="Arial, sans-serif" font-size="18" fill="#567277">Precomputed demo scenario • no real disaster evidence</text>
+  </svg>`;
+  const original = await sharp(Buffer.from(svg)).jpeg({ quality: 88 }).toBuffer();
+  const derivative = await sharp(original).jpeg({ quality: 88 }).toBuffer();
+  const thumbnail = await sharp(original).resize(320, 240, { fit: "cover" }).jpeg({ quality: 82 }).toBuffer();
+  return { original, derivative, thumbnail };
+}
+
+async function seedEvidence(reportId: string, eventId: string, title: string) {
+  const evidence = await makeDemoEvidence(reportId, title);
+  const paths = [
+    { bucket: "evidence-originals", path: `${eventId}/${reportId}.jpg`, bytes: evidence.original },
+    { bucket: "evidence-derivatives", path: `${eventId}/${reportId}.jpg`, bytes: evidence.derivative },
+    { bucket: "evidence-thumbnails", path: `${eventId}/${reportId}.jpg`, bytes: evidence.thumbnail },
+  ];
+  const uploaded: typeof paths = [];
+  try {
+    for (const item of paths) {
+      const { error } = await supabase.storage.from(item.bucket).upload(item.path, item.bytes, {
+        contentType: "image/jpeg",
+        upsert: true,
+      });
+      if (error) throw new Error(`${item.bucket} upload failed: ${error.message}`);
+      uploaded.push(item);
+    }
+  } catch (error) {
+    await Promise.all(uploaded.map((item) => supabase.storage.from(item.bucket).remove([item.path])));
+    throw error;
+  }
+  return {
+    sha256: createHash("sha256").update(evidence.original).digest("hex"),
+    imageBytes: evidence.original.length,
+  };
+}
 
 // The precomputed mock observation. This is NOT a live Meta inference.
 // The model_id is "demo-mock-v1" (NOT "muse-spark-1.3"). The
@@ -293,7 +340,7 @@ async function main() {
       latitude: 35.5951, longitude: -82.5515,
       location_source: "gps", location_label: "Asheville, NC",
       priority_score: 62,
-      sha256: DEMO_SHA256,
+      sha256: "",
       mock: mockObservation("flooding", 3, "A road is flooded with water covering both lanes."),
     },
     {
@@ -304,7 +351,7 @@ async function main() {
       latitude: 34.0359, longitude: -118.5186,
       location_source: "manual", location_label: "Pacific Palisades, CA",
       priority_score: 71,
-      sha256: DEMO_SHA256,
+      sha256: "",
       mock: mockObservation("other", 4, "Smoke visible on the horizon from Pacific Coast Highway."),
     },
     {
@@ -319,7 +366,7 @@ async function main() {
       latitude: null, longitude: null,
       location_source: "unknown", location_label: null,
       priority_score: 28,
-      sha256: DEMO_SHA256,
+      sha256: "",
       mock: mockObservation("debris", 2, "Debris scattered on a road; location not provided."),
     },
     {
@@ -333,7 +380,7 @@ async function main() {
       latitude: 35.5950, longitude: -82.5510,
       location_source: "gps", location_label: "Asheville, NC",
       priority_score: 84,
-      sha256: DEMO_SHA256,
+      sha256: "",
       mock: mockObservation("visible_structural_damage", 4, "Structural damage visible on a building facade."),
     },
     {
@@ -350,12 +397,13 @@ async function main() {
       priority_score: 0,
       retry_count: 3,
       last_error: "DEMO: simulated transient failure for demo purposes. The model call would be retried with backoff; past the cap (5), the report is parked in needs_manual_review.",
-      sha256: DEMO_SHA256,
+      sha256: "",
       mock: null, // no precomputed analysis for the failed report
     },
   ];
 
   for (const r of reports) {
+    const evidence = await seedEvidence(r.id, r.event_id, r.title);
     const { error } = await supabase.from("reports").upsert({
       id: r.id, event_id: r.event_id, creator_id: r.creator_id,
       status: r.status, review_outcome: r.review_outcome,
@@ -365,9 +413,9 @@ async function main() {
       original_storage_key: `evidence-originals/${r.event_id}/${r.id}.jpg`,
       derivative_storage_key: `evidence-derivatives/${r.event_id}/${r.id}.jpg`,
       thumbnail_storage_key: `evidence-thumbnails/${r.event_id}/${r.id}.jpg`,
-      sha256: r.sha256,
+      sha256: evidence.sha256,
       image_mime_type: "image/jpeg",
-      image_bytes: 0, image_width: 800, image_height: 600,
+      image_bytes: evidence.imageBytes, image_width: DEMO_IMAGE_WIDTH, image_height: DEMO_IMAGE_HEIGHT,
       captured_at: new Date(Date.now() - 3600 * 1000).toISOString(),
       uploaded_at: new Date(Date.now() - 3600 * 1000).toISOString(),
       priority_score: r.priority_score,

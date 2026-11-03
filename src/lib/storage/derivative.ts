@@ -15,8 +15,6 @@
 // the private Supabase Storage buckets (0003_storage.sql). The
 // derivative is what the reviewer sees + what the AI model receives.
 
-import sharp from "sharp";
-
 /** Max dimension (width or height) for the inference/display derivative. */
 const DERIVATIVE_MAX_DIM = 1600;
 /** Max dimension for the thumbnail. */
@@ -44,6 +42,9 @@ export interface DerivativeResult {
 export async function makeDerivatives(
   original: Uint8Array,
 ): Promise<DerivativeResult> {
+  // Upload routes import this module during startup, but only configured,
+  // validated uploads need the platform-native image processor.
+  const { default: sharp } = await import("sharp");
   const src = sharp(Buffer.from(original), { failOn: "truncated" });
 
   // Read the original metadata to compute the resize dimensions.

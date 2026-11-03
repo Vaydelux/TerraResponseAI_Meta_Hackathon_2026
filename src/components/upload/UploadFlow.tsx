@@ -851,6 +851,9 @@ export function UploadFlow({ className }: UploadFlowProps) {
           >
             <Input
               id="up-title"
+              name="report-title"
+              autoComplete="off"
+              spellCheck={false}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Flooded road near Brgy San Roque"
@@ -876,6 +879,8 @@ export function UploadFlow({ className }: UploadFlowProps) {
               />
               <Textarea
                 id="up-desc"
+                name="report-description"
+                autoComplete="off"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe visible hazards, water depth, road passability, or urgent risks…"
@@ -1217,7 +1222,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
                           fontSize: "0.72rem",
                         }}
                       >
-                        AI NOT STARTED
+                        QUEUED AFTER SUBMIT
                       </span>
                     </div>
 

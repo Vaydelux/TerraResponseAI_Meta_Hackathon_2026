@@ -7,7 +7,7 @@
 // location and failure cases. Test accessibility, keyboard focus,
 // mobile viewport, loading and empty states."
 //
-// IMPORTANT: The E2E tests run against the REAL Next.js dev server
+// IMPORTANT: The E2E tests run against the REAL built Next.js server
 // (next dev on :3000). The dev server is NOT mocked — it's the same
 // code the user runs. What IS "absent" is the Supabase backend
 // (the env vars aren't set in the sandbox), so the app surfaces the
@@ -20,9 +20,10 @@
 //   - The protected routes (dashboard, map, etc.) redirect to /login.
 //
 // The full happy-path UI flow (login → upload → analyze → review →
-// map with a real backend) is the developer's manual pre-release
-// check; it's NOT automated because it requires a real Supabase
-// project + a real Meta API key. See tests/TEST_COVERAGE.md.
+// map with a real backend) is covered by the opt-in authenticated
+// staging spec. It remains skipped in ordinary CI without protected
+// staging credentials; use E2E_REQUIRE_AUTHENTICATED=1 for a release
+// run that must fail instead of silently skipping it.
 //
 // To run:
 //   bun run test:e2e     # auto-starts the dev server + runs the tests
@@ -41,7 +42,7 @@ export default defineConfig({
   workers: 1, // single worker — the dev server is shared
   reporter: process.env.CI ? "list" : "list",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "off",
@@ -63,17 +64,17 @@ export default defineConfig({
       },
     },
   ],
-  // The webServer config starts the dev server automatically before
-  // the tests + stops it after. We use `dev` (not `build` + `start`)
-  // because dev is faster to boot and we don't need a prod build
-  // for E2E tests (the behavior under test is the not-configured
-  // empty state, which is the same in dev + prod).
-  webServer: {
-    command: "bun run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-    stdout: "ignore",
-    stderr: "pipe", // surface dev-server errors
-  },
+  // Exercise the standalone production artifact. This avoids sharing
+  // hot-reload state across tests and catches missing standalone assets
+  // before a release.
+  ...(process.env.PLAYWRIGHT_BASE_URL ? {} : {
+    webServer: {
+      command: "bun run build && bun run start",
+      url: "http://localhost:3000",
+      reuseExistingServer: false,
+      timeout: 120 * 1000,
+      stdout: "ignore",
+      stderr: "pipe", // surface server errors
+    },
+  }),
 });

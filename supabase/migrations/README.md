@@ -19,7 +19,9 @@ instructions, entity-relationship diagram, and RLS policy summary.
 0001_schema.sql  →  0002_rls.sql  →  0003_storage.sql
 ```
 
-Then seed: `supabase/seed.sql`. Then test: `supabase/tests/test_rls.sql`.
+Then provision isolated staging test identities through the protected Auth
+Admin workflow. Do not insert rows into `auth.users` with SQL. Run
+`supabase/tests/test_rls.sql` only after those identities and fixtures exist.
 
 ## Rollback
 

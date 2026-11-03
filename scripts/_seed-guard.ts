@@ -3,9 +3,9 @@
 // Shared guard for demo/seeding scripts.
 //
 // Refuses to run scripts that seed demo admin credentials or demo data
-// against a Supabase project whose URL looks like a production endpoint,
-// unless the operator has explicitly opted in via
-// ALLOW_DEMO_SEED_ON_PRODUCTION=1.
+// against an unverified Supabase project. Non-local seeding is allowed
+// only when the URL exactly identifies an explicitly configured staging
+// project that is distinct from production.
 //
 // Why: the prior version of seed-demo.ts shipped with default
 // credentials (admin@terra.ai / admin123) and would happily run against
@@ -19,7 +19,7 @@
 //     project ref prefix, which is the default for any real project)
 //
 // The guard is conservative: a Supabase project on the .supabase.co
-// domain is assumed production unless ALLOW_DEMO_SEED_ON_PRODUCTION=1.
+// domain is refused unless staging and production refs are explicit.
 // Local dev (supabase start -> http://localhost:54321) is always
 // allowed.
 
@@ -29,8 +29,6 @@
  */
 export function assertSeedEnvironmentAllowed(): boolean {
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").toLowerCase();
-  const override = process.env.ALLOW_DEMO_SEED_ON_PRODUCTION === "1";
-
   if (!url) {
     // The caller will produce the "missing env" error; here we just
     // pass through - no URL to inspect.
@@ -43,46 +41,34 @@ export function assertSeedEnvironmentAllowed(): boolean {
 
   if (isLocal) return true;
 
-  // Anything on .supabase.co (or any other real hostname) is
-  // treated as production unless the operator opted in.
-  if (!override) {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Refusing to seed: NEXT_PUBLIC_SUPABASE_URL is not a valid URL.");
+  }
+
+  const stagingRef = (process.env.STAGING_SUPABASE_PROJECT_REF ?? "").trim().toLowerCase();
+  const productionRef = (process.env.PRODUCTION_SUPABASE_PROJECT_REF ?? "").trim().toLowerCase();
+  const expectedHost = stagingRef ? `${stagingRef}.supabase.co` : "";
+  const knownProductionRef = "ywopsafppyykhwrejliz";
+
+  if (!stagingRef || !productionRef || stagingRef === productionRef ||
+      stagingRef === knownProductionRef || parsed.hostname !== expectedHost ||
+      parsed.protocol !== "https:" || parsed.pathname !== "/" || parsed.search || parsed.hash) {
     console.error("");
     console.error("============================================================");
-    console.error(" Refusing to seed against a non-local Supabase project.");
+    console.error(" Refusing to seed: target is not an explicitly identified staging project.");
     console.error("============================================================");
-    console.error("");
-    console.error(" The configured NEXT_PUBLIC_SUPABASE_URL is not a localhost");
-    console.error(" endpoint. Seeding demo data + demo admin credentials into a");
-    console.error(" production / shared Supabase project is dangerous - it can");
-    console.error(" leave the project in a state where the demo admin");
-    console.error(" (admin@terra.ai / <your-password>) can sign in and act on");
-    console.error(" demo reports that look like real disaster reports.");
-    console.error("");
-    console.error(" If this is genuinely a dev/demo project (NOT the production");
-    console.error(" Supabase), re-run with:");
-    console.error("");
-    console.error("     ALLOW_DEMO_SEED_ON_PRODUCTION=1 bun run scripts/seed-demo.ts");
-    console.error("");
-    console.error(" For production first-admin setup, use the secure path:");
-    console.error("");
-    console.error("     1. Sign up at /login (creates a profile with role=reporter)");
-    console.error("     2. Run: bun run scripts/bootstrap-admin.ts <your-email>");
+    console.error(" Set STAGING_SUPABASE_PROJECT_REF and PRODUCTION_SUPABASE_PROJECT_REF");
+    console.error(" in protected staging configuration, and ensure the URL matches staging.");
+    console.error(" Production first-admin setup must use a confirmed normal signup plus");
+    console.error(" scripts/bootstrap-admin.ts; it must not use this seed script.");
     console.error("");
     process.exit(1);
   }
 
-  // Override set - warn loudly and proceed.
-  console.warn("");
-  console.warn("============================================================");
-  console.warn(" WARNING: ALLOW_DEMO_SEED_ON_PRODUCTION=1 is set.");
-  console.warn("============================================================");
-  console.warn("");
-  console.warn(" Demo data + demo admin credentials will be seeded against a");
-  console.warn(" non-local Supabase project. Make sure this is a dev/demo");
-  console.warn(" project, NOT production. The demo admin's password is read");
-  console.warn(" from DEMO_SEED_ADMIN_PASSWORD (which MUST be set to a strong");
-  console.warn(" value - the script refuses to use a default password).");
-  console.warn("");
+  console.warn(`[seed-guard] verified isolated staging target ${stagingRef}; values not printed.`);
   return true;
 }
 

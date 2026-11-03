@@ -104,7 +104,14 @@ export default function RootLayout({
           </a>
           {isDemoMode() && <DemoBanner />}
           {children}
-          <SonnerToaster position="top-right" richColors closeButton />
+          <SonnerToaster
+            position="top-right"
+            duration={6000}
+            visibleToasts={3}
+            expand={false}
+            richColors
+            closeButton
+          />
           <ToastRegion />
         </Providers>
       </body>

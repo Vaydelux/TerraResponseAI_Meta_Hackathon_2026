@@ -14,16 +14,16 @@
 
 TerraResponse AI is a decision-support platform for disaster response teams. Authenticated contributors upload disaster photos; the server validates the file (magic bytes + Sharp decode), extracts EXIF GPS, stores the original in a private Supabase bucket, and creates an EXIF-stripped derivative for AI inference. The server calls Meta Muse Spark 1.3 via the Chat Completions API with a JSON-schema-constrained response format, producing a structured observation: incident type, visible evidence, preliminary severity (1–5), uncertainties, and English + Tagalog summaries. A second Zod validation layer catches any schema drift. The observation is routed through a human review queue where a reviewer — who is NOT the contributor — confirms, corrects, flags, or rejects it. Every action is recorded in an append-only audit trail. Confirmed incidents appear on an incident map with a transparent 5-factor priority score (visual severity, facility impact, access disruption, time recency, corroboration). Optional SAM 3.1 segmentation overlays are available via the Responses API. The platform enforces fixed safety boundaries: no automatic dispatch, AI observations always labeled preliminary, priority scores for review prioritization only, bounded API spend, private storage with 60-second signed URLs, and a retention/deletion workflow.
 
-**Architecture summary**: Next.js 16 (App Router, React 19, TypeScript strict) + Supabase (PostgreSQL + RLS + Auth + private Storage) + Meta Model API (Muse Spark 1.3 via Chat Completions, SAM 3.1 via Responses API). Single deployable — no separate backend service. Server-side identity verification via `supabase.auth.getUser()`. RLS on all 11 public tables. 60-second signed URLs for evidence access. 369 unit/integration tests + 86 E2E tests.
+**Architecture summary**: Next.js 16 (App Router, React 19, TypeScript strict) + Supabase (PostgreSQL + RLS + Auth + private Storage) + Meta Model API (Muse Spark 1.3 via Chat Completions, SAM 3.1 via Responses API). Single deployable — no separate backend service. Server-side identity verification via `supabase.auth.getUser()`. RLS on all 11 public tables. 60-second signed URLs for evidence access. The latest local run passed 623 unit/integration tests; authenticated staging E2E remains opt-in and unverified.
 
 **Meta model integration summary**: Muse Spark 1.3 (`POST /v1/chat/completions`) with `response_format: { type: "json_schema", json_schema: { name, schema, strict: true } }` for constrained structured output — a 5-factor disaster observation schema (incident_type enum, visible_evidence array, preliminary_severity 1-5, uncertainties, summary_en, summary_tl, needs_review=true). SAM 3.1 (`POST /v1/responses`) with `input` messages array (`input_text` + `input_image` content blocks) + `stream: true` for streaming mask data. Both use Bearer token auth at `https://api.meta.ai/v1`. Opt-in smoke tests call the real API (gated by `MODEL_API_KEY` / `SAM_API_KEY`).
 
 **Known limitations**:
-1. The full happy-path UI flow (login → upload → analyze → review → map with a real backend) is verified manually; the automated tests cover the logic (unit + integration) and the no-backend UI state (E2E).
+1. The full happy-path UI flow (login → upload → analyze → review → map with a real backend) is not yet verified. The repository contains opt-in authenticated Playwright coverage, but no staging run has been recorded.
 2. The live Meta API smoke tests are opt-in (skip without keys).
 3. Vercel Hobby plan's 10-second function timeout may be too short for the analyze route (30-second timeout + bounded retries); use Pro plan or lower `AI_CALL_TIMEOUT_MS`.
 4. JWT session strategy without revocation (acceptable for an MVP).
-5. The demo seed creates reports without real image bytes (storage keys point to non-existent objects).
+5. The demo seed creates visibly labeled synthetic JPEG evidence in private storage; it is not real disaster imagery or live model evidence.
 6. No scheduled purge job (the purge is manual via the admin endpoint or a cron job the user sets up).
 
 ---
@@ -41,7 +41,7 @@ TerraResponse AI is a decision-support platform for disaster response teams. Aut
 | `.env.example` committed (no real values) | ✅ Done | All secret values are empty quotes (`""`); the secrets-server-only.test.ts verifies this |
 | `README.md` with problem, architecture, setup, Meta models | ✅ Done | Written in Phase 17; includes architecture diagram, sequence diagram, Meta model table, setup steps, env vars, safety limitations |
 | `LICENSE` (MIT) committed | ✅ Done | `LICENSE` file committed with MIT License |
-| No unauthorized image assets | ✅ Done | `git ls-files "*.jpg" "*.png"` returns no tracked images; the demo seed creates reports without real image bytes |
+| No unauthorized image assets | ✅ Done | `git ls-files "*.jpg" "*.png"` returns no tracked images; seeded evidence is generated synthetically at seed time |
 
 ### 2. Deployed app
 
@@ -89,7 +89,7 @@ TerraResponse AI is a decision-support platform for disaster response teams. Aut
 | No third-party code without attribution | ✅ Done | Dependencies are via `bun install` (npm packages with their own licenses); no vendored code |
 | Meta API used per official docs | ✅ Done | Muse Spark via `/v1/chat/completions` (OpenAI-compatible); SAM 3.1 via `/v1/responses` (Responses API) — verified against official docs in Phase 15 |
 | Supabase SSR pattern matches official docs | ✅ Done | `createServerClient` from `@supabase/ssr` with `cookies()` pattern — verified against official docs in Phase 15 |
-| No unauthorized image assets | ✅ Done | No tracked images; demo seed creates reports without real photos |
+| No unauthorized image assets | ✅ Done | No tracked images; demo seed creates synthetic, visibly labeled private evidence |
 
 ### 6. All team contributors named
 
@@ -105,8 +105,8 @@ TerraResponse AI is a decision-support platform for disaster response teams. Aut
 |---|---|---|
 | Git history shows progressive development | ✅ Done | 20+ commits from Phase 1 (foundation) through Phase 16 (polish) |
 | Worklog documents every phase | ✅ Done | `worklog.md` — 5000+ lines documenting 16 phases + reviews |
-| 369 unit/integration tests | ✅ Done | 28 Vitest files + 2 skipped smoke tests |
-| 86 E2E tests | ✅ Done | 3 Playwright spec files (desktop + mobile) |
+| 623 unit/integration tests | ✅ Done | Latest local run: 623 passed, 2 skipped |
+| Authenticated E2E coverage | ⏳ Staging required | Opt-in `tests/e2e/authenticated-flow.spec.ts`; no authenticated staging run recorded |
 | Supabase migrations (4 files) | ✅ Done | `0001_schema.sql` through `0004_resilience.sql` |
 | RLS policies (11 tables) | ✅ Done | `0002_rls.sql` + `0004_resilience.sql` |
 | Private storage policies (3 buckets) | ✅ Done | `0003_storage.sql` |

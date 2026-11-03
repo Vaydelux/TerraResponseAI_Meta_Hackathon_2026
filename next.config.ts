@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Keep Sharp as a real Node external in the standalone server. Next's
+  // bundled image optimizer copy can otherwise resolve a second Sharp
+  // version and fail to load the platform-native Windows addon at runtime.
+  serverExternalPackages: ["sharp"],
   typescript: {
     ignoreBuildErrors: false,
   },

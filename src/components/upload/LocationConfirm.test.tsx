@@ -31,6 +31,17 @@ describe("disaster report location confirmation", () => {
     expect(onConfirm).toHaveBeenCalledWith("manual", { lat: 14.5995, lon: 120.9842 });
   });
 
+  it("supports keyboard movement on the manual location pad", () => {
+    const onConfirm = vi.fn();
+    render(<LocationConfirm exif={null} onConfirm={onConfirm} />);
+    fireEvent.click(screen.getByRole("button", { name: "Place pin manually" }));
+
+    const pad = screen.getByRole("button", { name: /Interactive sector pin placement pad/ });
+    fireEvent.keyDown(pad, { key: "ArrowRight" });
+
+    expect((screen.getByLabelText("Longitude") as HTMLInputElement).value).toBe("121.0550");
+  });
+
   it("explicitly confirms a valid photo GPS reading", () => {
     const onConfirm = vi.fn();
     render(<LocationConfirm exif={{ lat: 14.6, lon: 121.2 }} onConfirm={onConfirm} />);

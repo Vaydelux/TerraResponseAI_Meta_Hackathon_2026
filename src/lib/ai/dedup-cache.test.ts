@@ -91,6 +91,30 @@ describe("lookupCachedAnalysis", () => {
     expect(cached!.structuredObservation.incident_type).toBe("debris");
   });
 
+  it("does not reuse an analysis from an older prompt or schema contract", async () => {
+    mockFrom.mockReturnValue(makeThenable({
+      data: [{
+        id: "report-old-contract",
+        status: "needs_review",
+        report_analyses: [{
+          model_id: "muse-spark-1.3",
+          prompt_version: "v1",
+          schema_version: "v1",
+          processing_status: "succeeded",
+          structured_observation: { incident_type: "unclear" },
+        }],
+      }],
+      error: null,
+    }));
+    const cached = await lookupCachedAnalysis({
+      eventId: "evt-1",
+      sha256: "abc123",
+      promptVersion: "v2",
+      schemaVersion: "v2",
+    });
+    expect(cached).toBeNull();
+  });
+
   it("returns null when no report matches the sha256 in the event", async () => {
     mockFrom.mockReturnValue(makeThenable({ data: [], error: null }));
     const cached = await lookupCachedAnalysis({

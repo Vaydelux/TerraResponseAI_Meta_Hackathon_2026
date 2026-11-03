@@ -1,7 +1,7 @@
-# ISO Compliance Reference — TerraResponse AI
+# ISO Control Evidence Map — TerraResponse AI
 
 **Last updated:** 2026-10-29  
-**Purpose:** Maps the TerraResponse AI implementation to relevant ISO standards for data security, software quality, lifecycle process, and web engineering.
+**Purpose:** Maps implementation evidence and gaps to relevant ISO standards. This is not an ISO/IEC compliance claim, certification, audit, or completed external assessment.
 
 ---
 
@@ -9,7 +9,7 @@
 
 **Scope:** Regulates how the organization and infrastructure manage data security, risk assessment, and threat mitigation.
 
-### Compliance mapping
+### Evidence mapping (not certification)
 
 | Control area | Implementation | Evidence |
 |---|---|---|
@@ -31,7 +31,7 @@
 
 **Scope:** Extends 27001 to handle Personally Identifiable Information (PII), aligning with GDPR.
 
-### Compliance mapping
+### Evidence mapping (not certification)
 
 | Control area | Implementation | Evidence |
 |---|---|---|
@@ -133,7 +133,7 @@
 | Modularity | Pure functions for authz rules, priority scoring, cost controls, prompt injection, missing-location resolution — no I/O dependencies | `src/lib/authz-rules.ts`; `src/lib/priority.ts`; `src/lib/ai/cost-controls.ts` |
 | Reusability | Shared states component (Skeleton, EmptyState, ErrorState, SkeletonRow); shared demo-banner, prototype-banner | `src/components/terra/states.tsx` |
 | Modifiability | Env-var-driven configuration (11 cost-control vars, 2 retention vars, 4 demo-seed vars); no hardcoded values for limits or model IDs | `src/lib/ai/cost-controls.ts` (readCostControlConfig) |
-| Testability | 368 unit + integration tests + 86 E2E tests; mocked transport for AI calls; vi.mock for Supabase; mocked RPC for PostGIS | 30 test files; `tests/TEST_COVERAGE.md` |
+| Testability | 623 unit/integration tests passed in the latest local run; authenticated staging E2E is opt-in and unverified; mocked transport remains clearly separated from live smoke tests | `tests/TEST_COVERAGE.md`; `docs/LIVE_STAGING_VERIFICATION.md` |
 
 ### 3.8 Portability
 

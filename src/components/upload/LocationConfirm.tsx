@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, type KeyboardEvent, type MouseEvent } from "react";
 import {
   LocateFixed,
   RefreshCw,
@@ -174,7 +174,7 @@ export function LocationConfirm({
     );
   }
 
-  function handleInteractivePadClick(e: React.MouseEvent<HTMLDivElement>) {
+  function handleInteractivePadClick(e: MouseEvent<HTMLButtonElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const relX = Math.max(0, Math.min(1, (e.clientX - rect.left) / Math.max(1, rect.width)));
     const relY = Math.max(0, Math.min(1, (e.clientY - rect.top) / Math.max(1, rect.height)));
@@ -183,6 +183,19 @@ export function LocationConfirm({
     const computedLon = Number((120.95 + relX * 0.20).toFixed(4));
     setChoice("manual");
     updateManualCoords(String(computedLat), String(computedLon));
+  }
+
+  function handleInteractivePadKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
+    e.preventDefault();
+
+    const currentLat = manualValid && latValue !== null ? latValue : 14.60;
+    const currentLon = manualValid && lonValue !== null ? lonValue : 121.05;
+    const step = 0.005;
+    const nextLat = e.key === "ArrowUp" ? currentLat + step : e.key === "ArrowDown" ? currentLat - step : currentLat;
+    const nextLon = e.key === "ArrowRight" ? currentLon + step : e.key === "ArrowLeft" ? currentLon - step : currentLon;
+    setChoice("manual");
+    updateManualCoords(nextLat.toFixed(4), nextLon.toFixed(4));
   }
 
   function confirm() {
@@ -347,21 +360,32 @@ export function LocationConfirm({
         {choice === "manual" && (
           <div style={{ display: "grid", gap: "var(--s-3)" }}>
             {/* Interactive Sector Map Pin Pad */}
-            <div
+            <button
+              type="button"
+              className="location-map-preview"
               onClick={handleInteractivePadClick}
-              role="region"
+              onKeyDown={handleInteractivePadKeyDown}
               aria-label="Interactive sector pin placement pad — click anywhere to place pin"
               style={{
                 position: "relative",
-                height: 170,
+                height: 250,
+                width: "100%",
+                padding: 0,
                 borderRadius: "var(--r-ctl)",
                 border: "1px solid var(--rule-strong)",
                 background:
-                  "radial-gradient(circle at 55% 48%, rgba(72, 181, 198, 0.16), transparent 65%), repeating-linear-gradient(0deg, rgba(11, 101, 116, 0.08) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, rgba(11, 101, 116, 0.08) 0 1px, transparent 1px 28px), var(--sheet-sunk)",
+                  "radial-gradient(circle at 55% 48%, color-mix(in srgb, var(--tide) 20%, transparent), transparent 58%), linear-gradient(135deg, color-mix(in srgb, var(--tide) 9%, var(--sheet-sunk)), var(--sheet-sunk))",
                 cursor: "crosshair",
                 overflow: "hidden",
+                textAlign: "left",
               }}
             >
+              <span className="location-map-preview__water" aria-hidden="true" />
+              <span className="location-map-preview__road location-map-preview__road--one" aria-hidden="true" />
+              <span className="location-map-preview__road location-map-preview__road--two" aria-hidden="true" />
+              <span className="location-map-preview__district location-map-preview__district--north">NORTH METRO</span>
+              <span className="location-map-preview__district location-map-preview__district--east">EAST CORRIDOR</span>
+              <span className="location-map-preview__district location-map-preview__district--south">SOUTH ARTERIAL</span>
               <div
                 className="t-meta num"
                 style={{
@@ -412,7 +436,7 @@ export function LocationConfirm({
                 </span>
                 <MapPin size={24} style={{ color: "var(--tide)", fill: "var(--tide-wash)" }} />
               </div>
-            </div>
+            </button>
 
             {/* Quick Sector Presets */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -446,6 +470,9 @@ export function LocationConfirm({
               <Field label="Latitude" htmlFor="lc-lat">
                 <Input
                   id="lc-lat"
+                  name="latitude"
+                  autoComplete="off"
+                  spellCheck={false}
                   type="number"
                   step="0.0001"
                   min="-90"
@@ -459,6 +486,9 @@ export function LocationConfirm({
               <Field label="Longitude" htmlFor="lc-lon">
                 <Input
                   id="lc-lon"
+                  name="longitude"
+                  autoComplete="off"
+                  spellCheck={false}
                   type="number"
                   step="0.0001"
                   min="-180"

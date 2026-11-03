@@ -89,7 +89,10 @@ export function MaskControl({
       const res = await fetch(`/api/reports/${reportId}/segment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: target || undefined }),
+        // The segmentation route calls this field `prompt`. Sending the
+        // visible mask target under `target` made the server ignore it and
+        // return NO_TARGET even when the reviewer entered a value.
+        body: JSON.stringify({ prompt: target.trim() || undefined }),
         signal: ctrl.signal,
       });
       const body = await res.json();
@@ -99,12 +102,16 @@ export function MaskControl({
         onMask?.(body.overlay);
       } else if (!body?.ok) {
         const msg = body?.error?.message ?? "Segmentation failed.";
-        toast.error(msg, {
-          label: "Retry",
-          onClick: () => {
-            void handleRequest();
-          },
-        });
+        if (res.status === 401 || res.status === 403 || body?.error?.code === "FORBIDDEN") {
+          toast.error(msg);
+        } else {
+          toast.error(msg, {
+            label: "Retry",
+            onClick: () => {
+              void handleRequest();
+            },
+          });
+        }
       }
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === "AbortError") return;

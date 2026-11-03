@@ -50,7 +50,10 @@ export const toast = {
     this.push({ kind: "confirmed", message, action });
   },
   error(message: ReactNode, action?: ToastItem["action"]) {
-    this.push({ kind: "error", message, action, ttl: 0 });
+    // Errors should remain visible long enough to read, but must not trap
+    // the user forever. The inline action and dismiss button still remove it
+    // immediately when the user takes action.
+    this.push({ kind: "error", message, action, ttl: 8000 });
   },
 };
 
@@ -90,7 +93,12 @@ export function ToastRegion() {
   return (
     <div className="toast-region" aria-live="polite" aria-atomic="false">
       {items.map((item) => (
-        <div key={item.id} className="toast" data-kind={item.kind ?? "default"}>
+        <div
+          key={item.id}
+          className="toast"
+          data-kind={item.kind ?? "default"}
+          role={item.kind === "error" ? "alert" : "status"}
+        >
           <span className="filecheck__icon" aria-hidden="true">
             {KIND_ICON[item.kind ?? "default"]}
           </span>
@@ -100,8 +108,11 @@ export function ToastRegion() {
               type="button"
               className="btn btn--quiet btn--sm"
               onClick={() => {
-                item.action?.onClick();
-                setItems((prev) => prev.filter((i) => i.id !== item.id));
+                try {
+                  item.action?.onClick();
+                } finally {
+                  setItems((prev) => prev.filter((i) => i.id !== item.id));
+                }
               }}
             >
               {item.action.label}

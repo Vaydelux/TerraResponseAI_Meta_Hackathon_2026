@@ -289,7 +289,7 @@ export async function signUpAction(formData: FormData): Promise<SignUpState> {
     }
     return {
       status: "success",
-      message: "Registration request received. Check your inbox for a confirmation link if email verification is enabled. Then sign in. If you already have an account, use the sign-in page.",
+      message: "Registration request received. Check your email and confirm your address before signing in. If you already have an account, use the sign-in page.",
     };
   } catch {
     console.error("[auth] Sign-up service unavailable");

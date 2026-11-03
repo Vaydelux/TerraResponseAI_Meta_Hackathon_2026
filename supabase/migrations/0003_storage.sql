@@ -107,9 +107,9 @@ $$;
 -- On a vanilla PostgreSQL (no Supabase), the operator must enable RLS
 -- manually: `alter table storage.objects enable row level security;`
 -- (as the storage schema owner). The policies below assume RLS is on.
--- The pgTAP test runner (scripts/_run_sql_tests.ts) enables RLS
--- explicitly in its stub because PGlite doesn't ship with the Supabase
--- storage defaults.
+-- The local PGlite migration harness enables RLS explicitly in its stub
+-- because PGlite doesn't ship with the Supabase storage defaults. The
+-- authenticated storage tests still require isolated Supabase staging.
 
 -- ============================================================================
 -- 4. evidence-originals — policies

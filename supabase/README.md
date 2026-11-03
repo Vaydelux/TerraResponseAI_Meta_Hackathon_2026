@@ -11,7 +11,7 @@
 ```
 supabase/
 ├── README.md                      # this file
-├── seed.sql                       # minimal seed scaffolding (4 users, 2 events, 1 report)
+├── seed.sql                       # intentionally empty; never inserts auth.users rows
 ├── migrations/
 │   ├── 0001_schema.sql             # tables, check constraints, indices, triggers
 │   ├── 0002_rls.sql                # RLS helper functions + per-table policies
@@ -133,11 +133,10 @@ supabase link --project-ref <your-project-ref>
 supabase db push
 # (equivalent: supabase migration up)
 
-# 3. Seed the demo data (uses the service role; bypasses RLS)
-supabase db seed            # runs supabase/seed.sql
-# NOTE: on a hosted Supabase project, `supabase db seed` may fail on
-# the `auth.users` direct INSERT. Use `bun run db:seed-demo` instead
-# (uses the Supabase Auth admin API — the supported path).
+# 3. Seed synthetic demo evidence through the guarded Auth Admin API script
+bun run db:seed-demo
+# `supabase db seed` is intentionally a no-op. This project never inserts
+# identities directly into auth.users or creates preconfirmed demo users.
 
 # 4. Run the RLS tests (requires psql + the database URL)
 psql "$(supabase db url)" -v ON_ERROR_STOP=0 -f supabase/tests/test_rls.sql
@@ -161,8 +160,8 @@ psql "$DB_URL" -f supabase/migrations/0001_schema.sql
 psql "$DB_URL" -f supabase/migrations/0002_rls.sql
 psql "$DB_URL" -f supabase/migrations/0003_storage.sql
 
-# Seed
-psql "$DB_URL" -f supabase/seed.sql
+# Do not seed auth.users with SQL. Provision identities through the protected
+# staging Auth Admin workflow, then load only the approved synthetic fixtures.
 
 # Test
 psql "$DB_URL" -v ON_ERROR_STOP=0 -f supabase/tests/test_rls.sql
@@ -184,10 +183,10 @@ are the production-target set. To verify them locally, run them
 against a local Supabase instance (`supabase start`) or a cloud
 Supabase project.
 
-## 4. Seed users
+## 4. Test identities
 
-The seed (`supabase/seed.sql`) creates four demo users with fixed
-UUIDs so the RLS tests can reference them:
+The RLS suites do not create identities. Test identities must be provisioned
+through Supabase Auth Admin API in isolated staging only:
 
 | User | UUID | Global role | Event membership |
 |---|---|---|---|
@@ -199,11 +198,9 @@ UUIDs so the RLS tests can reference them:
 Dave is the **"second unaffiliated user"** for the cross-event gate
 test: he's in Event B and must NOT see Event A's reports or evidence.
 
-> The seed inserts rows into `auth.users` directly via SQL, which
-> requires the postgres/service role. In a real Supabase project
-> you'd create users via `supabase.auth.admin.createUser()` in a JS
-> script (the `handle_new_user` trigger creates the profile). The SQL
-> approach is for testing only.
+> Direct SQL inserts into `auth.users` are prohibited. Do not treat
+> preconfirmed demo identities as proof of email ownership. See
+> `scripts/provision-staging-test-users.ts` and Issue #21.
 
 ## 5. RLS policy summary
 

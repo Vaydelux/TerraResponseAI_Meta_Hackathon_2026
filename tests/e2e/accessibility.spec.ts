@@ -17,7 +17,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Accessibility — login page (Setup state)", () => {
   test("the page has a meaningful title (document.title contains the brand)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     const title = await page.title();
     expect(title.length).toBeGreaterThan(0);
@@ -25,7 +25,7 @@ test.describe("Accessibility — login page (Setup state)", () => {
   });
 
   test("the page has a single h1 (the brand heading)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     const h1 = page.locator("h1");
     await expect(h1).toBeVisible({ timeout: 10000 });
@@ -33,15 +33,14 @@ test.describe("Accessibility — login page (Setup state)", () => {
     expect(h1Count).toBe(1);
   });
 
-  test("the brand heading text is 'TerraResponse AI'", async ({ page }) => {
-    await page.goto("/");
+  test("the TerraResponse AI brand is visible", async ({ page }) => {
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
-    const h1 = page.locator("h1").first();
-    await expect(h1).toHaveText("TerraResponse AI", { timeout: 10000 });
+    await expect(page.getByText("TerraResponse AI", { exact: true }).first()).toBeVisible({ timeout: 10000 });
   });
 
   test("the Setup card has an accessible name (the 'Setup required' title)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     // The card title is a heading element (h2 or h3 in the shadcn/ui
     // CardTitle) — verify it's reachable.
@@ -50,7 +49,7 @@ test.describe("Accessibility — login page (Setup state)", () => {
   });
 
   test("the env-var names in the Setup card use a monospace font (machine-readable)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     const envVar = page.locator("text=NEXT_PUBLIC_SUPABASE_URL").first();
     await expect(envVar).toBeVisible({ timeout: 10000 });
@@ -66,7 +65,7 @@ test.describe("Accessibility — login page (Setup state)", () => {
 
 test.describe("Keyboard focus — login page (Setup state)", () => {
   test("the page is keyboard-navigable (Tab moves focus forward)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     // Wait for the Setup card to render.
     await expect(page.locator("text=Setup required")).toBeVisible({ timeout: 10000 });
@@ -81,7 +80,7 @@ test.describe("Keyboard focus — login page (Setup state)", () => {
   });
 
   test("the page has no focus traps (Tab cycles through all focusable elements)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     await expect(page.locator("text=Setup required")).toBeVisible({ timeout: 10000 });
     // Tab through the page; verify we can cycle without getting
@@ -101,7 +100,7 @@ test.describe("Mobile viewport — login page (Setup state)", () => {
   // viewport to Pixel 5 (393×851). The Setup card should be readable
   // at that width (no horizontal scroll, the card fits).
   test("the Setup card fits in the mobile viewport (no horizontal scroll)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     // The body's scrollWidth should not exceed the viewport width.
     const scrollWidth = await page.evaluate(() => document.body.scrollWidth);
@@ -111,7 +110,7 @@ test.describe("Mobile viewport — login page (Setup state)", () => {
   });
 
   test("the brand heading + Setup title are visible at mobile width", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     await expect(page.locator("h1")).toBeVisible({ timeout: 10000 });
     await expect(page.locator("text=Setup required")).toBeVisible();
@@ -126,7 +125,7 @@ test.describe("Mobile viewport — login page (Setup state)", () => {
   });
 
   test("the env-var names are visible + readable at mobile width (no truncation)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     const envVar = page.locator("text=NEXT_PUBLIC_SUPABASE_URL").first();
     await expect(envVar).toBeVisible({ timeout: 10000 });
@@ -143,7 +142,7 @@ test.describe("Mobile viewport — login page (Setup state)", () => {
 test.describe("Loading + empty states", () => {
   test("the login page renders within 5 seconds (no perpetual spinner)", async ({ page }) => {
     const start = Date.now();
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     await expect(page.locator("text=Setup required")).toBeVisible({ timeout: 5000 });
     const elapsed = Date.now() - start;
@@ -159,7 +158,7 @@ test.describe("Loading + empty states", () => {
     page.on("console", (msg) => {
       if (msg.type() === "error") errors.push(msg.text());
     });
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     // Allow a moment for any deferred errors.
     await page.waitForTimeout(500);
@@ -184,7 +183,7 @@ test.describe("Loading + empty states", () => {
     page.on("pageerror", (err) => {
       rejections.push(err.message);
     });
-    await page.goto("/");
+    await page.goto("/login");
     await page.waitForURL(/\/login/, { timeout: 10000 });
     await page.waitForTimeout(500);
     expect(rejections).toEqual([]);

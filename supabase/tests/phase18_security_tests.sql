@@ -3,14 +3,15 @@
 -- Phase 18 — Real-database security tests for TerraResponse AI.
 -- ============================================================================
 -- These tests run against a real PostgreSQL instance. The Phase 18
--- verification runner uses PGlite (PostgreSQL 16 in WASM); the same
--- tests can also run against a local Supabase or any PostgreSQL with
--- the 0001-0006 migrations applied + the seed.sql data.
+-- verification runner uses PGlite (PostgreSQL 16 in WASM) for migration
+-- checks only. These tests require an isolated database with identities
+-- provisioned through supported Supabase Auth APIs; they must not use a SQL
+-- seed that inserts into auth.users.
 --
 -- Result reporting: the tests INSERT into public._test_results(name,
--- ok, detail). The runner reads this table after each statement and
--- surfaces PASS/FAIL. (PGlite doesn't surface RAISE NOTICE via
--- pg.query().notices, so we use a side-channel table.)
+-- ok, detail). When run with psql, inspect that table and the NOTICE
+-- output for PASS/FAIL. The local PGlite harness does not execute this
+-- suite because it cannot provision Supabase Auth identities safely.
 --
 -- Coverage:
 --   * Anonymous access (no rows visible).
