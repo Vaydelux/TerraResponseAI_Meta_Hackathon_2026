@@ -28,6 +28,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabaseUrl, serviceRoleKey } from "@/lib/supabase/env";
 import { segmentImage, isSamConfigured } from "@/lib/ai/sam";
+import { checkAllAiCallCeilings } from "@/lib/rate-limit";
+import { logUsage } from "@/lib/ai/usage-log";
 
 export async function POST(
   request: NextRequest,
@@ -64,6 +66,14 @@ export async function POST(
       { status: 401 },
     );
   }
+  // Paid segmentation is a reviewer-only, opt-in operation. Ownership of
+  // a report does not grant the reporter authority to spend SAM credits.
+  if (ctx.user.role !== "reviewer" && ctx.user.role !== "admin") {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "Reviewer access required for segmentation." } },
+      { status: 403 },
+    );
+  }
 
   const { id } = await params;
 
@@ -71,7 +81,7 @@ export async function POST(
   const supabase = await createSupabaseServerClient();
   const { data: report, error: reportErr } = await supabase
     .from("reports")
-    .select("id, status, derivative_storage_key, image_width, image_height")
+    .select("id, event_id, status, derivative_storage_key, image_width, image_height")
     .eq("id", id)
     .single();
 
@@ -83,6 +93,17 @@ export async function POST(
   }
 
   // 3. The report MUST be in needs_review or reviewed (analysis done).
+  // Global reviewer role alone is not enough to operate on an
+  // unrelated workspace; global admins remain explicitly authorized.
+  if (ctx.user.role !== "admin" &&
+      !ctx.events.some((e) => e.event_id === report.event_id &&
+        (e.role === "reviewer" || e.role === "coordinator"))) {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "Event reviewer access required." } },
+      { status: 403 },
+    );
+  }
+
   if (report.status !== "needs_review" && report.status !== "reviewed") {
     return NextResponse.json(
       { error: { code: "INVALID_STATE", message: `Segmentation requires the report to be analyzed first (needs_review or reviewed). Current state: '${report.status}'.` } },
@@ -98,22 +119,59 @@ export async function POST(
   } catch {
     // No body is fine — we'll use the analysis's segmentation_target.
   }
+  if (body.prompt !== undefined && typeof body.prompt !== "string") {
+    return NextResponse.json(
+      { error: { code: "BAD_REQUEST", message: "Segmentation target must be text." } },
+      { status: 400 },
+    );
+  }
   const userPrompt = body.prompt?.trim();
 
   // 5. Fetch the Muse Spark analysis to get the segmentation_target.
-  const { data: analysis } = await supabase
+  const { data: analysis, error: analysisError } = await supabase
     .from("report_analyses")
-    .select("structured_observation")
+    .select("structured_observation, raw_usage_metadata")
     .eq("report_id", id)
     .single();
+  if (analysisError || !analysis) {
+    return NextResponse.json(
+      { error: { code: "NO_ANALYSIS", message: "A saved Meta observation is required for segmentation." } },
+      { status: 409 },
+    );
+  }
 
-  const analysisTarget = (analysis?.structured_observation as any)?.segmentation_target ?? null;
+  const observed = analysis.structured_observation as { segmentation_target?: string | null } | null;
+  const analysisTarget = observed?.segmentation_target ?? null;
   const prompt = userPrompt || analysisTarget;
 
   if (!prompt) {
     return NextResponse.json(
       { error: { code: "NO_TARGET", message: "No segmentation target provided. The Muse Spark analysis did not produce one, and no prompt was supplied in the request." } },
       { status: 422 },
+    );
+  }
+
+  const priorMetadata = (analysis.raw_usage_metadata ?? {}) as Record<string, unknown>;
+  const previouslySaved = priorMetadata._sam_overlay as
+    | { prompt?: string; created_at?: string }
+    | undefined;
+  if (previouslySaved?.prompt === prompt) {
+    return NextResponse.json({ ok: true, reportId: id, overlay: previouslySaved, fromCache: true });
+  }
+  const lastAttemptAt = previouslySaved?.created_at ? Date.parse(previouslySaved.created_at) : NaN;
+  if (Number.isFinite(lastAttemptAt) &&
+      lastAttemptAt <= Date.now() && Date.now() - lastAttemptAt < 15 * 60 * 1000) {
+    return NextResponse.json(
+      { error: { code: "SEGMENTATION_COOLDOWN", message: "Wait before requesting a different segmentation target." } },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
+  }
+
+  const budget = await checkAllAiCallCeilings({ userId: user.id, eventId: report.event_id });
+  if (!budget.ok) {
+    return NextResponse.json(
+      { error: { code: budget.code, message: budget.message } },
+      { status: budget.code === "AI_BUDGET_UNAVAILABLE" ? 503 : 429 },
     );
   }
 
@@ -153,6 +211,16 @@ export async function POST(
     imageBytes,
     imageMimeType: "image/jpeg",
     prompt,
+  });
+  await logUsage({
+    reportId: id, eventId: report.event_id, userId: user.id,
+    modelId: "sam-3.1", promptVersion: "segmentation-v1",
+    schemaVersion: "sam-rle-v1",
+    outcome: result.ok ? "succeeded" :
+      result.kind === "permanent" || result.kind === "not_configured" ? "permanent_failed" :
+      "transient_failed",
+    errorMessage: result.ok ? null : result.error,
+    usage: result.ok ? result.usageMetadata : null,
   });
 
   if (!result.ok) {
@@ -194,35 +262,27 @@ export async function POST(
     created_at: new Date().toISOString(),
   };
 
-  const { error: updateErr } = await supabase
+  // Strict Meta observations are immutable. Persist optional mask metadata
+  // separately through a trusted server client AFTER checking RLS and role.
+  const { data: persisted, error: updateErr } = await serviceClient
     .from("report_analyses")
     .update({
       raw_usage_metadata: {
-        ...(analysis?.structured_observation as any)?.usage ?? {},
+        ...priorMetadata,
         sam: result.usageMetadata,
+        _sam_overlay: overlayData,
       },
     })
-    .eq("report_id", id);
+    .eq("report_id", id)
+    .select("report_id")
+    .single();
 
-  if (updateErr) {
-    // Non-fatal: the overlay is still stored in structured_observation
-    // below. Log the error but don't block the response.
-    console.error(`[segment] raw_usage_metadata update failed for ${id}: ${updateErr.message}`);
-  }
-
-  // Store the overlay in a separate jsonb field or in
-  // structured_observation. We add it to the structured_observation
-  // under a `_sam_overlay` key (prefixed with _ to avoid colliding
-  // with the Zod-validated fields).
-  if (analysis?.structured_observation) {
-    const updated = {
-      ...(analysis.structured_observation as Record<string, unknown>),
-      _sam_overlay: overlayData,
-    };
-    await supabase
-      .from("report_analyses")
-      .update({ structured_observation: updated })
-      .eq("report_id", id);
+  if (updateErr || !persisted) {
+    console.error("[segment] Unable to persist SAM overlay.", { code: updateErr?.code ?? "missing_row" });
+    return NextResponse.json(
+      { error: { code: "SEGMENTATION_SAVE_FAILED", message: "The segmentation overlay could not be saved. The report is unchanged." } },
+      { status: 503 },
+    );
   }
 
   // 9. Return the overlay data.
@@ -267,7 +327,7 @@ export async function GET(
   const supabase = await createSupabaseServerClient();
   const { data: analysis, error } = await supabase
     .from("report_analyses")
-    .select("structured_observation")
+    .select("structured_observation, raw_usage_metadata")
     .eq("report_id", id)
     .single();
 
@@ -278,7 +338,9 @@ export async function GET(
     );
   }
 
-  const overlay = (analysis.structured_observation as any)?._sam_overlay ?? null;
+  const metadata = analysis.raw_usage_metadata as Record<string, unknown> | null;
+  const legacy = analysis.structured_observation as Record<string, unknown> | null;
+  const overlay = metadata?._sam_overlay ?? legacy?._sam_overlay ?? null;
 
   return NextResponse.json({
     ok: true,
