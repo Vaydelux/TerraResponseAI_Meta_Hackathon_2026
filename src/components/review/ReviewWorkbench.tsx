@@ -328,14 +328,16 @@ export function ReviewWorkbench({
               )
             }
           />
-          <ContextualIntelligenceCard
-            reportId={reportId}
-            initialContext={initialContextualIntelligence}
-            locationLabel={detail.location_label}
-            latitude={detail.latitude}
-            longitude={detail.longitude}
-            incidentType={observation.incidentType}
-          />
+          {(currentUserRole === "reviewer" || currentUserRole === "admin") && (
+            <ContextualIntelligenceCard
+              reportId={reportId}
+              initialContext={initialContextualIntelligence}
+              locationLabel={detail.location_label}
+              latitude={detail.latitude}
+              longitude={detail.longitude}
+              incidentType={observation.incidentType}
+            />
+          )}
         </div>
       </div>
       <section style={{ marginTop: "var(--s-6)" }}>
