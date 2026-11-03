@@ -42,6 +42,7 @@ export default async function DashboardPage() {
   // Start independent dashboard queries together. Previously these
   // ran in three serial stages: counts → recent rows → audit activity.
   // Promise.resolve eagerly begins PostgREST thenables before awaiting.
+  const canReview = ctx.user.role === "reviewer" || ctx.user.role === "admin";
   const auditPromise = Promise.resolve(canReview
     ? supabase.from("audit_events")
         .select("id, created_at, actor_name, actor_email, action, target, details")
@@ -132,7 +133,6 @@ export default async function DashboardPage() {
     };
   });
 
-  const canReview = ctx.user.role === "reviewer" || ctx.user.role === "admin";
   let streamItems: Array<{
     id: string;
     category: string;
@@ -144,8 +144,6 @@ export default async function DashboardPage() {
   }> = [];
 
   if (canReview) {
-
-
     if (auditRows && auditRows.length > 0) {
       streamItems = auditRows.map((a) => {
         const row = a as unknown as {
