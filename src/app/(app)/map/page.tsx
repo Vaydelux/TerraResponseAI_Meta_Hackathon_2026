@@ -10,7 +10,8 @@ import { getAuthContext } from "@/lib/auth/profile";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { IncidentMap, type IncidentMapReport } from "@/components/map/IncidentMap";
+import type { IncidentMapReport } from "@/components/map/IncidentMap";
+import { DeferredIncidentMap } from "@/components/map/DeferredIncidentMap";
 import { EmptyState, Button } from "@/components/ui-tr";
 
 export default async function MapPageRoute() {
@@ -118,7 +119,7 @@ export default async function MapPageRoute() {
           </>
         }
       />
-      <IncidentMap
+      <DeferredIncidentMap
         eventId={activeEventId}
         eventName={activeEvent?.event_name}
         canReview={canReview}

@@ -449,3 +449,28 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-progress__dots i, .auth-progress__rail span { animation: none; opacity: 1; transform: none; }
 }
+
+/* Fast navigation hint — visible only if a route is genuinely pending.
+ * The fallback UI is supplied by (app)/loading.tsx, not by a fake timer. */
+.tr-nav-pending {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-inline-start: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0;
+  visibility: hidden;
+  vertical-align: middle;
+  pointer-events: none;
+}
+.tr-nav-pending.is-pending {
+  visibility: visible;
+  animation: tr-nav-pending-in 160ms ease 100ms forwards,
+    tr-nav-pending-pulse 850ms ease-in-out 100ms infinite;
+}
+@keyframes tr-nav-pending-in { to { opacity: .65; } }
+@keyframes tr-nav-pending-pulse { 50% { opacity: .2; } }
+@media (prefers-reduced-motion: reduce) {
+  .tr-nav-pending.is-pending { animation: none; opacity: .65; }
+}

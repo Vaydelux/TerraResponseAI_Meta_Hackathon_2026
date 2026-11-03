@@ -15,6 +15,7 @@ import { Menu, X, PlusCircle } from "lucide-react";
 import { Wordmark } from "./Wordmark";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserMenu } from "./UserMenu";
+import { NavPendingIndicator } from "./NavPendingIndicator";
 import { isNavHrefActive } from "@/lib/upload/upload-ux-helpers";
 import type { AuthContext } from "@/lib/auth/profile";
 
@@ -83,6 +84,7 @@ export function TopBar({
                 style={{ whiteSpace: "nowrap" }}
               >
                 {l.label}
+                <NavPendingIndicator />
                 {l.showCount && pendingReviewCount > 0 && (
                   <span className="nav__count" aria-label={`${pendingReviewCount} pending`}>
                     {pendingReviewCount}
@@ -102,6 +104,7 @@ export function TopBar({
                 style={{ whiteSpace: "nowrap" }}
               >
                 {l.label}
+                <NavPendingIndicator />
               </Link>
             );
           })}
@@ -147,7 +150,8 @@ export function TopBar({
                   aria-current={active ? "page" : undefined}
                   onClick={() => setMobileOpen(false)}
                 >
-                  <span>{l.label}</span>
+                  <span>{l.label}
+                <NavPendingIndicator /></span>
                   {l.showCount && pendingReviewCount > 0 && (
                     <span className="nav__count" aria-label={`${pendingReviewCount} pending`}>
                       {pendingReviewCount}

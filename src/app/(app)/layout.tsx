@@ -10,12 +10,12 @@
 
 import { redirect } from "next/navigation";
 import { getServerUser, isSupabaseConfigured } from "@/lib/supabase/server";
-import { getAuthContext } from "@/lib/auth/profile";
+import { getAuthContext, reloadAuthContextForUserId } from "@/lib/auth/profile";
 import { AppShell } from "@/components/layout/AppShell";
 import { SetupRedirect } from "@/components/terra/setup-redirect";
 import { isTriageEnabled } from "@/lib/triage/processing";
 import { isRoleManagementEnabled } from "@/lib/admin/role-management";
-import { ensureCommunityIntakeMembership } from "@/lib/community/intake";
+import { ensureCommunityIntakeMembership, COMMUNITY_INTAKE_SLUG, isCommunityIntakeEnabled } from "@/lib/community/intake";
 
 export default async function AppLayout({
   children,
@@ -31,26 +31,35 @@ export default async function AppLayout({
     redirect("/login?callbackUrl=" + encodeURIComponent("/dashboard"));
   }
 
-  // Provision the fixed workspace at login so dashboards, report lists,
-  // reviewer queues and direct navigation all share one report-first context.
-  // Failure is non-fatal for navigation; /reports/new surfaces the outage.
-  try {
-    await ensureCommunityIntakeMembership(user.id);
-  } catch {
-    console.error("[intake] Shared reporting workspace unavailable.");
-  }
-  const ctx = await getAuthContext(user);
+  let ctx = await getAuthContext(user);
   if (!ctx) {
     // Authenticated but missing/inaccessible profile is NOT a login
     // failure. Directing back to /login creates a 307 bounce loop.
     redirect("/account-unavailable");
   }
 
+  // Existing members need no server-role upsert during tab navigation.
+  // Enroll only once for a newly registered user. Refresh the shared
+  // request-scoped context so this initial render sees the new membership.
+  if (isCommunityIntakeEnabled() &&
+      !ctx.events.some((e) => e.event_slug === COMMUNITY_INTAKE_SLUG)) {
+    try {
+      await ensureCommunityIntakeMembership(user.id);
+      const refreshed = await reloadAuthContextForUserId(user.id);
+      if (refreshed) {
+        Object.assign(ctx, refreshed);
+      }
+    } catch {
+      // Navigation is still available; uploads report intake errors.
+      console.error("[intake] Shared reporting workspace unavailable.");
+    }
+  }
+
   // The pending review count for the TopBar badge. This is a single
   // count query — for the (app) layout's first paint, we keep it
   // simple. The review page itself fetches the full list.
   let pendingReviewCount = 0;
-  if (ctx.events.length > 0) {
+  if ((ctx.user.role === "reviewer" || ctx.user.role === "admin") && ctx.events.length > 0) {
     try {
       const { createSupabaseServerClient } = await import("@/lib/supabase/server");
       const supabase = await createSupabaseServerClient();

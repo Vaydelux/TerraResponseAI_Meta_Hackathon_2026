@@ -39,10 +39,19 @@ export default async function DashboardPage() {
     ctx.events[0] ??
     null;
 
-  // Honest metrics — counts from the DB across the user's events.
-  const [allRes, pendingRes, reviewedRes, unlocatedRes, failedRes, manualRes] =
+  // Start independent dashboard queries together. Previously these
+  // ran in three serial stages: counts → recent rows → audit activity.
+  // Promise.resolve eagerly begins PostgREST thenables before awaiting.
+  const canReview = ctx.user.role === "reviewer" || ctx.user.role === "admin";
+  const auditPromise = Promise.resolve(canReview
+    ? supabase.from("audit_events")
+        .select("id, created_at, actor_name, actor_email, action, target, details")
+        .order("created_at", { ascending: false })
+        .range(0, 4)
+    : { data: [] });
+  const countsPromise = Promise.resolve(
     eventIds.length > 0
-      ? await Promise.all([
+      ? Promise.all([
           supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds),
           supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "needs_review"),
           supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("review_outcome", "confirmed"),
@@ -57,20 +66,12 @@ export default async function DashboardPage() {
           { count: 0 },
           { count: 0 },
           { count: 0 },
-        ];
-
-  const totalReceived = allRes.count ?? 0;
-  const awaitingReview = (pendingRes.count ?? 0) + (manualRes.count ?? 0);
-  const totalReviewed = reviewedRes.count ?? 0;
-  const totalUnlocated = unlocatedRes.count ?? 0;
-  const totalFailed = failedRes.count ?? 0;
-  const verificationRate =
-    totalReceived > 0 ? Math.round((totalReviewed / totalReceived) * 100) : 0;
+        ]);
 
   // Top 12 reports ordered by priority score desc, then newest first
-  const { data: recentRows } =
+  const recentPromise = Promise.resolve(
     eventIds.length > 0
-      ? await supabase
+      ? supabase
           .from("reports")
           .select(
             "id, status, review_outcome, title, description, latitude, longitude, location_source, location_label, image_mime_type, captured_at, uploaded_at, priority_score, created_at, report_analyses(structured_observation)",
@@ -79,7 +80,21 @@ export default async function DashboardPage() {
           .order("priority_score", { ascending: false, nullsFirst: false })
           .order("created_at", { ascending: false })
           .range(0, 11)
-      : { data: [] };
+      : { data: [] });
+
+  const [
+    [allRes, pendingRes, reviewedRes, unlocatedRes, failedRes, manualRes],
+    { data: recentRows },
+    { data: auditRows },
+  ] = await Promise.all([countsPromise, recentPromise, auditPromise]);
+
+  const totalReceived = allRes.count ?? 0;
+  const awaitingReview = (pendingRes.count ?? 0) + (manualRes.count ?? 0);
+  const totalReviewed = reviewedRes.count ?? 0;
+  const totalUnlocated = unlocatedRes.count ?? 0;
+  const totalFailed = failedRes.count ?? 0;
+  const verificationRate =
+    totalReceived > 0 ? Math.round((totalReviewed / totalReceived) * 100) : 0;
 
   const recent: ReportRowData[] = (recentRows ?? []).map((r) => {
     const row = r as unknown as {
@@ -118,7 +133,6 @@ export default async function DashboardPage() {
     };
   });
 
-  const canReview = ctx.user.role === "reviewer" || ctx.user.role === "admin";
   let streamItems: Array<{
     id: string;
     category: string;
@@ -130,12 +144,6 @@ export default async function DashboardPage() {
   }> = [];
 
   if (canReview) {
-    const { data: auditRows } = await supabase
-      .from("audit_events")
-      .select("id, created_at, actor_name, actor_email, action, target, details")
-      .order("created_at", { ascending: false })
-      .range(0, 4);
-
     if (auditRows && auditRows.length > 0) {
       streamItems = auditRows.map((a) => {
         const row = a as unknown as {
@@ -166,13 +174,13 @@ export default async function DashboardPage() {
             : isFlag
             ? "FLAGGED"
             : "RECORDED",
-          tone: isConfirm
+          tone: (isConfirm
             ? "green"
             : isReject
             ? "brick"
             : isFlag
             ? "amber"
-            : "tide",
+            : "tide") as "green" | "brick" | "amber" | "tide",
         };
       });
     }
