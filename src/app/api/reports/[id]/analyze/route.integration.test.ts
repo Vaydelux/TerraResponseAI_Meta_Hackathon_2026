@@ -242,6 +242,60 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     expect(mockAnalyzeImage).not.toHaveBeenCalled();
   });
 
+  it("keeps recently started analysis in progress without a second paid model call", async () => {
+    mockFrom.mockReturnValueOnce(makeBuilder({
+      data: {
+        id: REPORT_ID, event_id: EVENT_ID, status: "analyzing",
+        updated_at: new Date().toISOString(), retry_count: 0,
+        sha256: null, derivative_storage_key: "x/y.jpg",
+      },
+      error: null,
+    }));
+    const { request, context } = makeRequest();
+    const response = await POST(request, context);
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("IN_PROGRESS");
+    expect(mockAnalyzeImage).not.toHaveBeenCalled();
+    expect(mockCreateClient).not.toHaveBeenCalled();
+  });
+
+  it("recovers an orphaned AI job with status+timestamp CAS before any new paid inference", async () => {
+    const staleAt = new Date(Date.now() - 180_000).toISOString();
+    mockFrom.mockReturnValueOnce(makeBuilder({
+      data: {
+        id: REPORT_ID, event_id: EVENT_ID, status: "analyzing",
+        updated_at: staleAt, retry_count: 0, sha256: null,
+        derivative_storage_key: "x/y.jpg",
+      },
+      error: null,
+    }));
+    const update = vi.fn();
+    const eq = vi.fn();
+    const chain: Record<string, unknown> = {
+      eq,
+      select: () => ({
+        maybeSingle: async () => ({ data: { id: REPORT_ID }, error: null }),
+      }),
+    };
+    eq.mockReturnValue(chain);
+    update.mockReturnValue(chain);
+    mockFrom.mockReturnValueOnce({ update });
+    mockCheckAllAiCallCeilings.mockResolvedValue({
+      ok: false, code: "AI_BUDGET_UNAVAILABLE",
+      message: "Budget temporarily unavailable", used: 0, limit: 0,
+    });
+    const { request, context } = makeRequest();
+    const response = await POST(request, context);
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe("AI_BUDGET_UNAVAILABLE");
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      status: "retryable_error", retry_count: 1,
+    }));
+    expect(eq).toHaveBeenCalledWith("status", "analyzing");
+    expect(eq).toHaveBeenCalledWith("updated_at", staleAt);
+    expect(mockAnalyzeImage).not.toHaveBeenCalled();
+  });
+
   it("returns 409 RETRY_CAP_REACHED when retry_count is at the cap (5)", async () => {
     mockFrom.mockReturnValueOnce(makeBuilder({
       data: { id: REPORT_ID, event_id: EVENT_ID, status: "retryable_error",
