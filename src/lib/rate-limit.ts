@@ -32,8 +32,7 @@
 // The counters are rolled up by a unique index on (user_id, occurred_at)
 // or (event_id, occurred_at) etc. — see 0004_resilience.sql.
 //
-// Upload counters retain their existing fail-open availability trade-off.
-// Paid AI inference counters and private evidence mints FAIL CLOSED when
+// Upload counters also FAIL CLOSED when the count cannot be trusted.\n// Paid AI inference counters and private evidence mints FAIL CLOSED when
 // usage cannot be verified, preventing uncontrolled provider spending
 // and unaccounted private-file access.
 
@@ -94,16 +93,21 @@ export async function checkUserUploadRate(
     .eq("creator_id", userId)
     .gte("uploaded_at", since);
 
-  if (error) {
-    // Fail-OPEN (see module comment): log and allow. The ceiling is
-    // enforced when the count works; a DB hiccup shouldn't block a
-    // legitimate upload.
-    console.error(
-      `[rate-limit] checkUserUploadRate failed (allowing): ${error.message}`,
-    );
-    return { ok: true };
+  if (error || count === null) {
+    // A broken count is not zero: fail closed to protect private storage
+    // and prevent unbounded spam or rate-limit bypass.
+    console.error("[rate-limit] Upload accounting unavailable.", {
+      code: error?.code ?? "count_unavailable",
+    });
+    return {
+      ok: false,
+      code: COST_CONTROL_ERRORS.USER_UPLOAD_RATE_UNAVAILABLE,
+      message: "Photo reporting is temporarily unavailable. No photo was saved. Please retry later.",
+      used: 0,
+      limit: config.perUserUploadsPerHour,
+    };
   }
-  const used = count ?? 0;
+  const used = count;
   if (used >= config.perUserUploadsPerHour) {
     return {
       ok: false,
