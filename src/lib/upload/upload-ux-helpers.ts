@@ -26,9 +26,9 @@ export interface MetaAiPreTriagePreview {
     | "fire"
     | "other";
   incidentLabel: string;
-  preliminarySeverity: 1 | 2 | 3 | 4 | 5;
+  preliminarySeverity: 1 | 2 | 3 | 4 | 5 | null;
   severityLabel: string;
-  confidencePct: number;
+  confidencePct: number | null;
   detectedTags: string[];
   suggestedTitle: string;
   suggestedDescription: string;
@@ -201,107 +201,21 @@ export function deriveClientMetaAiPreTriage(input: {
   titleHint?: string;
   descriptionHint?: string;
 }): MetaAiPreTriagePreview {
-  const combined = `${input.fileName} ${input.titleHint ?? ""} ${input.descriptionHint ?? ""}`
-    .toLowerCase()
-    .replace(/[_-]+/g, " ");
-
-  let incidentType: MetaAiPreTriagePreview["incidentType"] = "flooding";
-  let incidentLabel = "Flooding & Inundation";
-  let preliminarySeverity: 1 | 2 | 3 | 4 | 5 = 4;
-  let severityLabel = "HIGH · SEV-4";
-  let confidencePct = 92;
-  let detectedTags: string[] = [
-    "Surface Water Inundation",
-    "Roadway Passability Risk",
-    "Urban Drainage Overflow",
-  ];
-  let suggestedTitle = "Flash Flooding & Submerged Roadway";
-  let suggestedDescription =
-    "Rising floodwater submerging primary roadway lanes. Passability restricted for light vehicles; field verification requested.";
-
-  if (/\b(tree|fallen|branch|debris|landslide|mudslide|rubble|rock)\b/.test(combined)) {
-    incidentType = "debris";
-    incidentLabel = "Fallen Tree & Debris Obstruction";
-    preliminarySeverity = 3;
-    severityLabel = "MODERATE · SEV-3";
-    confidencePct = 91;
-    detectedTags = ["Uprooted Vegetation", "Lane Obstruction", "Clearing Required"];
-    suggestedTitle = "Fallen Tree & Debris Blocking Corridor";
-    suggestedDescription =
-      "Large uprooted tree and storm debris obstructing roadway lanes. Clearing crew and traffic diversion recommended.";
-  } else if (/\b(block|road|highway|bridge|traffic|impassable|closed|edca|c5|marcos)\b/.test(combined)) {
-    incidentType = "blocked_road";
-    incidentLabel = "Blocked Access Corridor";
-    preliminarySeverity = 4;
-    severityLabel = "HIGH · SEV-4";
-    confidencePct = 93;
-    detectedTags = ["Corridor Bottleneck", "Stranded Vehicles", "Access Restricted"];
-    suggestedTitle = "Blocked Primary Access Corridor";
-    suggestedDescription =
-      "Primary transit corridor obstructed by hazard conditions. Emergency responder routing may require alternate sector approach.";
-  } else if (/\b(collapse|crack|wall|building|roof|power|pole|wire|structural|damage)\b/.test(combined)) {
-    incidentType = "visible_structural_damage";
-    incidentLabel = "Structural & Utility Damage";
-    preliminarySeverity = 4;
-    severityLabel = "HIGH · SEV-4";
-    confidencePct = 89;
-    detectedTags = ["Structural Compromise", "Utility Hazard", "Perimeter Cordon Needed"];
-    suggestedTitle = "Visible Structural & Utility Infrastructure Damage";
-    suggestedDescription =
-      "Visible damage to structure or utility lines along the public corridor. Safety cordon and engineering inspection advised.";
-  } else if (/\b(rescue|stranded|trapped|medical|injur|boat|evac|person|people|bus)\b/.test(combined)) {
-    incidentType = "medical";
-    incidentLabel = "Critical Rescue & Stranded Civilians";
-    preliminarySeverity = 5;
-    severityLabel = "CRITICAL · SEV-5";
-    confidencePct = 95;
-    detectedTags = ["Stranded Commuters", "High Water Rescue", "Priority Dispatch"];
-    suggestedTitle = "Critical Flooding & Stranded Commuters";
-    suggestedDescription =
-      "High floodwater with commuters awaiting evacuation assistance. Shallow-draft rescue boat and medical triage team requested.";
-  } else if (/\b(fire|smoke|flame|burn|explosion|hazmat)\b/.test(combined)) {
-    incidentType = "fire";
-    incidentLabel = "Fire & Smoke Plume";
-    preliminarySeverity = 5;
-    severityLabel = "CRITICAL · SEV-5";
-    confidencePct = 94;
-    detectedTags = ["Active Smoke Plume", "Thermal Hazard", "Immediate Fire Response"];
-    suggestedTitle = "Active Fire & Smoke Hazard Observation";
-    suggestedDescription =
-      "Visible smoke plume and fire hazard observed in structure/corridor. Immediate fire suppression and perimeter clearance needed.";
-  } else if (/\b(baha|flood|water|river|pasig|marikina|rain|surge|submerg)\b/.test(combined)) {
-    incidentType = "flooding";
-    incidentLabel = "Flash Flooding & Inundation";
-    preliminarySeverity = 4;
-    severityLabel = "HIGH · SEV-4";
-    confidencePct = 94;
-    detectedTags = ["Deep Surface Runoff", "Submerged Curb/Lanes", "Hydrological Surge"];
-    suggestedTitle = combined.includes("pasig")
-      ? "Flash Flooding along Pasig Sector Corridor"
-      : "Flash Flooding & Rising Water Level";
-    suggestedDescription =
-      "Rapid surface runoff submerging roadway lanes (~0.8m–1.2m estimated depth). Monitoring river gauge and rescue pre-positioning.";
-  }
-
-  if (input.hasExifGps) {
-    detectedTags = [...detectedTags, "EXIF GPS Verified"];
-  } else {
-    detectedTags = [...detectedTags, "Needs Pin Confirmation"];
-  }
-
+  // Before upload, we only know the file metadata. The browser MUST NOT
+  // invent hazard classifications, severity, response instructions or a
+  // Meta model identity from the filename or reporter-supplied text.
   return {
-    modelId: "Llama-4-Maverick-17B-128E-Instruct-FP8",
-    pipelineStage: "pre_scan_ready",
-    incidentType,
-    incidentLabel,
-    preliminarySeverity,
-    severityLabel,
-    confidencePct,
-    detectedTags,
-    suggestedTitle,
-    suggestedDescription,
-    automationNote:
-      "Provisional Meta AI Vision pre-scan. Full server-side Llama Vision analysis + human reviewer verification run upon submission.",
+    modelId: "Awaiting server analysis",
+    pipelineStage: "awaiting_server_verification",
+    incidentType: "other",
+    incidentLabel: "Not analyzed",
+    preliminarySeverity: null,
+    severityLabel: "Not assessed",
+    confidencePct: null,
+    detectedTags: input.hasExifGps ? ["Photo contains GPS metadata (unconfirmed)"] : [],
+    suggestedTitle: "",
+    suggestedDescription: "",
+    automationNote: "Only local file and GPS metadata have been checked. Meta analysis begins after submission.",
   };
 }
 
@@ -360,156 +274,84 @@ export function deriveAiTelemetrySnapshot(input: {
   serverStatus: "idle" | "requesting" | "review_ready" | "processing" | "manual_review" | "unavailable";
   serverTelemetry?: ServerAnalysisTelemetry | null;
 }): AiTelemetryCardSnapshot {
-  const defaultModel =
-    input.serverTelemetry?.modelId ||
-    input.preTriage?.modelId ||
-    "Llama-4-Maverick-17B-128E-Instruct-FP8";
-
+  const noConfidence = {
+    confidencePct: null,
+    confidenceLabel: "Not provided by model",
+  };
+  const locationTag = input.locationChoice === "manual"
+    ? "Reporter-selected location"
+    : input.locationChoice === "gps"
+      ? "GPS location confirmed by reporter"
+      : input.locationChoice === "unknown"
+        ? "Location unknown"
+        : "Location not confirmed";
+  const standby = {
+    modelId: "Awaiting Meta inference",
+    primaryHazardLabel: "Not analyzed",
+    preliminarySeverity: null,
+    severityLabel: "Not assessed",
+    hazardLabels: [] as string[],
+    ...noConfidence,
+  };
   if (!input.hasFile || !input.preTriage) {
     return {
-      phase: "standby",
-      phaseLabel: "STANDBY · AWAITING IMAGE",
-      isProcessing: false,
-      modelId: defaultModel,
-      confidencePct: null,
-      confidenceLabel: "Awaiting input",
-      primaryHazardLabel: "No image loaded",
-      severityLabel: "PENDING",
-      preliminarySeverity: null,
-      hazardLabels: ["Awaiting photo selection"],
-      statusMessage:
-        "Select, drop, or paste a field photo to stream live Meta AI Vision confidence scores and detected hazard labels.",
+      phase: "standby", phaseLabel: "AWAITING PHOTO",
+      isProcessing: false, ...standby,
+      statusMessage: "Select a photo. AI inference only starts after the photo is submitted.",
     };
   }
-
-  // Location tag refinement once user confirms Step 2
-  const refinedTags = input.preTriage.detectedTags.map((tag) => {
-    if (tag === "Needs Pin Confirmation" && input.locationChoice === "manual") {
-      return "Manual Pin Confirmed";
-    }
-    if (tag === "Needs Pin Confirmation" && input.locationChoice === "gps") {
-      return "EXIF GPS Confirmed";
-    }
-    return tag;
-  });
-
   if (input.isScanningClient) {
-    const intermediateConfidence = Math.max(68, input.preTriage.confidencePct - 14);
     return {
-      phase: "scanning",
-      phaseLabel: "SCANNING IMAGE BUFFER",
-      isProcessing: true,
-      modelId: defaultModel,
-      confidencePct: intermediateConfidence,
-      confidenceLabel: `${intermediateConfidence}% (calibrating…)`,
-      primaryHazardLabel: input.preTriage.incidentLabel,
-      severityLabel: input.preTriage.severityLabel,
-      preliminarySeverity: input.preTriage.preliminarySeverity,
-      hazardLabels: [input.preTriage.incidentLabel, ...refinedTags.slice(0, 2)],
-      statusMessage:
-        input.scanStepLabel ||
-        "Meta AI Vision is scanning image geometry, EXIF telemetry, and hazard features…",
+      phase: "scanning", phaseLabel: "CHECKING FILE METADATA",
+      isProcessing: true, ...standby,
+      hazardLabels: [locationTag],
+      statusMessage: "Checking local file metadata; no AI analysis has run.",
     };
   }
-
   if (input.uploadProgress !== null) {
     return {
-      phase: "uploading",
-      phaseLabel: `STREAMING TO VISION PIPELINE · ${input.uploadProgress}%`,
-      isProcessing: true,
-      modelId: defaultModel,
-      confidencePct: input.preTriage.confidencePct,
-      confidenceLabel: `${input.preTriage.confidencePct}% pre-scan`,
-      primaryHazardLabel: input.preTriage.incidentLabel,
-      severityLabel: input.preTriage.severityLabel,
-      preliminarySeverity: input.preTriage.preliminarySeverity,
-      hazardLabels: [input.preTriage.incidentLabel, ...refinedTags],
-      statusMessage: `Uploading encrypted derivative (${input.uploadProgress}%) for server-side Meta AI Vision inference…`,
+      phase: "uploading", phaseLabel: `UPLOADING PHOTO · ${input.uploadProgress}%`,
+      isProcessing: true, ...standby,
+      hazardLabels: [locationTag],
+      statusMessage: "Uploading photo securely. AI analysis will start after the upload completes.",
     };
   }
-
   if (input.serverStatus === "requesting" || input.serverStatus === "processing") {
     return {
-      phase: "analyzing_server",
-      phaseLabel: "META AI VISION INFERENCE · ACTIVE",
-      isProcessing: true,
-      modelId: defaultModel,
-      confidencePct: input.preTriage.confidencePct,
-      confidenceLabel: `${input.preTriage.confidencePct}% (verifying…)`,
-      primaryHazardLabel: input.preTriage.incidentLabel,
-      severityLabel: input.preTriage.severityLabel,
-      preliminarySeverity: input.preTriage.preliminarySeverity,
-      hazardLabels: [input.preTriage.incidentLabel, ...refinedTags],
-      statusMessage:
-        "Running server-side Meta AI Llama Vision structured hazard extraction and schema validation…",
+      phase: "analyzing_server", phaseLabel: "META ANALYSIS REQUESTED",
+      isProcessing: true, ...standby,
+      hazardLabels: [locationTag],
+      statusMessage: "Waiting for the server's real Meta inference result.",
     };
   }
-
-  if (input.serverStatus === "review_ready") {
-    const srv = input.serverTelemetry;
-    const srvSeverity =
-      srv?.preliminarySeverity !== undefined
-        ? srv.preliminarySeverity
-        : input.preTriage.preliminarySeverity;
-    const srvPrimaryLabel =
-      (srv?.incidentType && SERVER_INCIDENT_LABELS[srv.incidentType]) ||
-      input.preTriage.incidentLabel;
-    const srvEvidenceLabels =
-      srv?.visibleEvidence && srv.visibleEvidence.length > 0
-        ? srv.visibleEvidence.slice(0, 4).map((ev) => (ev.length > 44 ? `${ev.slice(0, 41)}…` : ev))
-        : [input.preTriage.incidentLabel, ...refinedTags];
-
-    // Derive server confidence from uncertainty count when available
-    const uncertaintyPenalty = (srv?.uncertainties?.length ?? 0) * 3;
-    const finalConfidence = Math.min(
-      98,
-      Math.max(78, input.preTriage.confidencePct + 2 - uncertaintyPenalty),
-    );
-
-    const sevLabel =
-      srvSeverity !== null && srvSeverity !== undefined
-        ? `${srvSeverity >= 4 ? "CRITICAL/HIGH" : "MODERATE"} · SEV-${srvSeverity}`
-        : input.preTriage.severityLabel;
-
+  if (input.serverStatus === "review_ready" && input.serverTelemetry) {
+    const obs = input.serverTelemetry;
+    const severity = obs.preliminarySeverity ?? null;
     return {
       phase: "complete",
-      phaseLabel: "VISION TELEMETRY LOCKED",
+      phaseLabel: "AI OBSERVATION SAVED · HUMAN REVIEW PENDING",
       isProcessing: false,
-      modelId: defaultModel,
-      confidencePct: finalConfidence,
-      confidenceLabel: `${finalConfidence}% verified schema`,
-      primaryHazardLabel: srvPrimaryLabel,
-      severityLabel: sevLabel,
-      preliminarySeverity: srvSeverity ?? input.preTriage.preliminarySeverity,
-      hazardLabels: srvEvidenceLabels,
-      statusMessage:
-        "Meta AI Vision inference complete. Provisional hazard labels queued for human reviewer sign-off.",
-      latencyMs: srv?.latencyMs,
+      modelId: obs.modelId ?? "Meta model (identifier unavailable)",
+      primaryHazardLabel:
+        (obs.incidentType && SERVER_INCIDENT_LABELS[obs.incidentType]) || "Observation recorded",
+      preliminarySeverity: severity,
+      severityLabel: severity === null ? "Not assessed" : `Provisional severity ${severity}/5`,
+      hazardLabels: obs.visibleEvidence?.slice(0, 4) ?? [],
+      ...noConfidence,
+      statusMessage: "Server analysis completed. This observation is provisional until human review.",
+      latencyMs: obs.latencyMs,
     };
   }
-
-  // Default when photo is selected and client pre-triage is ready (or server fallback)
-  const locationBoost = input.locationChoice && input.locationChoice !== "unknown" ? 2 : 0;
-  const liveConfidence = Math.min(98, input.preTriage.confidencePct + locationBoost);
-
   return {
     phase: "pre_triage_ready",
-    phaseLabel:
-      input.serverStatus === "manual_review" || input.serverStatus === "unavailable"
-        ? "PRE-TRIAGE TELEMETRY · QUEUED FOR REVIEW"
-        : "LIVE PRE-TRIAGE · READY",
-    isProcessing: false,
-    modelId: defaultModel,
-    confidencePct: liveConfidence,
-    confidenceLabel: `${liveConfidence}% confidence`,
-    primaryHazardLabel: input.preTriage.incidentLabel,
-    severityLabel: input.preTriage.severityLabel,
-    preliminarySeverity: input.preTriage.preliminarySeverity,
-    hazardLabels: [input.preTriage.incidentLabel, ...refinedTags],
-    statusMessage:
-      input.serverStatus === "manual_review" || input.serverStatus === "unavailable"
-        ? "Client pre-triage hazard telemetry preserved; report queued for human reviewer inspection."
-        : input.preTriage.automationNote,
+    phaseLabel: input.serverStatus === "manual_review" ? "MANUAL REVIEW NEEDED"
+      : input.serverStatus === "unavailable" ? "AI ANALYSIS UNAVAILABLE" : "PHOTO READY",
+    isProcessing: false, ...standby,
+    hazardLabels: [locationTag],
+    statusMessage: input.serverStatus === "manual_review"
+      ? "The saved photo is awaiting manual review. No AI finding has been confirmed."
+      : input.serverStatus === "unavailable"
+        ? "Automated analysis is unavailable. Your saved photo remains available."
+        : "Ready to submit. No AI inference has run.",
   };
 }
-
