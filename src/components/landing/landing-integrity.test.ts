@@ -30,6 +30,13 @@ describe("Hackathon public-demo integrity", () => {
     expect(cta).not.toContain('href="/review"');
   });
 
+  it("never directs signed-in reporters to reviewer-only landing actions", () => {
+    const hero = source("Hero.tsx");
+    expect(hero).toContain('signedIn ? "/reports/new"');
+    expect(hero).toContain('signedIn ? "/reports"');
+    expect(hero).not.toContain('signedIn ? "/review"');
+  });
+
   it("honors visitors' video pause, reduced-motion, and reduced-data preferences", () => {
     const video = source("CinematicHero.tsx");
     expect(video).toContain("userPaused");
