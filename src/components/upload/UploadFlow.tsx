@@ -189,7 +189,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
       // deliberately does not create another report or run inference.
       if (typeof body?.linkedTo === "string" && body.linkedTo) {
         setState({ kind: "linked", existingReportId: body.linkedTo });
-        toast.success("Existing report linked; no duplicate evidence created.");
+        toast.success("Existing report reused; no duplicate evidence created.");
         return;
       }
       if (typeof body?.reportId !== "string" || !body.reportId) {
@@ -341,19 +341,19 @@ export function UploadFlow({ className }: UploadFlowProps) {
             <div className="panel">
               <h3 style={{ fontSize: "var(--step-1)" }}>Already uploaded</h3>
               <p className="t-meta" style={{ marginTop: "var(--s-2)" }}>
-                A report with the same image already exists. Open it, or submit anyway as a linked report.
+                This photo has already been submitted by your account. Open the existing report instead of uploading it again.
               </p>
               <div className="tr-cluster" style={{ marginTop: "var(--s-3)" }}>
                 <Link className="btn" href={`/reports/${state.existingReportId}`}>Open existing report</Link>
-                <Button variant="primary" onClick={() => void doUpload(state.existingReportId)}>Link existing report</Button>
+                <Button variant="primary" onClick={() => void doUpload(state.existingReportId)}>Use existing report</Button>
               </div>
             </div>
           )}
           {state.kind === "linked" && (
             <div className="panel" role="status">
-              <h3 style={{ fontSize: "var(--step-1)" }}>Linked to existing report</h3>
+              <h3 style={{ fontSize: "var(--step-1)" }}>Existing report reused</h3>
               <p className="t-meta" style={{ marginTop: "var(--s-2)" }}>
-                The same photo was already submitted. No additional report was created and no new AI analysis was requested.
+                The original report is unchanged. No duplicate photo or AI request was created.
               </p>
               <Link className="btn btn--primary" style={{ marginTop: "var(--s-3)" }} href={`/reports/${state.existingReportId}`}>
                 Open existing report
@@ -375,6 +375,16 @@ export function UploadFlow({ className }: UploadFlowProps) {
                 <p role="status" aria-live="polite" className="t-meta" style={{ marginTop: "var(--s-2)" }}>{state.analysis.message}</p>
                 <div className="tr-cluster" style={{ marginTop: "var(--s-3)" }}>
                   <Link className="btn btn--primary" href={`/reports/${state.reportId}`}>Open the report</Link>
+                  {state.analysis.kind === "unavailable" && (
+                    <Button variant="secondary" onClick={() => {
+                      setState((current) => current.kind === "success" && current.reportId === state.reportId
+                        ? { ...current, analysis: { kind: "requesting", message: "Retrying automated analysis for the saved report…" } }
+                        : current);
+                      void startAnalysis(state.reportId);
+                    }}>
+                      Retry AI analysis
+                    </Button>
+                  )}
                   <Button variant="quiet" onClick={() => {
                     setStep(1);
                     setFiles([]);
