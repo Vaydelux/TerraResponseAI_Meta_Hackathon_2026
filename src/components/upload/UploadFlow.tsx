@@ -379,7 +379,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
                 <div className="tr-cluster" style={{ marginTop: "var(--s-3)" }}>
                   <Link className="btn btn--primary" href={`/reports/${state.reportId}`}>Open the report</Link>
                   {state.analysis.kind === "unavailable" && (
-                    <Button variant="secondary" onClick={() => void startAnalysis(state.reportId)}>
+                    <Button variant="default" onClick={() => void startAnalysis(state.reportId)}>
                       Retry AI analysis
                     </Button>
                   )}
