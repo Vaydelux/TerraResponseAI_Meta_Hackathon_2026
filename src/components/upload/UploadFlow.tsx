@@ -378,9 +378,9 @@ export function UploadFlow({ className }: UploadFlowProps) {
                 <p role="status" aria-live="polite" className="t-meta" style={{ marginTop: "var(--s-2)" }}>{state.analysis.message}</p>
                 <div className="tr-cluster" style={{ marginTop: "var(--s-3)" }}>
                   <Link className="btn btn--primary" href={`/reports/${state.reportId}`}>Open the report</Link>
-                  {state.analysis.kind === "unavailable" && (
+                  {(state.analysis.kind === "unavailable" || state.analysis.kind === "processing") && (
                     <Button variant="default" onClick={() => void startAnalysis(state.reportId)}>
-                      Retry AI analysis
+                      {state.analysis.kind === "processing" ? "Check analysis status" : "Retry AI analysis"}
                     </Button>
                   )}
                   <Button variant="quiet" onClick={() => {
