@@ -34,6 +34,7 @@ import { getAuthContext } from "@/lib/auth/profile";
 import { reportUploadMetaSchema } from "@/lib/api-schemas/reports";
 import {
   validateImageFile,
+  maxUploadBytes,
   describeValidationError,
   type AllowedImageType,
 } from "@/lib/storage/image-validate";
@@ -151,7 +152,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 5. Read the file bytes. File is a Web File/Blob; .arrayBuffer() works.
+  // 5. Refuse obviously invalid sizes BEFORE duplicating the file
+  // bytes in memory. The full validation below checks byte length,
+  // signature and actual decode independently of client metadata.
+  const maxBytes = maxUploadBytes();
+  if (file.size === 0) {
+    return NextResponse.json(
+      { error: { code: "EMPTY_FILE", message: "Choose a non-empty photo." } },
+      { status: 400 },
+    );
+  }
+  if (file.size > maxBytes) {
+    return NextResponse.json(
+      { error: { code: "TOO_LARGE", message: "This photo is too large.", limitBytes: maxBytes } },
+      { status: 413 },
+    );
+  }
   const buf = new Uint8Array(await file.arrayBuffer());
 
   // 6. File validation: size + magic bytes + Sharp decode.
@@ -176,7 +192,18 @@ export async function POST(request: NextRequest) {
   const digest = sha256Hex(buf);
 
   // 8. Dedup check within the authorized event.
-  const dup = await checkDuplicate(eventId, digest);
+  let dup: Awaited<ReturnType<typeof checkDuplicate>>;
+  try {
+    dup = await checkDuplicate(eventId, digest);
+  } catch {
+    return NextResponse.json(
+      { error: {
+        code: "DUPLICATE_CHECK_UNAVAILABLE",
+        message: "Photo reporting is temporarily unable to check previous submissions. Please retry; no photo was saved.",
+      } },
+      { status: 503 },
+    );
+  }
   if (dup.isDuplicate && dup.existingReportId) {
     // If the client asked to link (meta.linkToReportId === the existing
     // id), we'd allow it — but linking is a Phase 4 affordance. For now,
