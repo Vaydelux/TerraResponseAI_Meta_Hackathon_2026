@@ -149,7 +149,7 @@ export async function processReportTriage(args: {
       const radius = stored.incidentType === "flooding" ? 10000 : 5000;
       const { data: candidates, error: candidateError } = await db.rpc(
         "find_community_incident_candidates", {
-          p_event_id: args.eventId, p_type: args.observation.incident_type,
+          p_event_id: args.eventId, p_type: stored.incidentType,
           p_lat: report.latitude, p_lon: report.longitude, p_radius_m: radius,
         },
       );
