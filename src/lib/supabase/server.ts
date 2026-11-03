@@ -6,6 +6,7 @@
 //
 // Official @supabase/ssr pattern (v0.12+):
 //   import { createServerClient } from "@supabase/ssr";
+import { cache } from "react";
 //   import { cookies } from "next/headers";
 //   const supabase = createServerClient(url, anonKey, {
 //     cookies: {
@@ -67,14 +68,14 @@ export async function createSupabaseServerClient() {
  * Per the brief: "Use server-side identity verification on mutations,
  * not cookie presence alone."
  */
-export async function getServerUser() {
+export const getServerUser = cache(async function getServerUser() {
   if (!isSupabaseConfigured()) return null;
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
-}
+});
 
 /**
  * Require an authenticated user. Throws a typed error if absent.
