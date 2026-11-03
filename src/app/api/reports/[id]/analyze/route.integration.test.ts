@@ -176,6 +176,7 @@ beforeEach(() => {
   mockCheckAllAiCallCeilings.mockResolvedValue({ ok: true });
   mockLookupCachedAnalysis.mockResolvedValue(null);
   mockLogUsage.mockResolvedValue(undefined);
+  mockCreateClient.mockImplementation(() => ({ from: mockFrom }));
 });
 
 afterEach(() => {
@@ -360,6 +361,7 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     // The download succeeds (returns a fake Blob).
     const fakeBlob = { arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff]).buffer };
     mockCreateClient.mockReturnValue({
+      from: mockFrom,
       storage: { from: vi.fn(() => ({ download: vi.fn(async () => ({ data: fakeBlob, error: null })) })) },
     });
     // The model call times out (transient failure).
@@ -388,6 +390,7 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     mockFrom.mockReturnValueOnce(makeCasUpdateBuilder({ data: { id: REPORT_ID }, error: null }));
     const fakeBlob = { arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff]).buffer };
     mockCreateClient.mockReturnValue({
+      from: mockFrom,
       storage: { from: vi.fn(() => ({ download: vi.fn(async () => ({ data: fakeBlob, error: null })) })) },
     });
     mockAnalyzeImage.mockResolvedValue({
@@ -423,6 +426,7 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     mockFrom.mockReturnValueOnce(makeCasUpdateBuilder({ data: { id: REPORT_ID }, error: null }));
     const fakeBlob = { arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff]).buffer };
     mockCreateClient.mockReturnValue({
+      from: mockFrom,
       storage: { from: vi.fn(() => ({ download: vi.fn(async () => ({ data: fakeBlob, error: null })) })) },
     });
     mockAnalyzeImage.mockResolvedValue({
@@ -441,6 +445,12 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     expect(body.latencyMs).toBeGreaterThanOrEqual(0);
     // Verify the telemetry was logged with outcome=succeeded.
     expect(mockLogUsage).toHaveBeenCalled();
+    // The server writes a validated observation with a trusted server
+    // client instead of incorrectly relying on reporter RLS INSERT rights.
+    expect(mockCreateClient).toHaveBeenCalledWith(
+      "https://test.supabase.co", "test-service-role-key",
+      expect.objectContaining({ auth: { persistSession: false, autoRefreshToken: false } }),
+    );
     const logCall = mockLogUsage.mock.calls.find(
       (c: unknown[]) => (c[0] as { outcome: string }).outcome === "succeeded",
     );
