@@ -217,6 +217,9 @@ export function UploadFlow({ className }: UploadFlowProps) {
   async function startAnalysis(reportId: string) {
     if (analysisInFlightRef.current === reportId) return;
     analysisInFlightRef.current = reportId;
+    setState((previous) => previous.kind === "success" && previous.reportId === reportId
+      ? { ...previous, analysis: { kind: "requesting", message: "Requesting automated analysis for the saved report…" } }
+      : previous);
     try {
       const response = await fetch(`/api/reports/${encodeURIComponent(reportId)}/analyze`, {
         method: "POST",
@@ -376,12 +379,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
                 <div className="tr-cluster" style={{ marginTop: "var(--s-3)" }}>
                   <Link className="btn btn--primary" href={`/reports/${state.reportId}`}>Open the report</Link>
                   {state.analysis.kind === "unavailable" && (
-                    <Button variant="secondary" onClick={() => {
-                      setState((current) => current.kind === "success" && current.reportId === state.reportId
-                        ? { ...current, analysis: { kind: "requesting", message: "Retrying automated analysis for the saved report…" } }
-                        : current);
-                      void startAnalysis(state.reportId);
-                    }}>
+                    <Button variant="secondary" onClick={() => void startAnalysis(state.reportId)}>
                       Retry AI analysis
                     </Button>
                   )}
