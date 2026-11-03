@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   ArrowLeft,
   ArrowRight,
-  Wand2,
   MapPin,
   FileImage,
   ShieldAlert,
@@ -68,11 +67,9 @@ export function UploadFlow({ className }: UploadFlowProps) {
   const [readingExif, setReadingExif] = useState(false);
   const [aiScanning, setAiScanning] = useState(false);
   const [aiScanStageText, setAiScanStageText] = useState<string>("");
-  const [aiAutoFilled, setAiAutoFilled] = useState(false);
   const [serverTelemetry, setServerTelemetry] = useState<ServerAnalysisTelemetry | null>(null);
   const fileSequenceRef = useRef(0);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scanStageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stepButtonRefs = useRef<Array<HTMLButtonElement | null>>([null, null, null]);
   const [state, setState] = useState<UploadState>({ kind: "idle" });
   const xhrRef = useRef<XMLHttpRequest | null>(null);
@@ -83,9 +80,6 @@ export function UploadFlow({ className }: UploadFlowProps) {
     return () => {
       if (scanTimerRef.current) {
         clearTimeout(scanTimerRef.current);
-      }
-      if (scanStageTimerRef.current) {
-        clearTimeout(scanStageTimerRef.current);
       }
     };
   }, []);
@@ -136,10 +130,9 @@ export function UploadFlow({ className }: UploadFlowProps) {
     setAiScanning(selected.length > 0);
     setAiScanStageText(
       selected.length > 0
-        ? "Stage 1/2 · Decoding image buffer & EXIF GPS headers…"
+        ? "Checking local file and GPS metadata…"
         : "",
     );
-    setAiAutoFilled(false);
     setState({ kind: "idle" });
     setStep(1);
 
@@ -176,21 +169,10 @@ export function UploadFlow({ className }: UploadFlowProps) {
       setReadingExif(false);
     }
 
-    // Client-side sanity check + multi-stage Meta AI Vision telemetry progression
+    // Local-only file validation. No model call or hazard assessment happens here.
     if (scanTimerRef.current) {
       clearTimeout(scanTimerRef.current);
     }
-    if (scanStageTimerRef.current) {
-      clearTimeout(scanStageTimerRef.current);
-    }
-
-    if (selected.length > 0) {
-      scanStageTimerRef.current = setTimeout(() => {
-        if (sequence !== fileSequenceRef.current) return;
-        setAiScanStageText("Stage 2/2 · Extracting hazard vectors & confidence telemetry…");
-      }, 30);
-    }
-
     scanTimerRef.current = setTimeout(() => {
       if (sequence !== fileSequenceRef.current) return;
       setAiScanning(false);
@@ -208,32 +190,12 @@ export function UploadFlow({ className }: UploadFlowProps) {
           return {
             ...c,
             state: "ok" as const,
-            message: "Size/type check passed; Meta AI Vision telemetry ready",
+            message: "Local size/type check passed (server will validate the image)",
           };
         }),
       );
 
-      // Auto-populate suggested title & description if the user hasn't typed anything yet
-      if (chosenFile) {
-        const preview = deriveClientMetaAiPreTriage({
-          fileName: chosenFile.name,
-          fileSize: chosenFile.size,
-          mimeType: chosenFile.type,
-          hasExifGps: false,
-        });
-        setTitle((prev) => (prev.trim() === "" ? preview.suggestedTitle : prev));
-        setDescription((prev) => (prev.trim() === "" ? preview.suggestedDescription : prev));
-        setAiAutoFilled(true);
-      }
     }, 60);
-  }
-
-  function applyAiSuggestions() {
-    if (!aiPreTriage) return;
-    setTitle(aiPreTriage.suggestedTitle);
-    setDescription(aiPreTriage.suggestedDescription);
-    setAiAutoFilled(true);
-    toast.success("Applied Meta AI Vision draft to Title and Description.");
   }
 
   function canProceedToStep2(): boolean {
@@ -348,7 +310,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
         reportId: newReportId,
         analysis: {
           kind: "requesting",
-          message: "Running server-side Meta AI Llama Vision analysis…",
+          message: "Requesting Meta Muse Spark image analysis…",
         },
       });
       toast.success("Photo and private report saved.");
@@ -375,7 +337,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
             ...previous,
             analysis: {
               kind: "requesting",
-              message: "Running server-side Meta AI Llama Vision analysis for the saved report…",
+              message: "Requesting Meta Muse Spark analysis for the saved report…",
             },
           }
         : previous,
@@ -535,7 +497,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
     <div className={className} style={{ display: "grid", gap: "var(--s-4)" }}>
       <PageHeader
         title="Upload a photo"
-        subtitle="Three steps: choose or paste a photo (with automated Meta AI Vision pre-triage), confirm the location, and submit for human review."
+        subtitle="Choose a photo, confirm or skip its location, and submit. Real Meta analysis happens after the photo is saved."
       />
 
       {/* Accessible Non-Linear 3-Step Progress Stepper */}
@@ -659,7 +621,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        aria-label="AI Telemetry"
+        aria-label="Photo analysis status"
         data-testid="ai-telemetry-card"
         data-phase={aiTelemetry.phase}
         style={{
@@ -703,7 +665,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
               }}
             >
               <Activity size={13} aria-hidden="true" style={{ color: "var(--tide)" }} />
-              <span>AI Telemetry</span>
+              <span>Analysis status</span>
             </span>
 
             <span
@@ -802,7 +764,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
               }}
             >
               <span className="t-meta" style={{ fontSize: "0.72rem", fontWeight: 600 }}>
-                Confidence:
+                Model confidence:
               </span>
               <strong
                 className="num"
@@ -814,27 +776,9 @@ export function UploadFlow({ className }: UploadFlowProps) {
               >
                 {aiTelemetry.confidencePct !== null
                   ? `${aiTelemetry.confidencePct}%`
-                  : "—"}
+                  : "Not provided"}
               </strong>
-              <div
-                aria-hidden="true"
-                style={{
-                  width: 56,
-                  height: 6,
-                  borderRadius: 3,
-                  background: "var(--rule)",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    width: `${aiTelemetry.confidencePct ?? 0}%`,
-                    height: "100%",
-                    background: aiTelemetry.isProcessing ? "var(--amber)" : "var(--green)",
-                    transition: "width 220ms ease",
-                  }}
-                />
-              </div>
+
             </div>
           </div>
         </div>
@@ -857,7 +801,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
             style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}
           >
             <span className="t-meta" style={{ fontSize: "0.74rem", fontWeight: 700, color: "var(--ink)" }}>
-              Detected Hazard Labels:
+              Evidence / location:
             </span>
             {aiTelemetry.hazardLabels.map((label) => (
               <span
@@ -882,17 +826,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
             <span className="t-meta" style={{ fontSize: "0.73rem" }}>
               {aiTelemetry.statusMessage}
             </span>
-            {step === 1 && activeFile && aiPreTriage && (
-              <button
-                type="button"
-                className="btn btn--sm"
-                onClick={applyAiSuggestions}
-                data-testid="apply-ai-suggestions-btn"
-              >
-                <Wand2 size={14} aria-hidden="true" />
-                <span>{aiAutoFilled ? "Re-apply AI Draft" : "Apply AI Draft"}</span>
-              </button>
-            )}
+
           </div>
         </div>
       </aside>
@@ -912,7 +846,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
             </p>
           )}
           <Field
-            label="Title (auto-drafted by Meta AI Vision · editable)"
+            label="Report title (enter what you observed)"
             htmlFor="up-title"
           >
             <Input
@@ -923,7 +857,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
             />
           </Field>
           <Field
-            label="Description (auto-drafted by Meta AI Vision · editable)"
+            label="Description (facts you observed, not AI estimates)"
             htmlFor="up-desc"
             hint="Edit situational details or use Voice Dictation to speak hands-free in the field."
           >
@@ -1002,7 +936,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
                   <div style={{ display: "grid", gap: 4 }}>
                     <h3 style={{ fontSize: "var(--step-1)", margin: 0 }}>Ready to submit</h3>
                     <p className="t-meta" style={{ margin: 0 }}>
-                      Verify your photo evidence, location coordinates, and Meta AI Vision pre-triage telemetry before queuing for human moderation.
+                      Verify the selected photo, reported details and location before submission. No AI classification has run yet.
                     </p>
                   </div>
                   <span
@@ -1270,7 +1204,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
                         style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--tide)" }}
                       >
                         <Cpu size={14} aria-hidden="true" />
-                        <span>3. AI Telemetry Summary</span>
+                        <span>3. Analysis readiness</span>
                       </span>
                       <span
                         className="t-meta num"
@@ -1283,7 +1217,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
                           fontSize: "0.72rem",
                         }}
                       >
-                        {aiTelemetry.confidencePct !== null ? `${aiTelemetry.confidencePct}% CONFIDENCE` : "READY"}
+                        {state.kind === "success" && state.analysis.kind === "review_ready" ? "AI RESULT SAVED" : "AI PENDING"}
                       </span>
                     </div>
 
@@ -1348,7 +1282,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
                         <span>
                           AI Pipeline:{" "}
                           <strong style={{ color: "var(--ink)" }}>
-                            Meta Llama Vision structured extraction + Human Reviewer gate
+                            Meta Muse Spark image observation + human reviewer gate
                           </strong>
                         </span>
                       </div>
@@ -1382,7 +1316,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
           )}
           {state.kind === "uploading" && (
             <div className="panel">
-              <UploadProgress value={state.progress} label="Uploading photo & queuing Meta AI Vision…" />
+              <UploadProgress value={state.progress} label="Uploading photo for server-side analysis…" />
               <Button
                 variant="quiet"
                 onClick={cancelUpload}
