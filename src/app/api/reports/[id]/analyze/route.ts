@@ -101,6 +101,11 @@ export async function POST(
     );
   }
 
+  // All subsequent service-role writes are fixed-field transitions scoped
+  // to this exact report ID. The preceding user-session read MUST succeed
+  // under RLS before the service client is created. In particular, a
+  // reporter cannot UPDATE a retryable_error row under the narrow
+  // creator policy; widening that policy would grant client-side writes.
   // 4. Idempotency: check the current state.
   let status = report.status;
   if (status === "needs_review" || status === "reviewed") {
@@ -151,7 +156,7 @@ export async function POST(
       Date.now() - lastTransition > 120_000;
     if (stale) {
       const nextRetryCount = (report.retry_count ?? 0) + 1;
-      const { data: recovered, error: recoveryError } = await supabase
+      const { data: recovered, error: recoveryError } = await trustedAnalysisClient()
         .from("reports")
         .update({
           status: "retryable_error",
@@ -235,7 +240,7 @@ export async function POST(
       // be mid-model-call). If the CAS fails (race lost), return 409;
       // the client can retry. The cache-hit upsert is then a no-op
       // (the model call's eventual outcome overwrites it).
-      const { data: casData, error: casErr } = await supabase
+      const { data: casData, error: casErr } = await trustedAnalysisClient()
         .from("reports")
         .update({ status: "needs_review" })
         .eq("id", id)
@@ -347,7 +352,7 @@ export async function POST(
   //    retryable_error). The .select() returns the updated row; if 0
   //    rows were updated (a concurrent request won the race), the
   //    returned data is null and we return 409.
-  const { data: transitionData, error: transitionErr } = await supabase
+  const { data: transitionData, error: transitionErr } = await trustedAnalysisClient()
     .from("reports")
     .update({ status: "analyzing" })
     .eq("id", id)
@@ -523,7 +528,7 @@ export async function POST(
   }
 
   // 10. Transition to needs_review.
-  const { data: finalTransition, error: finalTransitionErr } = await supabase
+  const { data: finalTransition, error: finalTransitionErr } = await trustedAnalysisClient()
     .from("reports")
     .update({ status: "needs_review" })
     .eq("id", id)
@@ -607,7 +612,7 @@ function trustedAnalysisClient() {
 
 
 async function markAsManualReview(reportId: string, error: string) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = trustedAnalysisClient();
   await supabase
     .from("reports")
     .update({ status: "needs_manual_review", last_error: error })
@@ -616,7 +621,7 @@ async function markAsManualReview(reportId: string, error: string) {
 }
 
 async function markAsRetryable(reportId: string, error: string) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = trustedAnalysisClient();
   // Increment retry_count + set next_retry_at (the backoff poller reads this).
   const { data: current } = await supabase
     .from("reports")
