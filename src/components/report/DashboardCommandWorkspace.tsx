@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   Search,
   MapPin,
-  Users,
   Gauge,
   ArrowRight,
   ShieldCheck,
@@ -94,7 +93,7 @@ export function DashboardCommandWorkspace({
 
   return (
     <div style={{ display: "grid", gap: "var(--s-5)" }}>
-      {/* Two-Column Main Operational Workspace (Active Incident Feeds + Command Dispatch Rail) */}
+      {/* Two-Column Incident Evidence Workspace */}
       <div
         style={{
           display: "grid",
@@ -292,9 +291,9 @@ export function DashboardCommandWorkspace({
                                 fontSize: "0.73rem",
                               }}
                             >
-                              {isCritical
-                                ? `CRITICAL · SEV-${sev}`
-                                : `MODERATE · SEV-${sev}`}
+                              {r.severity == null
+                                ? "Severity not assessed"
+                                : `Provisional severity ${sev}/5`}
                             </span>
                             <span
                               className="t-meta num"
@@ -311,7 +310,7 @@ export function DashboardCommandWorkspace({
                                 fontSize: "0.73rem",
                               }}
                             >
-                              {state === "confirmed" ? "AI + Human Verified" : "Meta AI Analyzed"}
+                              {state === "confirmed" ? "Human confirmed" : state === "rejected" ? "Rejected" : state === "flagged" ? "Flagged for review" : state === "failed" ? "Analysis unavailable" : r.status === "uploaded" ? "Awaiting AI analysis" : r.status === "analyzing" ? "AI analysis in progress" : "AI observation · not verified"}
                             </span>
                           </div>
                           <p
@@ -351,12 +350,6 @@ export function DashboardCommandWorkspace({
                         className="t-meta num"
                         style={{ display: "flex", flexWrap: "wrap", gap: 16 }}
                       >
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <Users size={14} aria-hidden="true" style={{ color: "var(--tide)" }} />
-                          <strong>
-                            {assigned ? "First Responder Unit Assigned" : "3 First Responder Units Nearby"}
-                          </strong>
-                        </span>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                           <Gauge size={14} aria-hidden="true" style={{ color: "var(--amber-ink)" }} />
                           <span>Priority Score: {r.priority_score ?? "Pending"}</span>
@@ -462,9 +455,9 @@ export function DashboardCommandWorkspace({
           )}
         </section>
 
-        {/* Right Column: Quick Agency Dispatch + Recent Verifications + Helpline & Checklist */}
+        {/* Right Column: real review activity */}
         <aside
-          aria-label="Emergency Operations Command Rail"
+          aria-label="Review Activity Rail"
           style={{ display: "grid", gap: "var(--s-4)" }}
         >
           {/* Card 2: Recent Verifications */}
