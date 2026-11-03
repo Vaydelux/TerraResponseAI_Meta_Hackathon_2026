@@ -79,7 +79,7 @@ function buildLocationDescriptor(input: ContextualIntelligenceInput): string {
     parts.push(`(${input.latitude.toFixed(4)}°N, ${input.longitude.toFixed(4)}°E)`);
   }
   if (parts.length === 0) {
-    return "Metro Manila / Philippines operational sector";
+    return "Location not provided";
   }
   return parts.join(" ");
 }
@@ -183,29 +183,13 @@ function buildFallbackIntelligence(
   const locationContext = buildLocationDescriptor(input);
   const hazardLabel = formatIncidentCategory(input.incidentType);
   return {
-    summary: `Situational context for ${locationContext} (${hazardLabel}): Monitor local disaster risk reduction advisories, drainage capacity, and arterial road passability in the surrounding barangay sector.`,
-    weatherAlerts: [
-      `Check active PAGASA rainfall and thunderstorm advisories for ${locationContext}.`,
-      "Low-lying waterways and urban underpasses remain sensitive to localized runoff surges.",
-    ],
-    localNewsAndAdvisories: [
-      `Cross-reference field reports of ${hazardLabel} with municipal DRRMO dispatch logs.`,
-      "Verify clearance of primary emergency responder access routes before confirming severity.",
-    ],
-    sources: [
-      {
-        title: "PAGASA Official Weather & Flood Advisories",
-        uri: "https://bagong.pagasa.dost.gov.ph",
-      },
-      {
-        title: "NDRRMC Situational Bulletins",
-        uri: "https://ndrrmc.gov.ph",
-      },
-    ],
-    searchQueries: [
-      `${locationContext} weather alert flood advisory`,
-      `${locationContext} ${hazardLabel} news update`,
-    ],
+    summary: `No independently retrieved weather or local news context is available for ${locationContext} (${hazardLabel}). Treat the photograph as unverified evidence and consult official advisories directly.`,
+    // Suggestions are not alerts or verified headlines: never fabricate
+    // live observations or cite sites we did not actually retrieve.
+    weatherAlerts: [],
+    localNewsAndAdvisories: [],
+    sources: [],
+    searchQueries: [],
     locationContext,
     generatedAt: new Date().toISOString(),
     modelId: "contextual-standby-v1",
@@ -221,6 +205,12 @@ function buildFallbackIntelligence(
 export async function fetchContextualIntelligence(
   input: ContextualIntelligenceInput,
 ): Promise<ContextualIntelligenceData> {
+  const hasKnownLocation = Boolean(input.locationLabel?.trim()) ||
+    (typeof input.latitude === "number" && Number.isFinite(input.latitude) &&
+     typeof input.longitude === "number" && Number.isFinite(input.longitude));
+  // Missing locations are NOT silently assumed to be Manila: there is
+  // no geographic basis for a disaster advisory without a location.
+  if (!hasKnownLocation) return buildFallbackIntelligence(input);
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.trim() === "") {
     return buildFallbackIntelligence(input);
@@ -290,20 +280,14 @@ export async function fetchContextualIntelligence(
       (q): q is string => typeof q === "string" && q.trim().length > 0,
     );
 
+    // Model text without independently returned citations is NOT a live
+    // grounded advisory, even when the request used a search tool.
+    if (sources.length === 0) return buildFallbackIntelligence(input);
+
     return {
       summary: parsed.summary,
-      weatherAlerts:
-        parsed.weatherAlerts.length > 0
-          ? parsed.weatherAlerts
-          : [
-              `Active meteorological monitoring in effect for ${locationContext}.`,
-            ],
-      localNewsAndAdvisories:
-        parsed.localNewsAndAdvisories.length > 0
-          ? parsed.localNewsAndAdvisories
-          : [
-              `Review local municipal advisories and responder dispatches near ${locationContext}.`,
-            ],
+      weatherAlerts: parsed.weatherAlerts,
+      localNewsAndAdvisories: parsed.localNewsAndAdvisories,
       sources,
       searchQueries:
         searchQueries.length > 0
