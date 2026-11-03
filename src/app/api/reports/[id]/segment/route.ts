@@ -220,7 +220,14 @@ export async function POST(
       result.kind === "permanent" || result.kind === "not_configured" ? "permanent_failed" :
       "transient_failed",
     errorMessage: result.ok ? null : result.error,
-    usage: result.ok ? result.usageMetadata : null,
+    usage: result.ok ? {
+      prompt_tokens: typeof result.usageMetadata.prompt_tokens === "number"
+        ? result.usageMetadata.prompt_tokens : null,
+      completion_tokens: typeof result.usageMetadata.completion_tokens === "number"
+        ? result.usageMetadata.completion_tokens : null,
+      total_tokens: typeof result.usageMetadata.total_tokens === "number"
+        ? result.usageMetadata.total_tokens : null,
+    } : null,
   });
 
   if (!result.ok) {
