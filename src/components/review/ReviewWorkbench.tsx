@@ -83,6 +83,7 @@ interface ReportDetail {
     prompt_version: string;
     schema_version: string;
     structured_observation: Record<string, unknown>;
+    raw_usage_metadata?: Record<string, unknown> | null;
     created_at: string;
   }>;
 }
@@ -238,8 +239,11 @@ export function ReviewWorkbench({
 
   const observation = readObservation(detail);
   const rawStructuredObs = (detail.report_analyses?.[0]?.structured_observation ?? {}) as Record<string, unknown>;
+  const rawAnalysisMetadata =
+    detail.report_analyses?.[0]?.raw_usage_metadata ?? null;
   const initialContextualIntelligence =
-    (rawStructuredObs.contextual_intelligence as ContextualIntelligenceData | undefined) ?? null;
+    ((rawAnalysisMetadata?.contextual_intelligence ??
+      rawStructuredObs.contextual_intelligence) as ContextualIntelligenceData | undefined) ?? null;
   const state: VerificationState = detail.status === "reviewed" && reviewWasCorrected
     ? "corrected"
     : stateFromReport({ status: detail.status, reviewOutcome: detail.review_outcome });
@@ -324,14 +328,16 @@ export function ReviewWorkbench({
               )
             }
           />
-          <ContextualIntelligenceCard
-            reportId={reportId}
-            initialContext={initialContextualIntelligence}
-            locationLabel={detail.location_label}
-            latitude={detail.latitude}
-            longitude={detail.longitude}
-            incidentType={observation.incidentType}
-          />
+          {(currentUserRole === "reviewer" || currentUserRole === "admin") && (
+            <ContextualIntelligenceCard
+              reportId={reportId}
+              initialContext={initialContextualIntelligence}
+              locationLabel={detail.location_label}
+              latitude={detail.latitude}
+              longitude={detail.longitude}
+              incidentType={observation.incidentType}
+            />
+          )}
         </div>
       </div>
       <section style={{ marginTop: "var(--s-6)" }}>

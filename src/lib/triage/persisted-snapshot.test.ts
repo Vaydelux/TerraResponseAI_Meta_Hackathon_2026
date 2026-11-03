@@ -43,6 +43,8 @@ describe("persisted triage is authoritative on retries", () => {
     expect(source).toContain('onConflict: "report_id", ignoreDuplicates: true');
     expect(source).toContain("readPersistedTriage(persisted)");
     expect(source).toContain("stored.incidentType");
+    expect(source).toContain("p_type: stored.incidentType");
+    expect(source).not.toContain("p_type: args.observation.incident_type");
     expect(source).toContain('stored.verificationStatus === "awaiting_human"');
     expect(source).not.toContain("return { ...decision, policyVersion: TRIAGE_POLICY_VERSION }");
   });

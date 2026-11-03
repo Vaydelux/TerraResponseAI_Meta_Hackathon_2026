@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
   if (!uploadRate.ok) {
     return NextResponse.json(
       { error: { code: uploadRate.code, message: uploadRate.message, used: uploadRate.used, limit: uploadRate.limit } },
-      { status: 429 },
+      { status: uploadRate.code === "USER_UPLOAD_RATE_UNAVAILABLE" ? 503 : 429 },
     );
   }
 

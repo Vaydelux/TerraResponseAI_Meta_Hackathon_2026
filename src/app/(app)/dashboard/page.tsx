@@ -200,7 +200,7 @@ export default async function DashboardPage() {
           <h1 style={{ fontSize: "var(--step-3)", lineHeight: 1.15 }}>
             Welcome back, {displayName}.{" "}
             <span style={{ fontWeight: 400, color: "var(--ink-2)" }}>
-              {ctx.events.length} {ctx.events.length === 1 ? "event" : "events"} in your workspace.
+              Share what you see — no disaster event setup required.
             </span>
           </h1>
           <p className="t-meta">

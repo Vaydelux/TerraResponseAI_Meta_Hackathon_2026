@@ -14,6 +14,8 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/server";
 import { getAuthContext } from "@/lib/auth/profile";
+import { createClient } from "@supabase/supabase-js";
+import { serviceRoleKey, supabaseUrl } from "@/lib/supabase/env";
 import {
   fetchContextualIntelligence,
   type ContextualIntelligenceData,
@@ -31,10 +33,12 @@ interface ReportContextRow {
   uploaded_at: string;
   report_analyses?:
     | {
+        raw_usage_metadata?: Record<string, unknown> | null;
         model_id?: string;
         structured_observation?: Record<string, unknown> | null;
       }
     | Array<{
+        raw_usage_metadata?: Record<string, unknown> | null;
         model_id?: string;
         structured_observation?: Record<string, unknown> | null;
       }>
@@ -70,11 +74,20 @@ async function resolveContextForReport(
     );
   }
 
+  // External context is a reviewer tool, never a public user-paid
+  // inference endpoint. The RLS report read below still checks access.
+  if (ctx.user.role !== "reviewer" && ctx.user.role !== "admin") {
+    return NextResponse.json(
+      { error: { code: "FORBIDDEN", message: "Reviewer access required." } },
+      { status: 403 },
+    );
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data: rawReport, error } = await supabase
     .from("reports")
     .select(
-      "id, event_id, title, description, latitude, longitude, location_label, captured_at, uploaded_at, report_analyses(model_id, structured_observation)",
+      "id, event_id, title, description, latitude, longitude, location_label, captured_at, uploaded_at, report_analyses(model_id, structured_observation, raw_usage_metadata)",
     )
     .eq("id", id)
     .single();
@@ -92,11 +105,17 @@ async function resolveContextForReport(
     : report.report_analyses;
   const structuredObs = analysisRow?.structured_observation ?? null;
 
-  // Return cached contextual_intelligence if already present and not force-refreshing
-  const existingContext = structuredObs?.contextual_intelligence as
-    | ContextualIntelligenceData
-    | undefined;
-  if (!forceRefresh && existingContext && existingContext.summary) {
+  // Keep external context separate from strict Meta image observations:
+  // adding arbitrary keys to structured_observation breaks Zod .strict()
+  // and can strand an otherwise valid report on a triage retry.
+  const analysisMetadata = analysisRow?.raw_usage_metadata ?? {};
+  const existingContext = (analysisMetadata.contextual_intelligence ??
+    structuredObs?.contextual_intelligence) as ContextualIntelligenceData | undefined;
+  const cachedAt = existingContext?.generatedAt ? Date.parse(existingContext.generatedAt) : NaN;
+  const refreshCooldownMs = 15 * 60 * 1000;
+  const cacheFresh = Number.isFinite(cachedAt) &&
+    cachedAt <= Date.now() && Date.now() - cachedAt < refreshCooldownMs;
+  if (existingContext?.summary && (!forceRefresh || cacheFresh)) {
     return NextResponse.json({
       ok: true,
       contextualIntelligence: existingContext,
@@ -120,20 +139,25 @@ async function resolveContextForReport(
     description: report.description,
   });
 
-  // Best-effort persist into report_analyses.structured_observation if an analysis row exists
-  if (structuredObs) {
-    try {
-      await supabase
-        .from("report_analyses")
-        .update({
-          structured_observation: {
-            ...structuredObs,
-            contextual_intelligence: contextualIntelligence,
-          },
-        })
-        .eq("report_id", id);
-    } catch {
-      // Non-fatal if RLS or transient DB error prevents caching
+  // Only confirmed source-grounded results deserve a durable cache.
+  // In standby mode, do not invent evidence or alter the Meta observation.
+  if (structuredObs && contextualIntelligence.grounded) {
+    const db = createClient(supabaseUrl(), serviceRoleKey(), {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { error: cacheError } = await db
+      .from("report_analyses")
+      .update({
+        raw_usage_metadata: {
+          ...analysisMetadata,
+          contextual_intelligence: contextualIntelligence,
+        },
+      })
+      .eq("report_id", id);
+    if (cacheError) {
+      // Do not claim a persisted cache; the reviewer still gets the
+      // grounded response and this incident can be retried later.
+      console.error("[context] Unable to persist external context.", { code: cacheError.code });
     }
   }
 
