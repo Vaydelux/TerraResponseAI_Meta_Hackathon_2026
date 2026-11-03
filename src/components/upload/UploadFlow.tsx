@@ -1217,7 +1217,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
                           fontSize: "0.72rem",
                         }}
                       >
-                        {state.kind === "success" && state.analysis.kind === "review_ready" ? "AI RESULT SAVED" : "AI PENDING"}
+                        AI NOT STARTED
                       </span>
                     </div>
 
@@ -1232,7 +1232,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
                       }}
                     >
                       <div className="t-meta" style={{ fontSize: "0.72rem" }}>
-                        Detected Hazard Classification
+                        Observation status
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {aiTelemetry.hazardLabels.map((label) => (
@@ -1413,7 +1413,6 @@ export function UploadFlow({ className }: UploadFlowProps) {
                       setLocationCoords(null);
                       setExif(null);
                       setServerTelemetry(null);
-                      setAiAutoFilled(false);
                       fileSequenceRef.current += 1;
                     }}
                   >
