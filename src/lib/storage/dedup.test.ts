@@ -5,10 +5,8 @@
 // real DB. The tests verify:
 //   - On a row match, isDuplicate=true with the existing id.
 //   - On no match, isDuplicate=false, existingReportId=null.
-//   - On a Supabase error, the function fails-OPEN (returns
-//     isDuplicate=false) so the upload proceeds — the worst case is
-//     a re-analysis (the brief: "repeated uploads do not waste model
-//     calls", but blocking uploads is worse than a rare duplicate).
+//   - On query errors or a missing result, the function fails closed
+//     rather than creating redundant evidence or paying for duplicate AI.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -56,24 +54,16 @@ describe("checkDuplicate", () => {
     expect(result.existingReportId).toBeNull();
   });
 
-  it("returns isDuplicate=false when data is null", async () => {
+  it("fails closed when the database returns null instead of a result array", async () => {
     const chain = mockQueryChain({ data: null, error: null });
     mockFrom.mockReturnValue(chain);
-    const result = await checkDuplicate("evt-id", "abc123");
-    expect(result.isDuplicate).toBe(false);
-    expect(result.existingReportId).toBeNull();
+    await expect(checkDuplicate("evt-id", "abc123")).rejects.toThrow("Duplicate lookup");
   });
 
-  it("fails OPEN on a Supabase error (treats as not a duplicate)", async () => {
-    // The brief: a failed dedup check that blocks uploads is worse than
-    // a rare duplicate. So the function returns isDuplicate=false on
-    // a query error, and the upload proceeds (the model call will be
-    // made, but the rate-limit + cost-control ceilings catch the runaway).
+  it("fails CLOSED on a Supabase error without inserting another report", async () => {
     const chain = mockQueryChain({ data: null, error: { message: "DB down" } });
     mockFrom.mockReturnValue(chain);
-    const result = await checkDuplicate("evt-id", "abc123");
-    expect(result.isDuplicate).toBe(false);
-    expect(result.existingReportId).toBeNull();
+    await expect(checkDuplicate("evt-id", "abc123")).rejects.toThrow("Duplicate lookup");
   });
 
   it("never queries across events — only filters by the authorized event_id", async () => {

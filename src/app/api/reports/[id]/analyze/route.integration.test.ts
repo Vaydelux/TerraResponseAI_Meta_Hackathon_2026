@@ -176,6 +176,7 @@ beforeEach(() => {
   mockCheckAllAiCallCeilings.mockResolvedValue({ ok: true });
   mockLookupCachedAnalysis.mockResolvedValue(null);
   mockLogUsage.mockResolvedValue(undefined);
+  mockCreateClient.mockImplementation(() => ({ from: mockFrom }));
 });
 
 afterEach(() => {
@@ -238,6 +239,60 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     const body = await res.json();
     expect(body.error.code).toBe("NOT_FOUND");
     // Verify no model call was made (the report is unreachable).
+    expect(mockAnalyzeImage).not.toHaveBeenCalled();
+  });
+
+  it("keeps recently started analysis in progress without a second paid model call", async () => {
+    mockFrom.mockReturnValueOnce(makeBuilder({
+      data: {
+        id: REPORT_ID, event_id: EVENT_ID, status: "analyzing",
+        updated_at: new Date().toISOString(), retry_count: 0,
+        sha256: null, derivative_storage_key: "x/y.jpg",
+      },
+      error: null,
+    }));
+    const { request, context } = makeRequest();
+    const response = await POST(request, context);
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe("IN_PROGRESS");
+    expect(mockAnalyzeImage).not.toHaveBeenCalled();
+    expect(mockCreateClient).not.toHaveBeenCalled();
+  });
+
+  it("recovers an orphaned AI job with status+timestamp CAS before any new paid inference", async () => {
+    const staleAt = new Date(Date.now() - 180_000).toISOString();
+    mockFrom.mockReturnValueOnce(makeBuilder({
+      data: {
+        id: REPORT_ID, event_id: EVENT_ID, status: "analyzing",
+        updated_at: staleAt, retry_count: 0, sha256: null,
+        derivative_storage_key: "x/y.jpg",
+      },
+      error: null,
+    }));
+    const update = vi.fn();
+    const eq = vi.fn();
+    const chain: Record<string, unknown> = {
+      eq,
+      select: () => ({
+        maybeSingle: async () => ({ data: { id: REPORT_ID }, error: null }),
+      }),
+    };
+    eq.mockReturnValue(chain);
+    update.mockReturnValue(chain);
+    mockFrom.mockReturnValueOnce({ update });
+    mockCheckAllAiCallCeilings.mockResolvedValue({
+      ok: false, code: "AI_BUDGET_UNAVAILABLE",
+      message: "Budget temporarily unavailable", used: 0, limit: 0,
+    });
+    const { request, context } = makeRequest();
+    const response = await POST(request, context);
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe("AI_BUDGET_UNAVAILABLE");
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      status: "retryable_error", retry_count: 1,
+    }));
+    expect(eq).toHaveBeenCalledWith("status", "analyzing");
+    expect(eq).toHaveBeenCalledWith("updated_at", staleAt);
     expect(mockAnalyzeImage).not.toHaveBeenCalled();
   });
 
@@ -360,6 +415,7 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     // The download succeeds (returns a fake Blob).
     const fakeBlob = { arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff]).buffer };
     mockCreateClient.mockReturnValue({
+      from: mockFrom,
       storage: { from: vi.fn(() => ({ download: vi.fn(async () => ({ data: fakeBlob, error: null })) })) },
     });
     // The model call times out (transient failure).
@@ -388,6 +444,7 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     mockFrom.mockReturnValueOnce(makeCasUpdateBuilder({ data: { id: REPORT_ID }, error: null }));
     const fakeBlob = { arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff]).buffer };
     mockCreateClient.mockReturnValue({
+      from: mockFrom,
       storage: { from: vi.fn(() => ({ download: vi.fn(async () => ({ data: fakeBlob, error: null })) })) },
     });
     mockAnalyzeImage.mockResolvedValue({
@@ -423,6 +480,7 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     mockFrom.mockReturnValueOnce(makeCasUpdateBuilder({ data: { id: REPORT_ID }, error: null }));
     const fakeBlob = { arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff]).buffer };
     mockCreateClient.mockReturnValue({
+      from: mockFrom,
       storage: { from: vi.fn(() => ({ download: vi.fn(async () => ({ data: fakeBlob, error: null })) })) },
     });
     mockAnalyzeImage.mockResolvedValue({
@@ -441,6 +499,12 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     expect(body.latencyMs).toBeGreaterThanOrEqual(0);
     // Verify the telemetry was logged with outcome=succeeded.
     expect(mockLogUsage).toHaveBeenCalled();
+    // The server writes a validated observation with a trusted server
+    // client instead of incorrectly relying on reporter RLS INSERT rights.
+    expect(mockCreateClient).toHaveBeenCalledWith(
+      "https://test.supabase.co", "test-service-role-key",
+      expect.objectContaining({ auth: { persistSession: false, autoRefreshToken: false } }),
+    );
     const logCall = mockLogUsage.mock.calls.find(
       (c: unknown[]) => (c[0] as { outcome: string }).outcome === "succeeded",
     );

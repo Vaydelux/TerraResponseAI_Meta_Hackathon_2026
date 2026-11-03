@@ -60,13 +60,12 @@ export async function checkDuplicate(
     .eq("sha256", digest)
     .limit(1);
 
-  if (error) {
-    // On error, fail safe: treat as NOT a duplicate so the upload
-    // proceeds (the worst case is a re-analysis, which the brief
-    // accepts: "repeated uploads do not waste model calls" — but a
-    // failed dedup check that blocks uploads is worse than a rare
-    // duplicate).
-    return { isDuplicate: false, existingReportId: null };
+  if (error || data === null) {
+    // Failed accounting must never be interpreted as "not a duplicate".
+    // Database access will also be needed to save the report, so it is
+    // safer to ask the user to retry than create duplicate evidence.
+    console.error("[upload] Duplicate lookup unavailable.", { code: error?.code ?? "null_result" });
+    throw new Error("Duplicate lookup temporarily unavailable");
   }
 
   if (data && data.length > 0) {

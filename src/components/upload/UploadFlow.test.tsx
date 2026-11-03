@@ -103,8 +103,8 @@ describe("upload → authenticated analysis handoff", () => {
     fireEvent.click(continueButton);
     fireEvent.click(screen.getByRole("button", { name: "Use unknown location" }));
     fireEvent.click(screen.getByRole("button", { name: "Submit for review" }));
-    expect(await screen.findByText("Linked to existing report")).toBeTruthy();
-    expect(screen.getByText(/No additional report was created/i)).toBeTruthy();
+    expect(await screen.findByText("Existing report reused")).toBeTruthy();
+    expect(screen.getByText(/No duplicate photo or AI request was created/i)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Open existing report" }).getAttribute("href"))
       .toBe("/reports/c3333333-3333-4333-8333-333333333333");
     expect(modelCall).not.toHaveBeenCalled();
