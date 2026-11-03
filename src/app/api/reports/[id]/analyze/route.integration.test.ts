@@ -343,6 +343,40 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     expect(mockAnalyzeImage).not.toHaveBeenCalled();
   });
 
+  it("allows the trusted server to claim a retryable report without widening reporter RLS update rights", async () => {
+    mockFrom.mockReturnValueOnce(makeBuilder({
+      data: {
+        id: REPORT_ID, event_id: EVENT_ID, creator_id: USER_ID,
+        status: "retryable_error", retry_count: 1, sha256: null,
+        derivative_storage_key: "x/y.jpg", image_mime_type: "image/jpeg",
+      },
+      error: null,
+    }));
+    mockCheckAllAiCallCeilings.mockResolvedValue({ ok: true });
+    const cas = makeCasUpdateBuilder({ data: null, error: null });
+    mockFrom.mockReturnValueOnce(cas);
+    const { request, context } = makeRequest();
+    const res = await POST(request, context);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.code).toBe("STATE_TRANSITION_FAILED");
+    expect(cas.update).toHaveBeenCalledWith({ status: "analyzing" });
+    expect(mockCreateClient).toHaveBeenCalledWith(
+      "https://test.supabase.co", "test-service-role-key",
+      expect.objectContaining({ auth: { persistSession: false, autoRefreshToken: false } }),
+    );
+    expect(mockAnalyzeImage).not.toHaveBeenCalled();
+  });
+
+  it("checks user RLS access before any trusted status mutation", async () => {
+    mockFrom.mockReturnValue(makeBuilder({
+      data: null, error: { code: "PGRST116" },
+    }));
+    const { request, context } = makeRequest();
+    const res = await POST(request, context);
+    expect(res.status).toBe(404);
+    expect(mockCreateClient).not.toHaveBeenCalled();
+  });
+
   it("returns 429 USER_AI_RATE_EXCEEDED when the per-user AI rate is exceeded", async () => {
     mockFrom.mockReturnValueOnce(makeBuilder({
       data: { id: REPORT_ID, event_id: EVENT_ID, status: "uploaded",
