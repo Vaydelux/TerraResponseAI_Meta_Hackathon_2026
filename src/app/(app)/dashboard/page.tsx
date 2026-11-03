@@ -174,13 +174,13 @@ export default async function DashboardPage() {
             : isFlag
             ? "FLAGGED"
             : "RECORDED",
-          tone: isConfirm
+          tone: (isConfirm
             ? "green"
             : isReject
             ? "brick"
             : isFlag
             ? "amber"
-            : "tide",
+            : "tide") as "green" | "brick" | "amber" | "tide",
         };
       });
     }
