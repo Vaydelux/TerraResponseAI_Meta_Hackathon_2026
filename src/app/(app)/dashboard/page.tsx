@@ -45,7 +45,7 @@ export default async function DashboardPage() {
       ? await Promise.all([
           supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds),
           supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "needs_review"),
-          supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "reviewed"),
+          supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("review_outcome", "confirmed"),
           supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("location_source", "unknown"),
           supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "retryable_error"),
           supabase.from("reports").select("id", { count: "exact", head: true }).in("event_id", eventIds).eq("status", "needs_manual_review"),
@@ -65,7 +65,7 @@ export default async function DashboardPage() {
   const totalUnlocated = unlocatedRes.count ?? 0;
   const totalFailed = failedRes.count ?? 0;
   const verificationRate =
-    totalReceived > 0 ? Math.round((totalReviewed / totalReceived) * 100) : 94;
+    totalReceived > 0 ? Math.round((totalReviewed / totalReceived) * 100) : 0;
 
   // Top 12 reports ordered by priority score desc, then newest first
   const { data: recentRows } =
@@ -191,21 +191,21 @@ export default async function DashboardPage() {
         title:
           r.title ||
           `Report #TR-${r.id.slice(0, 6).toUpperCase()} (${r.location_label || "Field upload"})`,
-        detail: `EXIF & AI Vision checked · Status: ${r.status.replace(/_/g, " ")}${
+        detail: `Report status: ${r.status.replace(/_/g, " ")}${
           r.review_outcome ? ` (${r.review_outcome})` : ""
         }`,
         timestamp: r.uploaded_at,
         badge: isConfirmed
-          ? "98%"
+          ? "CONFIRMED"
           : isRejected
           ? "REJECTED"
           : isFlagged
           ? "FLAGGED"
           : isReviewed
-          ? "94%"
+          ? "REVIEWED"
           : isFailed
           ? "RETRY"
-          : "92%",
+          : "PENDING",
         tone: isConfirmed
           ? "green"
           : isRejected
@@ -222,7 +222,7 @@ export default async function DashboardPage() {
   }
 
   const displayName = ctx.user.name || ctx.user.email.split("@")[0];
-  const highPriorityCount = recent.filter((r) => (r.severity ?? 0) >= 4).length || awaitingReview;
+  const highPriorityCount = recent.filter((r) => (r.severity ?? 0) >= 4).length;
 
   return (
     <div className="tr-page" style={{ display: "grid", gap: "var(--s-5)" }}>
@@ -240,16 +240,15 @@ export default async function DashboardPage() {
                 fontWeight: 700,
               }}
             >
-              {activeEvent?.event_name || "Metro Manila Sector 04"}
+              {activeEvent?.event_name || "Community reporting"}
             </span>
-            <span className="t-meta">· Live Telemetry Synced · Role: {ctx.user.role}</span>
+            <span className="t-meta">· Data from submitted reports · Role: {ctx.user.role}</span>
           </div>
           <h1 style={{ fontSize: "var(--step-3)", lineHeight: 1.15, margin: 0 }}>
             Good afternoon, {displayName}
           </h1>
           <p className="t-meta" style={{ margin: 0, maxWidth: "68ch" }}>
-            Here is the current emergency response summary for Metro Manila and adjoining
-            riverway corridors.
+            Review submitted disaster evidence, provisional observations, and human verification status.
           </p>
         </div>
 
@@ -275,7 +274,7 @@ export default async function DashboardPage() {
             }}
           >
             <span style={{ color: "var(--brick-ink)", fontWeight: 700 }}>
-              {highPriorityCount} Active Alerts
+              {highPriorityCount} High-priority observations
             </span>
             <span>·</span>
             <span style={{ color: "var(--tide)", fontWeight: 700 }}>
@@ -291,9 +290,9 @@ export default async function DashboardPage() {
 
       {ctx.events.length === 0 ? (
         <EmptyState
-          title="No event selected"
-          description="You are not a member of any incident event yet. An admin must add you to one."
-          action={<Link className="btn" href="/profile">View your profile</Link>}
+          title="Reporting workspace temporarily unavailable"
+          description="Your account is signed in, but the shared reporting workspace is not available. You can still try submitting a report."
+          action={<Link className="btn" href="/reports/new">Upload photo</Link>}
         />
       ) : (
         <>
@@ -322,17 +321,17 @@ export default async function DashboardPage() {
                     className="t-meta num"
                     style={{ color: "var(--amber-ink)", fontWeight: 700 }}
                   >
-                    ▲ +{Math.max(1, awaitingReview)} pending
+                    {awaitingReview} pending
                   </span>
                 </div>
                 <div className="t-meta num">
-                  {awaitingReview} under initial triage, {totalReviewed} fully confirmed
+                  {awaitingReview} awaiting review, {totalReviewed} confirmed
                 </div>
                 <div className="kpi-bar" aria-hidden="true">
                   <div
                     className="kpi-bar__fill"
                     style={{
-                      width: `${Math.min(100, Math.max(25, totalReceived * 8))}%`,
+                      width: `${totalReceived > 0 ? Math.min(100, totalReceived * 8) : 0}%`,
                     }}
                   />
                 </div>

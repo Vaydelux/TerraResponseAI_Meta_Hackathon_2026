@@ -3,19 +3,13 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Bot,
   Search,
   MapPin,
-  Users,
   Gauge,
-  CheckCircle2,
   ArrowRight,
-  Send,
   ShieldCheck,
-  PhoneCall,
   Waves,
   AlertTriangle,
-  Radio,
 } from "lucide-react";
 import { IncidentTriageCard } from "./IncidentTriageCard";
 import { ShareReportButton } from "./ShareReportButton";
@@ -23,7 +17,6 @@ import type { ReportRowData } from "./ReportRow";
 import { formatRelativeTime } from "@/lib/design/format";
 import { toSeverityLevel } from "@/lib/design/severity";
 import { stateFromReport } from "@/lib/design/status";
-import { toast } from "@/components/ui-tr";
 
 export interface DashboardCommandWorkspaceProps {
   reports: ReportRowData[];
@@ -62,20 +55,9 @@ export function DashboardCommandWorkspace({
   canReview,
   totalReceived,
 }: DashboardCommandWorkspaceProps) {
-  const [recommendationState, setRecommendationState] = useState<
-    "active" | "authorized" | "dismissed"
-  >("active");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("priority");
-  const [dispatchedAgencies, setDispatchedAgencies] = useState<Record<string, boolean>>({
-    rc: true,
-  });
-  const [assignedReports, setAssignedReports] = useState<Record<string, boolean>>({});
-  const [checklist, setChecklist] = useState<{ radio: boolean; satellite: boolean }>({
-    radio: true,
-    satellite: true,
-  });
 
   const floodCount = useMemo(
     () => reports.filter((r) => classifyFeedCategory(r) === "flooding").length,
@@ -109,115 +91,9 @@ export function DashboardCommandWorkspace({
     });
   }, [reports, categoryFilter, searchQuery, sortMode]);
 
-  function handleDispatchAgency(id: string, name: string) {
-    setDispatchedAgencies((prev) => {
-      const next = !prev[id];
-      if (next) {
-        toast.success(`Dispatched triage telemetry & coordinates to ${name}.`);
-      }
-      return { ...prev, [id]: next };
-    });
-  }
-
   return (
     <div style={{ display: "grid", gap: "var(--s-5)" }}>
-      {/* AI Tactical Recommendation Banner (Meta Llama Vision Live Model) */}
-      {recommendationState !== "dismissed" && (
-        <section
-          aria-label="AI Tactical Recommendation"
-          className="panel"
-          style={{
-            padding: "var(--s-4) var(--s-5)",
-            border: "1px solid var(--tide)",
-            background: "var(--grad-banner-wash), var(--sheet)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "var(--s-4)",
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--s-3)", flex: "1 1 480px" }}>
-            <span
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "var(--r-ctl)",
-                background: "var(--tide-wash)",
-                color: "var(--tide)",
-                display: "grid",
-                placeItems: "center",
-                flexShrink: 0,
-              }}
-            >
-              <Bot size={20} aria-hidden="true" />
-            </span>
-            <div style={{ display: "grid", gap: 4 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <strong style={{ fontSize: "var(--step-0)" }}>AI Tactical Recommendation</strong>
-                <span
-                  className="t-meta num"
-                  style={{
-                    padding: "2px 8px",
-                    borderRadius: 4,
-                    background: "var(--tide-wash)",
-                    color: "var(--tide)",
-                    fontWeight: 700,
-                    fontSize: "0.74rem",
-                  }}
-                >
-                  Meta Llama Vision · Live Model v4.2
-                </span>
-                {recommendationState === "authorized" && (
-                  <span
-                    className="t-meta num"
-                    style={{
-                      padding: "2px 8px",
-                      borderRadius: 4,
-                      background: "var(--green-wash)",
-                      color: "var(--green-ink)",
-                      fontWeight: 700,
-                      fontSize: "0.74rem",
-                    }}
-                  >
-                    PRE-POSITION AUTHORIZED
-                  </span>
-                )}
-              </div>
-              <p className="t-meta" style={{ margin: 0, color: "var(--ink-2)" }}>
-                Rising water levels in Pasig and Marikina corridors may cause cascading slowdowns
-                across Ortigas Avenue. Recommend pre-positioning Rescue Unit Alpha to Rosario
-                Bridge and prioritizing flood verification queue.
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--s-2)", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className="btn btn--primary btn--sm"
-              onClick={() => {
-                setRecommendationState("authorized");
-                toast.success("Rescue Unit Alpha pre-positioning advisory logged.");
-              }}
-              disabled={recommendationState === "authorized"}
-            >
-              {recommendationState === "authorized"
-                ? "Unit Alpha Pre-positioned"
-                : "Authorize Pre-position"}
-            </button>
-            <button
-              type="button"
-              className="btn btn--sm"
-              onClick={() => setRecommendationState("dismissed")}
-            >
-              Dismiss
-            </button>
-          </div>
-        </section>
-      )}
-
-      {/* Two-Column Main Operational Workspace (Active Incident Feeds + Command Dispatch Rail) */}
+      {/* Two-Column Incident Evidence Workspace */}
       <div
         style={{
           display: "grid",
@@ -342,7 +218,6 @@ export function DashboardCommandWorkspace({
                 });
                 const isCritical = sev >= 4;
                 const cat = classifyFeedCategory(r);
-                const assigned = !!assignedReports[r.id];
                 const titleText =
                   r.title ||
                   (cat === "blocked_road"
@@ -416,9 +291,9 @@ export function DashboardCommandWorkspace({
                                 fontSize: "0.73rem",
                               }}
                             >
-                              {isCritical
-                                ? `CRITICAL · SEV-${sev}`
-                                : `MODERATE · SEV-${sev}`}
+                              {r.severity == null
+                                ? "Severity not assessed"
+                                : `Provisional severity ${sev}/5`}
                             </span>
                             <span
                               className="t-meta num"
@@ -435,7 +310,7 @@ export function DashboardCommandWorkspace({
                                 fontSize: "0.73rem",
                               }}
                             >
-                              {state === "confirmed" ? "AI + Human Verified" : "Meta AI Analyzed"}
+                              {state === "confirmed" ? "Human confirmed" : state === "rejected" ? "Rejected" : state === "flagged" ? "Flagged for review" : state === "failed" ? "Analysis unavailable" : r.status === "uploaded" ? "Awaiting AI analysis" : r.status === "analyzing" ? "AI analysis in progress" : "AI observation · not verified"}
                             </span>
                           </div>
                           <p
@@ -476,14 +351,8 @@ export function DashboardCommandWorkspace({
                         style={{ display: "flex", flexWrap: "wrap", gap: 16 }}
                       >
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <Users size={14} aria-hidden="true" style={{ color: "var(--tide)" }} />
-                          <strong>
-                            {assigned ? "First Responder Unit Assigned" : "3 First Responder Units Nearby"}
-                          </strong>
-                        </span>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                           <Gauge size={14} aria-hidden="true" style={{ color: "var(--amber-ink)" }} />
-                          <span>Priority Score: {r.priority_score ?? 78}</span>
+                          <span>Priority Score: {r.priority_score ?? "Pending"}</span>
                         </span>
                       </div>
                     </div>
@@ -498,21 +367,6 @@ export function DashboardCommandWorkspace({
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <button
-                          type="button"
-                          className={`btn btn--sm ${assigned ? "" : "btn--primary"}`}
-                          onClick={() => {
-                            setAssignedReports((prev) => ({ ...prev, [r.id]: !prev[r.id] }));
-                            toast.success(
-                              assigned
-                                ? "Cleared unit assignment."
-                                : `Assigned responder team to #TR-${r.id.slice(0, 6).toUpperCase()}.`,
-                            );
-                          }}
-                        >
-                          <Users size={14} aria-hidden="true" />
-                          <span>{assigned ? "Team Assigned ✓" : "Assign Team"}</span>
-                        </button>
                         <Link href="/map" className="btn btn--sm">
                           <MapPin size={14} aria-hidden="true" />
                           <span>View on Map</span>
@@ -539,151 +393,6 @@ export function DashboardCommandWorkspace({
                   </article>
                 );
               })}
-
-              {/* River Hydrograph Telemetry Card (matching reference screenshot) */}
-              <article
-                className="panel"
-                style={{ display: "grid", gap: "var(--s-3)", padding: "var(--s-4) var(--s-5)" }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "var(--s-2)",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: "var(--r-ctl)",
-                        background: "var(--tide-wash)",
-                        color: "var(--tide)",
-                        display: "grid",
-                        placeItems: "center",
-                      }}
-                    >
-                      <Waves size={18} aria-hidden="true" />
-                    </span>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <h3 style={{ fontSize: "var(--step-1)", margin: 0 }}>
-                          Rising River Water Level
-                        </h3>
-                        <span
-                          className="t-meta num"
-                          style={{
-                            padding: "2px 8px",
-                            borderRadius: 4,
-                            background: "var(--amber-wash)",
-                            color: "var(--amber-ink)",
-                            fontWeight: 700,
-                            fontSize: "0.73rem",
-                          }}
-                        >
-                          Warning Stage (Level 2)
-                        </span>
-                      </div>
-                      <p className="t-meta" style={{ margin: 0 }}>
-                        Marikina Bridge Sensor Station #09 · Automated Hydrological Telemetry
-                      </p>
-                    </div>
-                  </div>
-                  <span className="t-meta num">Live Telemetry (30s ago)</span>
-                </div>
-
-                <div
-                  style={{
-                    padding: "var(--s-3) var(--s-4)",
-                    borderRadius: "var(--r-ctl)",
-                    background: "var(--sheet-sunk)",
-                    border: "1px solid var(--rule)",
-                    display: "grid",
-                    gap: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "baseline",
-                      justifyContent: "space-between",
-                      gap: 8,
-                    }}
-                  >
-                    <div>
-                      <strong
-                        className="num"
-                        style={{ fontSize: "var(--step-2)", color: "var(--amber-ink)" }}
-                      >
-                        16.4m
-                      </strong>{" "}
-                      <span className="t-meta num">/ 18.0m Critical Evac Threshold</span>
-                    </div>
-                    <span className="t-meta num" style={{ color: "var(--tide)", fontWeight: 700 }}>
-                      +0.3m / hr
-                    </span>
-                  </div>
-                  <div className="kpi-bar" aria-hidden="true">
-                    <div
-                      className="kpi-bar__fill"
-                      style={{
-                        width: "78%",
-                        background: "linear-gradient(90deg, var(--tide), var(--amber), var(--brick))",
-                      }}
-                    />
-                  </div>
-                  <div
-                    className="t-meta num"
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "0.74rem",
-                    }}
-                  >
-                    <span>15.0m (Alarm)</span>
-                    <span style={{ color: "var(--amber-ink)", fontWeight: 700 }}>
-                      16.0m (Pre-Evacuate)
-                    </span>
-                    <span>18.0m (Forced Evac)</span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      className="btn btn--primary btn--sm"
-                      onClick={() =>
-                        toast.success("Sector advisory broadcasted to riverway barangay nodes.")
-                      }
-                    >
-                      <Radio size={14} aria-hidden="true" />
-                      <span>Broadcast Siren Advisory</span>
-                    </button>
-                    <Link href="/map" className="btn btn--sm">
-                      <span>View on Tactical Map</span>
-                    </Link>
-                  </div>
-                  <Link
-                    href="/reports"
-                    className="t-meta"
-                    style={{ color: "var(--tide)", fontWeight: 700, textDecoration: "none" }}
-                  >
-                    All Reports ({totalReceived}) →
-                  </Link>
-                </div>
-              </article>
 
               {/* Visual Photo Triage Grid */}
               <div style={{ marginTop: "var(--s-2)" }}>
@@ -746,121 +455,11 @@ export function DashboardCommandWorkspace({
           )}
         </section>
 
-        {/* Right Column: Quick Agency Dispatch + Recent Verifications + Helpline & Checklist */}
+        {/* Right Column: real review activity */}
         <aside
-          aria-label="Emergency Operations Command Rail"
+          aria-label="Review Activity Rail"
           style={{ display: "grid", gap: "var(--s-4)" }}
         >
-          {/* Card 1: Quick Agency Dispatch */}
-          <section className="panel" style={{ display: "grid", gap: "var(--s-3)" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 8,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Send size={16} aria-hidden="true" style={{ color: "var(--tide)" }} />
-                <h2 style={{ fontSize: "var(--step-1)", margin: 0 }}>Quick Agency Dispatch</h2>
-              </div>
-              <span
-                className="t-meta num"
-                style={{
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                  background: "var(--sheet-sunk)",
-                  border: "1px solid var(--rule)",
-                  fontSize: "0.72rem",
-                  fontWeight: 700,
-                }}
-              >
-                One-Click SOP
-              </span>
-            </div>
-            <p className="t-meta" style={{ margin: 0 }}>
-              Send pre-formatted triage telemetry and verified incident coordinates directly to
-              partner responder operational centers.
-            </p>
-
-            <div style={{ display: "grid", gap: 8 }}>
-              {[
-                {
-                  id: "mmda",
-                  code: "MM",
-                  name: "MMDA Operations",
-                  role: "Traffic & Flood Management",
-                },
-                {
-                  id: "pcg",
-                  code: "CG",
-                  name: "Philippine Coast Guard",
-                  role: "Special Water Rescue Unit",
-                },
-                {
-                  id: "rc",
-                  code: "RC",
-                  name: "Philippine Red Cross",
-                  role: "Medical Ambulance & Triage",
-                },
-              ].map((agency) => {
-                const active = !!dispatchedAgencies[agency.id];
-                return (
-                  <div
-                    key={agency.id}
-                    style={{
-                      padding: "10px 12px",
-                      borderRadius: "var(--r-ctl)",
-                      background: "var(--sheet-sunk)",
-                      border: "1px solid var(--rule)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span
-                        className="num"
-                        style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: "var(--r-ctl)",
-                          background: "var(--tide-wash)",
-                          color: "var(--tide)",
-                          fontWeight: 700,
-                          fontSize: "0.8rem",
-                          display: "grid",
-                          placeItems: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {agency.code}
-                      </span>
-                      <div>
-                        <strong style={{ display: "block", fontSize: "0.88rem" }}>
-                          {agency.name}
-                        </strong>
-                        <span className="t-meta" style={{ fontSize: "0.75rem" }}>
-                          {agency.role}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className={`btn btn--sm ${active ? "" : "btn--primary"}`}
-                      onClick={() => handleDispatchAgency(agency.id, agency.name)}
-                    >
-                      {active ? "✓ Active (3 Units)" : "Dispatch →"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
           {/* Card 2: Recent Verifications */}
           <section className="panel" style={{ display: "grid", gap: "var(--s-3)" }}>
             <div
@@ -888,29 +487,10 @@ export function DashboardCommandWorkspace({
             </p>
 
             <div style={{ display: "grid", gap: 8 }}>
-              {(streamItems.length > 0
-                ? streamItems.slice(0, 3)
-                : [
-                    {
-                      id: "v1",
-                      category: "FLOOD TELEMETRY",
-                      title: "Water Level Post #4",
-                      detail: "EXIF matches GPS · Verified by Meta AI Vision",
-                      timestamp: new Date().toISOString(),
-                      badge: "98%",
-                      tone: "green" as const,
-                    },
-                    {
-                      id: "v2",
-                      category: "FIELD SUBMISSION",
-                      title: "Relief Supply Drop #12",
-                      detail: "Geo-stamp Pasig Elementary Gym · Human Sign-off",
-                      timestamp: new Date().toISOString(),
-                      badge: "94%",
-                      tone: "green" as const,
-                    },
-                  ]
-              ).map((item, idx) => (
+              {streamItems.length === 0 && (
+                <p className="t-meta">No review activity recorded yet. Upload a report to begin.</p>
+              )}
+              {streamItems.slice(0, 3).map((item) => (
                 <div
                   key={item.id}
                   style={{
@@ -945,144 +525,14 @@ export function DashboardCommandWorkspace({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    ✓ {idx === 0 ? "98%" : idx === 1 ? "94%" : item.badge}
+                    {item.badge}
                   </span>
                 </div>
               ))}
             </div>
           </section>
 
-          {/* Card 3: Helpline & Direct Links + Shift Readiness Checklist */}
-          <section className="panel" style={{ display: "grid", gap: "var(--s-3)" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 8,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <PhoneCall size={16} aria-hidden="true" style={{ color: "var(--tide)" }} />
-                <h2 style={{ fontSize: "var(--step-1)", margin: 0 }}>
-                  Helpline &amp; Direct Links
-                </h2>
-              </div>
-              <span
-                className="t-meta num"
-                style={{
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                  background: "var(--tide-wash)",
-                  color: "var(--tide)",
-                  fontSize: "0.72rem",
-                  fontWeight: 700,
-                }}
-              >
-                Priority 1 Lines
-              </span>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                gap: 8,
-              }}
-            >
-              {[
-                { label: "National Emergency", num: "911", sub: "Direct EOC Link" },
-                { label: "Red Cross Hotline", num: "143", sub: "Dispatch Direct" },
-                { label: "MMDA Metro Base", num: "136", sub: "Traffic & Towing" },
-                { label: "Coast Guard Action", num: "527-8481", sub: "Amphibious Rescue" },
-              ].map((line) => (
-                <div
-                  key={line.num}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "var(--r-ctl)",
-                    background: "var(--sheet-sunk)",
-                    border: "1px solid var(--rule)",
-                    display: "grid",
-                    gap: 2,
-                  }}
-                >
-                  <span className="t-meta" style={{ fontSize: "0.73rem" }}>
-                    {line.label}
-                  </span>
-                  <strong className="num" style={{ fontSize: "var(--step-2)" }}>
-                    {line.num}
-                  </strong>
-                  <span
-                    className="t-meta"
-                    style={{ fontSize: "0.72rem", color: "var(--tide)", fontWeight: 700 }}
-                  >
-                    {line.sub}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div
-              style={{
-                paddingTop: "var(--s-2)",
-                borderTop: "1px solid var(--rule)",
-                display: "grid",
-                gap: 6,
-              }}
-            >
-              <span className="t-meta" style={{ fontWeight: 700, fontSize: "0.73rem" }}>
-                SHIFT READINESS CHECKLIST
-              </span>
-              <button
-                type="button"
-                onClick={() => setChecklist((c) => ({ ...c, radio: !c.radio }))}
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: "var(--r-ctl)",
-                  background: "var(--sheet-sunk)",
-                  border: "1px solid var(--rule)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  cursor: "pointer",
-                  color: "var(--ink)",
-                }}
-              >
-                <span className="t-meta" style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--ink)" }}>
-                  <CheckCircle2 size={14} aria-hidden="true" style={{ color: "var(--green)" }} />
-                  Radio relay stations verified
-                </span>
-                <span className="t-meta num" style={{ color: "var(--green)", fontWeight: 700 }}>
-                  {checklist.radio ? "Complete" : "Pending"}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setChecklist((c) => ({ ...c, satellite: !c.satellite }))}
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: "var(--r-ctl)",
-                  background: "var(--sheet-sunk)",
-                  border: "1px solid var(--rule)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  cursor: "pointer",
-                  color: "var(--ink)",
-                }}
-              >
-                <span className="t-meta" style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--ink)" }}>
-                  <CheckCircle2 size={14} aria-hidden="true" style={{ color: "var(--green)" }} />
-                  Satellite uplink redundancy test
-                </span>
-                <span className="t-meta num" style={{ color: "var(--green)", fontWeight: 700 }}>
-                  {checklist.satellite ? "Operational" : "Checking"}
-                </span>
-              </button>
-            </div>
-          </section>
-        </aside>
+          </aside>
       </div>
     </div>
   );

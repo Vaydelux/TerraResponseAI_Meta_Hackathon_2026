@@ -73,7 +73,7 @@ export function IncidentTriageCard({
   const ctaLabel = canReview && isPending ? "Launch Review Workbench" : "Inspect Incident Report";
 
   return (
-    <article className="triage-card" data-sev={severity} aria-label={`${title} — severity ${severity}`}>
+    <article className="triage-card" data-sev={report.severity == null ? undefined : severity} aria-label={`${title} — ${report.severity == null ? "severity not assessed" : `provisional severity ${severity}/5`}`}>
       <div className="triage-card__stripe" aria-hidden="true" />
       <div className="triage-card__body">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--s-2)", flexWrap: "wrap" }}>
@@ -84,7 +84,7 @@ export function IncidentTriageCard({
               color: severity >= 4 ? "var(--brick-ink)" : severity === 3 ? "var(--amber-ink)" : "var(--tide)",
             }}
           >
-            {SEVERITY_TAG[severity] ?? `SEV ${severity}`}
+            {report.severity == null ? "SEVERITY NOT ASSESSED" : SEVERITY_TAG[severity] ?? `SEV ${severity}`}
           </span>
           <span className="t-meta num">#TR-{report.id.slice(0, 6).toUpperCase()}</span>
         </div>
