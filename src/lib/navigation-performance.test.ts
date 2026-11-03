@@ -20,6 +20,15 @@ describe("fast authenticated navigation", () => {
     expect(source("src/components/layout/NavPendingIndicator.tsx")).toContain("useLinkStatus");
   });
 
+  it("uses client routing for internal action buttons but preserves native external links", () => {
+    const button = source("src/components/ui-tr/Button.tsx");
+    expect(button).toContain('import Link from "next/link"');
+    expect(button).toContain('href.startsWith("/")');
+    expect(button).toContain("!anchorRest.download");
+    expect(button).toContain("<Link className={cls} href={href}");
+    expect(button).toContain("<a className={cls} href={href}");
+  });
+
   it("does not upsert the intake membership on every tab navigation", () => {
     const layout = source("src/app/(app)/layout.tsx");
     expect(layout).toContain("!ctx.events.some");
