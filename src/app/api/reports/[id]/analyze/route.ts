@@ -217,7 +217,7 @@ export async function POST(
         );
       }
       // CAS succeeded — safe to upsert the cached observation.
-      const { error: cacheInsertErr } = await supabase
+      const { error: cacheInsertErr } = await trustedAnalysisClient()
         .from("report_analyses")
         .upsert({
           report_id: id,
@@ -450,7 +450,7 @@ export async function POST(
   //    persistFailedAnalysis) overwrites the failed row. Without
   //    upsert, the unique constraint on report_id would reject the
   //    insert and we'd waste the model call's cost.
-  const { error: insertErr } = await supabase.from("report_analyses").upsert({
+  const { error: insertErr } = await trustedAnalysisClient().from("report_analyses").upsert({
     report_id: id,
     model_id: result.modelId,
     prompt_version: result.promptVersion,
@@ -556,6 +556,17 @@ export async function POST(
 
 // --- helpers ---
 
+// Called ONLY after the route has verified the user and read the report
+// through their RLS-scoped session. Reporters are intentionally NOT
+// granted INSERT/UPDATE on report_analyses; the trusted server persists
+// fixed, schema-validated results for the authorized report only.
+function trustedAnalysisClient() {
+  return createClient(supabaseUrl(), serviceRoleKey(), {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+
 async function markAsManualReview(reportId: string, error: string) {
   const supabase = await createSupabaseServerClient();
   await supabase
@@ -586,8 +597,7 @@ async function persistFailedAnalysis(
   reportId: string,
   result: { ok: false; kind: string; error: string; rawOutput?: string; statusCode?: number },
 ) {
-  const supabase = await createSupabaseServerClient();
-  await supabase.from("report_analyses").upsert({
+  await trustedAnalysisClient().from("report_analyses").upsert({
     report_id: reportId,
     model_id: MODEL_ID,
     prompt_version: PROMPT_VERSION,
