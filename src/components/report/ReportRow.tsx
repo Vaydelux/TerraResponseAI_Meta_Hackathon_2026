@@ -94,7 +94,11 @@ export function ReportRow({ report, reviewerName, eventName }: ReportRowProps) {
             </>
           )}
         </div>
-        <SeverityMeter level={severity} state={state} compact />
+        {report.severity == null ? (
+          <span className="t-meta">Severity not assessed</span>
+        ) : (
+          <SeverityMeter level={severity} state={state} compact />
+        )}
       </div>
       <div style={{ textAlign: "right", display: "grid", gap: 2, justifyItems: "end", flex: "none" }}>
         <div className="priority__score-num num" style={{ fontSize: "var(--step-2)", fontFamily: "var(--font-display)", fontWeight: 700 }}>
