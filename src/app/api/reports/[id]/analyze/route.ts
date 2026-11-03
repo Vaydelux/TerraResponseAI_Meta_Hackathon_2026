@@ -29,6 +29,10 @@ import { createClient } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabaseUrl, serviceRoleKey } from "@/lib/supabase/env";
 import { analyzeImage, MODEL_ID } from "@/lib/ai/muse-spark";
 import { withRetry } from "@/lib/ai/retry";
+
+// Keep inference inside the hosting function's bounded execution budget.
+// Retryable provider errors remain resumable through a new idempotent request.
+export const maxDuration = 60;
 import { OBSERVATION_SCHEMA_VERSION } from "@/lib/ai/observation-schema";
 import { PROMPT_VERSION } from "@/lib/ai/prompt";
 import { readCostControlConfig } from "@/lib/ai/cost-controls";
@@ -371,16 +375,20 @@ export async function POST(
   // 7. Read the image bytes.
   const imageBytes = new Uint8Array(await imageBlob.arrayBuffer());
 
-  // 8. Call the Meta Model API with bounded retries + a timeout.
-  //    Measure the round-trip latency for the telemetry row.
+  // 8. One bounded paid provider attempt per HTTP request. Repeating a
+  //    30-second inference five times can exceed Vercel's execution budget,
+  //    leave the report stuck as 'analyzing', and undercount AI spending.
+  //    Transient errors transition to retryable_error; a subsequent
+  //    idempotent request is the safe retry boundary.
   const callStart = Date.now();
   const result = await withRetry(
     () => analyzeImage({
       imageBytes,
       imageMimeType: "image/jpeg",
-      timeoutMs: costConfig.modelCallTimeoutMs,
+      timeoutMs: Math.min(costConfig.modelCallTimeoutMs, 30_000),
     }),
     (r) => r.ok === false && (r.kind === "transient" || r.kind === "timeout"),
+    { maxRetries: 0, baseDelayMs: 1000, maxDelayMs: 1000 },
   );
   const latencyMs = Date.now() - callStart;
 
