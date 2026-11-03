@@ -90,7 +90,7 @@ export async function POST(
   const supabase = await createSupabaseServerClient();
   const { data: report, error: reportErr } = await supabase
     .from("reports")
-    .select("id, event_id, creator_id, status, derivative_storage_key, image_mime_type, sha256, retry_count")
+    .select("id, event_id, creator_id, status, updated_at, derivative_storage_key, image_mime_type, sha256, retry_count")
     .eq("id", id)
     .single();
 
@@ -102,7 +102,7 @@ export async function POST(
   }
 
   // 4. Idempotency: check the current state.
-  const status = report.status;
+  let status = report.status;
   if (status === "needs_review" || status === "reviewed") {
     // Already analyzed — return the existing analysis.
     const { data: existing } = await supabase
@@ -140,10 +140,41 @@ export async function POST(
   }
 
   if (status === "analyzing") {
-    return NextResponse.json(
-      { error: { code: "IN_PROGRESS", message: "Analysis is already in progress." } },
-      { status: 409 },
-    );
+    // A terminated serverless worker may never execute its catch block,
+    // leaving this report stuck forever. Recover only when the last
+    // state transition is older than twice this route's runtime limit.
+    // Both status AND updated_at participate in CAS, so a new worker's
+    // transition cannot be overwritten by a stale client.
+    const lastTransition = Date.parse(report.updated_at ?? "");
+    const stale = Number.isFinite(lastTransition) &&
+      lastTransition <= Date.now() &&
+      Date.now() - lastTransition > 120_000;
+    if (stale) {
+      const nextRetryCount = (report.retry_count ?? 0) + 1;
+      const { data: recovered, error: recoveryError } = await supabase
+        .from("reports")
+        .update({
+          status: "retryable_error",
+          retry_count: nextRetryCount,
+          last_error: "The previous AI request stopped before completion. A new attempt is permitted.",
+          next_retry_at: null,
+        })
+        .eq("id", id)
+        .eq("status", "analyzing")
+        .eq("updated_at", report.updated_at)
+        .select("id")
+        .maybeSingle();
+      if (!recoveryError && recovered) {
+        status = "retryable_error";
+        report.retry_count = nextRetryCount;
+      }
+    }
+    if (status === "analyzing") {
+      return NextResponse.json(
+        { error: { code: "IN_PROGRESS", message: "Analysis is still running. Check again shortly." } },
+        { status: 409 },
+      );
+    }
   }
 
   // Allow retry from retryable_error; allow first run from uploaded.
