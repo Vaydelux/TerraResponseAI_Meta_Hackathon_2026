@@ -14,6 +14,7 @@
 
 import type { ButtonHTMLAttributes, AnchorHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 export type ButtonVariant = "default" | "primary" | "danger" | "quiet";
 export type ButtonSize = "default" | "lg";
@@ -76,6 +77,17 @@ export function Button(props: ButtonProps) {
 
   if (href !== undefined) {
     const { ...anchorRest } = rest as AnchorHTMLAttributes<HTMLAnchorElement>;
+    // Internal routes should preserve the App Router shell and its prefetch.
+    // External destinations and downloads keep normal browser navigation.
+    if (href.startsWith("/") && !href.startsWith("//") &&
+        !anchorRest.download && !anchorRest.target) {
+      return (
+        <Link className={cls} href={href} aria-busy={busy || undefined} {...anchorRest}>
+          {children}
+          {kbdHint}
+        </Link>
+      );
+    }
     return (
       <a className={cls} href={href} aria-busy={busy || undefined} {...anchorRest}>
         {children}
