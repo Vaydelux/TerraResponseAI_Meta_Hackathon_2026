@@ -1,4 +1,5 @@
 name: One-time Superseded Branch Cleanup
+# Executes once on the reviewed repository inventory only.
 
 on:
   push:
