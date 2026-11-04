@@ -231,7 +231,7 @@ See `docs/DEMO_SCRIPT.md` for the 3-minute demo script and `docs/DEMO_MODE.md` f
 ## Submission readiness and unresolved safety gates
 
 > [!WARNING]
-> **Hackathon prototype ≠ approved emergency service or fully verified production release.**
+> **SECURITY RELEASE BLOCKER — Hackathon prototype ≠ approved emergency service or fully verified production release.**
 > [Issue #21](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/21)
 > still requires owner-confirmed email verification, SMTP and staging-demo-account cleanup.
 > Other open issues cover [database authorization boundaries (#48)](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/48),
