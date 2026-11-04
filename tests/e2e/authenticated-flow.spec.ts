@@ -53,6 +53,8 @@ test.describe("Authenticated staging acceptance flow", () => {
     }, { path, init });
   }
 
+  test.setTimeout(240_000);
+
   test("persists live analysis, audited separate review, private evidence, and map result", async ({
     browser,
   }) => {
@@ -78,7 +80,6 @@ test.describe("Authenticated staging acceptance flow", () => {
       ])
       .jpeg({ quality: 82 })
       .toBuffer();
-    const imageBytes = Array.from(normalizedJpeg);
 
     const reporterContext = await browser.newContext();
     const reporterPage = await reporterContext.newPage();
@@ -88,24 +89,62 @@ test.describe("Authenticated staging acceptance flow", () => {
     try {
       await signIn(reporterPage, reporterEmail!, reporterPassword!);
 
-      const upload = await reporterPage.evaluate(async ({ imageBytes }) => {
-        const file = new File([new Uint8Array(imageBytes)], "staging-e2e.jpg", { type: "image/jpeg" });
-        const form = new FormData();
-        form.append("file", file);
-        form.append("meta", JSON.stringify({
-          title: "STAGING E2E — synthetic acceptance evidence",
-          description: "STAGING E2E ONLY — not a real incident report.",
-          latitude: 14.5995,
-          longitude: 120.9842,
-          locationSource: "manual",
-        }));
-        const response = await fetch("/api/reports", { method: "POST", body: form });
-        return { status: response.status, body: await response.json().catch(() => null) };
-      }, { imageBytes });
-      expect([200, 201], JSON.stringify(upload.body)).toContain(upload.status);
-      reportId = (upload.body as { reportId?: unknown }).reportId as string | undefined;
-      expect(typeof reportId).toBe("string");
-      if (!reportId) throw new Error("Upload response did not include a report id.");
+      // Use the actual three-step reporter UI, not a hidden direct-upload API
+      // call. This catches broken file-picker, location and submit controls.
+      await reporterPage.goto("/reports/new");
+      await expect(reporterPage.getByRole("heading", { name: "Upload a photo" })).toBeVisible();
+      await reporterPage.locator('input[accept="image/jpeg,image/png,image/webp"]').setInputFiles({
+        name: `staging-e2e-${seed}.jpg`,
+        mimeType: "image/jpeg",
+        buffer: normalizedJpeg,
+      });
+      await reporterPage.getByLabel("Report title (enter what you observed)").fill("STAGING E2E — synthetic acceptance evidence");
+      await reporterPage.getByLabel("Description (facts you observed, not AI estimates)").fill(
+        "STAGING E2E ONLY — synthetic and not a real emergency.",
+      );
+      const continueButton = reporterPage.getByRole("button", { name: /^Continue$/ });
+      await expect(continueButton).toBeEnabled({ timeout: 15000 });
+      await continueButton.click();
+      await expect(reporterPage.getByRole("heading", { name: "Confirm the location" })).toBeVisible();
+      await reporterPage.getByLabel("Latitude").fill("14.5995");
+      await reporterPage.getByLabel("Longitude").fill("120.9842");
+      await reporterPage.getByRole("button", { name: "Use this location" }).click();
+      await expect(reporterPage.getByTestId("step3-review-summary-card")).toBeVisible();
+      await reporterPage.getByRole("button", { name: "Submit for review" }).click();
+
+      const reportLink = reporterPage.getByTestId("submitted-report-link");
+      await expect(reportLink).toBeVisible({ timeout: 60000 });
+      const reportHref = await reportLink.getAttribute("href");
+      reportId = reportHref?.match(/^\/reports\/([0-9a-f-]{36})$/i)?.[1];
+      if (!reportId) throw new Error("UI did not provide a valid saved report link.");
+
+      // The upload component initiates analysis itself. Poll read-only state;
+      // never silently issue a second analysis or fake a model response.
+      await expect.poll(async () => {
+        const result = await postJson(reporterPage, `/api/reports/${reportId}`);
+        return (result.body as { report?: { status?: string } } | null)?.report?.status ?? "unavailable";
+      }, { timeout: 150000, intervals: [2000, 4000, 6000] }).toBe("needs_review");
+
+      const saved = await postJson(reporterPage, `/api/reports/${reportId}`);
+      expect(saved.status).toBe(200);
+      const savedReport = (saved.body as {
+        report?: {
+          creator_id?: string;
+          report_analyses?: Array<{
+            model_id?: string;
+            structured_observation?: Record<string, unknown>;
+          }>;
+        };
+      }).report;
+      const latest = savedReport?.report_analyses?.[0];
+      expect(latest?.model_id).toBeTruthy();
+      expect(latest?.model_id).not.toBe("demo-mock-v1");
+      expect(latest?.structured_observation?._demo).not.toBe(true);
+      expect(latest?.structured_observation?.incident_type).toBeTruthy();
+      const creatorId = savedReport?.creator_id;
+      expect(creatorId).toBeTruthy();
+      await reportLink.click();
+      await expect(reporterPage.getByText(/AI.generated, not verified/i).first()).toBeVisible();
 
       const evidence = await postJson(reporterPage, `/api/reports/${reportId}/evidence?kind=derivative`);
       expect(evidence.status).toBe(200);
@@ -121,34 +160,23 @@ test.describe("Authenticated staging acceptance flow", () => {
       expect(signedEvidence.status).toBe(200);
       expect(signedEvidence.contentType).toMatch(/^image\//);
 
-      const analysis = await postJson(reporterPage, `/api/reports/${reportId}/analyze`, { method: "POST" });
-      expect(analysis.status, JSON.stringify(analysis.body)).toBe(200);
-      const analysisBody = analysis.body as {
-        analysis?: { model_id?: string; structured_observation?: Record<string, unknown> };
-        modelId?: string;
-        observation?: Record<string, unknown>;
-      };
-      const modelId = analysisBody.analysis?.model_id ?? analysisBody.modelId;
-      const observation = analysisBody.analysis?.structured_observation ?? analysisBody.observation;
-      expect(modelId).toBeTruthy();
-      expect(modelId).not.toBe("demo-mock-v1");
-      expect(observation?._demo).not.toBe(true);
-      expect(observation?.incident_type).toBeTruthy();
-
       reviewerContext = await browser.newContext();
       const reviewerPage = await reviewerContext.newPage();
       await signIn(reviewerPage, reviewerEmail!, reviewerPassword!);
+      await reviewerPage.goto("/review");
+      const pendingLink = reviewerPage.locator(`a[href="/review/${reportId}"]`).first();
+      await expect(pendingLink).toBeVisible({ timeout: 30000 });
+      await pendingLink.click();
+      const confirm = reviewerPage.getByRole("button", { name: /Confirm/i }).first();
+      await expect(confirm).toBeEnabled({ timeout: 20000 });
+      await confirm.click();
 
-      const review = await postJson(reviewerPage, `/api/reports/${reportId}/review`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "confirm",
-          requestId: crypto.randomUUID(),
-          comment: "STAGING E2E — separate reviewer confirmation.",
-        }),
-      });
-      expect(review.status, JSON.stringify(review.body)).toBe(200);
+      // The reviewer used the actual protected action bar; verify its
+      // authenticated DB-backed action from the same reviewer session.
+      await expect.poll(async () => {
+        const result = await postJson(reviewerPage, `/api/reports/${reportId}`);
+        return (result.body as { report?: { status?: string } } | null)?.report?.status ?? "unavailable";
+      }, { timeout: 40000, intervals: [1000, 2000, 3000] }).toBe("reviewed");
 
       const reviewHistory = await postJson(reviewerPage, `/api/reports/${reportId}/review`);
       expect(reviewHistory.status).toBe(200);
@@ -158,6 +186,7 @@ test.describe("Authenticated staging acceptance flow", () => {
       expect(actions.some((action) =>
         action.action === "confirm" &&
         Boolean(action.reviewer_id) &&
+        action.reviewer_id !== creatorId &&
         action.new_status === "reviewed",
       )).toBe(true);
 
@@ -167,10 +196,11 @@ test.describe("Authenticated staging acceptance flow", () => {
       expect((persisted.body as { report?: { review_outcome?: string } }).report?.review_outcome).toBe("confirmed");
 
       await reviewerPage.goto("/map");
-      await expect(reviewerPage.getByText("Pinned Reports")).toBeVisible({ timeout: 20_000 });
-      await expect(reviewerPage.getByText(`#TR-${reportId.slice(0, 6).toUpperCase()}`)).toBeVisible({
-        timeout: 20_000,
-      });
+      await expect(reviewerPage.getByTestId("reviewed-map-index")).toBeVisible({ timeout: 25000 });
+      await expect(reviewerPage.getByTestId(`reviewed-map-report-${reportId}`)).toBeVisible({ timeout: 25000 });
+      // The reviewed index remains accessible if map tiles/WebGL fail.
+      // A visual map pin must be demonstrated separately in the live rehearsal.
+      await expect(reviewerPage.getByTestId(`reviewed-map-report-${reportId}`).getByText(/Human confirmed/)).toBeVisible();
     } finally {
       // Never leave an active synthetic report in staging after acceptance.
       // Purging storage remains an explicit admin retention operation.
