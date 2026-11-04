@@ -9,7 +9,7 @@ const STEPS = [
 
 export function DemoFlow() {
   return (
-    <section id="how-it-works" aria-labelledby="flow-heading" className="grid min-w-0 scroll-mt-40 gap-6 sm:scroll-mt-24">
+    <section id="how-it-works" aria-labelledby="flow-heading" className="grid min-w-0 gap-6">
       <div className="grid gap-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-[var(--tide)]">From evidence to decision</p>
         <h2 id="flow-heading" className="font-[family-name:var(--font-display)] text-[length:var(--step-3)] font-bold text-[var(--ink)]">How it works</h2>
