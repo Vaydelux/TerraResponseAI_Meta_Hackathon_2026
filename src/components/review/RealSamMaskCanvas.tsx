@@ -44,20 +44,21 @@ export function RealSamMaskCanvas({ overlay, opacity, visible }: RealSamMaskCanv
       queueMicrotask(() => setInvalid(true));
       return;
     }
-    const context = canvas.getContext("2d");
+    const activeCanvas = canvas;
+    const context = activeCanvas.getContext("2d");
     if (!context) { queueMicrotask(() => setInvalid(true)); return; }
-    canvas.width = sourceW;
-    canvas.height = sourceH;
+    activeCanvas.width = sourceW;
+    activeCanvas.height = sourceH;
     function position() {
       if (!stage) return;
       const width = stage.clientWidth, height = stage.clientHeight;
       if (!width || !height) return;
       const scale = Math.min(width / sourceW, height / sourceH);
       const paintedW = sourceW * scale, paintedH = sourceH * scale;
-      canvas.style.width = paintedW + "px";
-      canvas.style.height = paintedH + "px";
-      canvas.style.left = (width - paintedW) / 2 + "px";
-      canvas.style.top = (height - paintedH) / 2 + "px";
+      activeCanvas.style.width = paintedW + "px";
+      activeCanvas.style.height = paintedH + "px";
+      activeCanvas.style.left = (width - paintedW) / 2 + "px";
+      activeCanvas.style.top = (height - paintedH) / 2 + "px";
     }
     position();
     const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(position) : null;
