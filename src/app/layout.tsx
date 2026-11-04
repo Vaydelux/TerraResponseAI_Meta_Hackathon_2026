@@ -1,3 +1,4 @@
+import "@/lib/utils/patch-fetch";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Bricolage_Grotesque, Public_Sans } from "next/font/google";
@@ -93,6 +94,13 @@ export default function RootLayout({
   // /login page (which is outside the (app) route group).
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){if(typeof window==='undefined')return;try{var f=window.fetch;if(typeof f==='function'){var def=function(target){try{Object.defineProperty(target,'fetch',{get:function(){return f;},set:function(v){f=v;},configurable:true,enumerable:true});return true;}catch(e){return false;}};if(!def(window)&&typeof Window!=='undefined'&&Window.prototype){def(Window.prototype);}}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body
         className={`${bricolage.variable} ${publicSans.variable} ${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >

@@ -21,6 +21,15 @@ import { toSeverityLevel } from "@/lib/design/severity";
 import { formatRelativeTime } from "@/lib/design/format";
 import type { PriorityFactor } from "./PriorityBreakdown";
 
+export interface ReportAuditEntry {
+  id?: string;
+  action: string;
+  created_at: string;
+  actor_name?: string | null;
+  actor_email?: string | null;
+  details?: string | null;
+}
+
 export interface ReportRowData {
   id: string;
   status: string;
@@ -39,6 +48,8 @@ export interface ReportRowData {
   incident_type?: string | null;
   /** The AI's preliminary_severity from the analysis. */
   severity?: number | null;
+  /** Optional audit trail entries associated with this specific report. */
+  audit_trail?: ReportAuditEntry[];
 }
 
 export interface ReportRowProps {

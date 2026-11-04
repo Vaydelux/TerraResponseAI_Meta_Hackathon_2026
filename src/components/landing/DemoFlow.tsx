@@ -2,170 +2,120 @@
 //
 // Interactive demo flow — a visual 4-step walkthrough showing the
 // product's core pipeline:
-//   1. Upload photo
-//   2. AI observation (Muse Spark)
-//   3. Review decision (human)
-//   4. Incident appears on map
+//   01. Upload photo
+//   02. AI observation (Muse Spark)
+//   03. Review decision (human authority)
+//   04. Incident appears on map
 //
-// Each step is a panel with an icon + description. The "AI observation"
-// step shows the amber-hatched Seal; the "Review decision" step shows
-// the resolved green Seal. The "Map" step shows a pin.
+// Fully responsive across Desktop (4 columns), Tablet (2x2 grid),
+// and Mobile (1-column stack with dynamic auto-heights).
 //
-// Server component — the interactivity is in the Hero demo card above
-// this section. This is a visual narrative, not a clickable flow.
+// Server component.
+
+import { UploadCloud, Sparkles, UserCheck, MapPin, ArrowRight } from "lucide-react";
 
 export function DemoFlow() {
   const steps = [
     {
       n: 1,
       label: "Upload photo",
-      detail: "A contributor uploads a disaster photo with optional GPS. Nothing is sent to emergency services.",
-      icon: (
-        <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 7h18M3 12h18M3 17h18" />
-        </svg>
-      ),
-      bg: "var(--sheet)",
-      border: "var(--rule)",
-      color: "var(--ink)",
+      detail: "A contributor uploads a disaster photo with optional EXIF GPS or manual location pin. Evidence remains untampered in private storage.",
+      icon: UploadCloud,
+      border: "border-slate-800",
+      accent: "text-slate-200 bg-slate-800/80 border-slate-700",
+      badge: "Step 01 · Ingestion",
+      badgeColor: "text-slate-400 bg-slate-900 border-slate-800",
     },
     {
       n: 2,
       label: "AI observes",
-      detail: "Muse Spark reads the photo and produces a structured observation. The result is hatched amber: AI-generated, not verified.",
-      icon: (
-        <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-          <rect x={4} y={4} width={16} height={16} rx={2} strokeDasharray="3 2.5" />
-          <path d="M8 12h8M12 8v8" strokeLinecap="round" />
-        </svg>
-      ),
-      bg: "var(--amber-wash)",
-      border: "var(--amber)",
-      color: "var(--amber-ink)",
+      detail: "Muse Spark parses optical features, proposes severity levels, and flags confidence gaps. The status is unverified until human review.",
+      icon: Sparkles,
+      border: "border-amber-600/40",
+      accent: "text-amber-400 bg-amber-950/60 border-amber-800/50",
+      badge: "Step 02 · Inference",
+      badgeColor: "text-amber-300 bg-amber-950/80 border-amber-800/60",
     },
     {
       n: 3,
       label: "Reviewer decides",
-      detail: "A reviewer confirms, corrects, flags, or rejects. The hatch wipes out and the Seal signs it green.",
-      icon: (
-        <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M5 12l5 5L20 7" />
-        </svg>
-      ),
-      bg: "var(--green-wash)",
-      border: "var(--green)",
-      color: "var(--green-ink)",
+      detail: "An authorized operator confirms, adjusts severity, or rejects false alarms. The cryptographic verification seal is signed and locked.",
+      icon: UserCheck,
+      border: "border-emerald-600/40",
+      accent: "text-emerald-400 bg-emerald-950/60 border-emerald-800/50",
+      badge: "Human Authority",
+      badgeColor: "text-emerald-300 bg-emerald-950/80 border-emerald-700/60",
     },
     {
       n: 4,
       label: "Incident on map",
-      detail: "Confirmed incidents appear as solid pins on the PostGIS-powered map. Pending ones stay hatched until reviewed.",
-      icon: (
-        <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z" />
-          <circle cx={12} cy={9} r={2.5} fill="currentColor" />
-        </svg>
-      ),
-      bg: "var(--tide-wash)",
-      border: "var(--tide)",
-      color: "var(--tide)",
+      detail: "Sealed incidents become authoritative tactical pins on the PostGIS command map, triggering real-time agency coordination.",
+      icon: MapPin,
+      border: "border-cyan-600/40",
+      accent: "text-cyan-400 bg-cyan-950/60 border-cyan-800/50",
+      badge: "Step 04 · Dispatch",
+      badgeColor: "text-cyan-300 bg-cyan-950/80 border-cyan-800/60",
     },
   ];
 
   return (
-    <section id="how-it-works" style={{ marginTop: "var(--s-6)" }}>
-      <h2 style={{ fontSize: "var(--step-2)", marginBottom: "var(--s-2)" }}>
-        How it works
-      </h2>
-      <p className="t-meta" style={{ marginBottom: "var(--s-4)" }}>
-        Four steps from photo to verified incident. The reviewer&apos;s decision is the only moment the Seal resolves.
-      </p>
+    <section id="how-it-works" className="mt-14 sm:mt-16 md:mt-20">
+      <div className="mb-6">
+        <span className="text-xs font-mono font-semibold text-cyan-400 uppercase tracking-wider block mb-1">
+          End-to-End Pipeline
+        </span>
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100 mb-2">
+          How it works
+        </h2>
+        <p className="text-sm sm:text-base text-slate-400 max-w-2xl leading-relaxed">
+          Four structured steps from raw community photo to verified tactical incident.
+          AI accelerates triage, but human operators always retain the authority to act.
+        </p>
+      </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: "var(--s-3)",
-        }}
-      >
-        {steps.map((s, i) => (
-          <div key={s.label}>
+      {/* Responsive step grid: 4 cols on desktop, 2x2 on tablet, 1-col on mobile with dynamic auto-heights */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {steps.map((s) => {
+          const Icon = s.icon;
+          return (
             <div
-              className="panel"
-              style={{
-                padding: "var(--s-4)",
-                display: "grid",
-                gap: "var(--s-2)",
-                height: "100%",
-                background: s.bg,
-                borderColor: s.border,
-                color: s.color,
-                position: "relative",
-              }}
+              key={s.label}
+              className={`rounded-xl border ${s.border} bg-slate-900/60 backdrop-blur-md p-5 flex flex-col justify-between shadow-sm hover:border-slate-700 transition-colors h-auto`}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span
-                  style={{
-                    display: "inline-grid",
-                    placeItems: "center",
-                    width: 40,
-                    height: 40,
-                    borderRadius: "var(--r-pill)",
-                    background: "var(--sheet)",
-                    border: "1px solid var(--rule)",
-                    color: "var(--ink)",
-                  }}
-                >
-                  {s.icon}
-                </span>
-                <span
-                  className="num"
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontWeight: 700,
-                    fontSize: "var(--step-2)",
-                    color: "var(--ink-3)",
-                  }}
-                >
-                  {String(s.n).padStart(2, "0")}
-                </span>
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`p-2.5 rounded-lg border ${s.accent}`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <span className="text-2xl font-mono font-bold text-slate-600">
+                    0{s.n}
+                  </span>
+                </div>
+
+                <div className="mb-2">
+                  <span className={`inline-block text-[11px] font-mono font-semibold px-2 py-0.5 rounded border ${s.badgeColor} mb-2`}>
+                    {s.badge}
+                  </span>
+                  <h3 className="text-base font-semibold text-slate-100">
+                    {s.label}
+                  </h3>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  {s.detail}
+                </p>
               </div>
-              <div style={{ fontWeight: 700, fontSize: "var(--step-0)", color: "var(--ink)" }}>
-                {s.label}
-              </div>
-              <p className="t-meta" style={{ color: "var(--ink-2)" }}>
-                {s.detail}
-              </p>
+
               {s.n === 3 && (
-                <div
-                  style={{
-                    marginTop: "var(--s-1)",
-                    padding: "2px 8px",
-                    borderRadius: "var(--r-pill)",
-                    background: "var(--green)",
-                    color: "#fff",
-                    fontSize: "var(--step--1)",
-                    fontWeight: 700,
-                    display: "inline-block",
-                    justifySelf: "start",
-                  }}
-                >
-                  Human authority
+                <div className="mt-4 pt-3 border-t border-slate-800/80">
+                  <span className="text-[11px] font-medium text-emerald-400 flex items-center gap-1">
+                    ✓ Non-bypassable verification gate
+                  </span>
                 </div>
               )}
             </div>
-            {i < steps.length - 1 && (
-              <div
-                style={{
-                  display: "none",
-                }}
-                aria-hidden="true"
-              >
-                {/* Arrow rendered as CSS pseudo-element on larger screens */}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

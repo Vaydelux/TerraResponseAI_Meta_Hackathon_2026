@@ -58,14 +58,10 @@ export default async function LandingPage() {
           <WhatMakesDifferent />
 
           {/* 7. Human-review workflow */}
-          <div style={{ marginTop: "var(--s-7)" }}>
-            <TrustModelDiagram />
-          </div>
+          <TrustModelDiagram />
 
-          {/* 8. Responsible AI (condensed) */}
-          <div style={{ marginTop: "var(--s-7)" }}>
-            <BoundariesGrid />
-          </div>
+          {/* 8. Responsible AI */}
+          <BoundariesGrid />
         </div>
 
         {/* 9. Final CTA */}

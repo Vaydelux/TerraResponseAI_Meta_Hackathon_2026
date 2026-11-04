@@ -223,6 +223,9 @@
       gap: 8px;
       padding-inline: 12px;
     }
+    .topbar .nav {
+      display: none;
+    }
     .topbar .segmented__btn span:not([aria-hidden="true"]):last-child {
       display: none;
     }
@@ -1403,22 +1406,34 @@
   .triage-card__media {
     position: relative;
     aspect-ratio: 16 / 10;
+    width: 100%;
     border-radius: var(--r-ctl);
     overflow: hidden;
     background: var(--sheet-sunk);
     border: 1px solid var(--rule);
   }
+  .triage-card__thumb,
+  .triage-card__media > img,
+  .triage-card__media > span,
+  .triage-card__media .report-row__thumb,
+  .report-card .report-row__thumb {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+    display: block;
+    border-radius: 0;
+  }
   .triage-card__overlay {
     position: absolute;
     left: var(--s-2);
     bottom: var(--s-2);
-    padding: 4px 10px;
-    border-radius: var(--r-ctl);
-    background: var(--sheet);
-    color: var(--ink);
-    border: 1px solid var(--rule);
-    font-size: var(--step--1);
-    font-weight: 600;
+    z-index: 2;
+    padding: 2px;
+    border-radius: var(--r-pill);
+    background: color-mix(in srgb, var(--sheet) 88%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
     max-width: calc(100% - 16px);
   }
   .triage-card__specs {
@@ -1538,17 +1553,20 @@
     color: var(--tide);
   }
 
-  /* Persistent Keyboard Shortcuts Floating Dock & Dialog */
+  /* Persistent Keyboard Shortcuts Dock & Dialog (Desktop / Laptop Only >= 1024px) */
   .shortcuts-dock {
-    position: sticky;
-    bottom: var(--s-3);
-    z-index: 35;
+    position: relative;
+    z-index: 20;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     gap: var(--s-2);
     margin-top: var(--s-2);
-    pointer-events: none;
+  }
+  @media (max-width: 1023px) {
+    .shortcuts-dock {
+      display: none !important;
+    }
   }
   .shortcuts-bar,
   .shortcuts-dialog {

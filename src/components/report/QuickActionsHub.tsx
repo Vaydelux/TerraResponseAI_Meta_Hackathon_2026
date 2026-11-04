@@ -3,8 +3,9 @@
 // src/components/report/QuickActionsHub.tsx
 //
 // Interactive Quick Actions Hub for the Commander Dashboard with
-// live F1–F4 keyboard shortcut bindings. Ignores keystrokes when
-// focused inside an input/textarea/select or contenteditable element.
+// live F1–F4 keyboard shortcut bindings (desktop/laptop only).
+// Ignores keystrokes when focused inside an input/textarea/select
+// or contenteditable element.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -26,10 +27,10 @@ export function QuickActionsHub({
   const actions = [
     {
       key: "F1",
-      label: "Report Incident",
-      sub: "Upload field photo & EXIF",
-      href: "/reports/new",
-      icon: Upload,
+      label: "Incident Map",
+      sub: "Geospatial pins & layers",
+      href: "/map",
+      icon: Map,
     },
     {
       key: "F2",
@@ -40,10 +41,10 @@ export function QuickActionsHub({
     },
     {
       key: "F3",
-      label: "Incident Map",
-      sub: "Geospatial pins & layers",
-      href: "/map",
-      icon: Map,
+      label: "New Upload",
+      sub: "Upload field photo & EXIF",
+      href: "/reports/new",
+      icon: Upload,
     },
     {
       key: "F4",
@@ -56,6 +57,11 @@ export function QuickActionsHub({
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      // Desktop / Laptop only check: ignore keybindings on mobile / narrow touch viewports (< 1024px)
+      if (typeof window !== "undefined" && window.innerWidth > 0 && window.innerWidth < 1024) {
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
       if (
         target &&
@@ -71,7 +77,7 @@ export function QuickActionsHub({
         setLastTriggered("F1");
         if (!disableGlobalHotkeys) {
           e.preventDefault();
-          router.push("/reports/new");
+          router.push("/map");
         }
       } else if (e.key === "F2") {
         setLastTriggered("F2");
@@ -83,7 +89,7 @@ export function QuickActionsHub({
         setLastTriggered("F3");
         if (!disableGlobalHotkeys) {
           e.preventDefault();
-          router.push("/map");
+          router.push("/reports/new");
         }
       } else if (e.key === "F4") {
         setLastTriggered("F4");
@@ -124,7 +130,7 @@ export function QuickActionsHub({
             >
               <div className="quick-action-btn__top">
                 <Icon size={18} aria-hidden="true" />
-                <kbd className="quick-action-btn__kbd">{item.key}</kbd>
+                <kbd className="quick-action-btn__kbd hidden lg:inline-block">{item.key}</kbd>
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: "var(--step-0)" }}>{item.label}</div>
@@ -138,12 +144,11 @@ export function QuickActionsHub({
       </div>
 
       <div
-        className="t-meta num"
+        className="t-meta num hidden lg:flex"
         style={{
           marginTop: "auto",
           paddingTop: "var(--s-3)",
           borderTop: "1px solid var(--rule)",
-          display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: "var(--s-2)",
@@ -152,10 +157,11 @@ export function QuickActionsHub({
         <span>
           {lastTriggered
             ? `SHORTCUT ${lastTriggered} DISPATCHED`
-            : "SYSTEM KEYBOARD SHORTCUTS ENABLED (F1–F4)"}
+            : "DESKTOP KEYBOARD SHORTCUTS ENABLED (F1–F4)"}
         </span>
         <Keyboard size={16} aria-hidden="true" />
       </div>
     </section>
   );
 }
+

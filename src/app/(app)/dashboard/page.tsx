@@ -96,6 +96,16 @@ export default async function DashboardPage() {
   const verificationRate =
     totalReceived > 0 ? Math.round((totalReviewed / totalReceived) * 100) : 0;
 
+  const parsedAuditRows = ((auditRows ?? []) as unknown as Array<{
+    id: string;
+    created_at: string;
+    actor_name: string | null;
+    actor_email: string | null;
+    action: string;
+    target: string | null;
+    details: string | null;
+  }>);
+
   const recent: ReportRowData[] = (recentRows ?? []).map((r) => {
     const row = r as unknown as {
       id: string;
@@ -116,6 +126,17 @@ export default async function DashboardPage() {
     };
     const analysisEntry = Array.isArray(row.report_analyses) ? row.report_analyses[0] : row.report_analyses;
     const obs = (analysisEntry as { structured_observation?: { incident_type?: string; preliminary_severity?: number } } | undefined)?.structured_observation ?? {};
+    const reportAuditTrail = parsedAuditRows
+      .filter((a) => a.target && (a.target === row.id || a.target.includes(row.id.slice(0, 8))))
+      .map((a) => ({
+        id: a.id,
+        action: a.action,
+        created_at: a.created_at,
+        actor_name: a.actor_name,
+        actor_email: a.actor_email,
+        details: a.details,
+      }));
+
     return {
       id: row.id,
       status: row.status,
@@ -131,6 +152,7 @@ export default async function DashboardPage() {
       priority_score: row.priority_score,
       incident_type: (obs.incident_type as string) ?? null,
       severity: (obs.preliminary_severity as number) ?? null,
+      audit_trail: reportAuditTrail,
     };
   });
 

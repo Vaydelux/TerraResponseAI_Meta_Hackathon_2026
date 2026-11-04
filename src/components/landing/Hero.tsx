@@ -155,30 +155,14 @@ export function Hero({ signedIn = false, className }: HeroProps) {
           </p>
 
           <div
-            className="hero__cta"
-            style={{ marginTop: "var(--s-5)", gap: "var(--s-3)" }}
+            className="hero__cta flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-6 w-full sm:w-auto"
           >
-            <Button variant="primary" size="lg" href={ctaHref}>
+            <Button variant="primary" size="lg" href={ctaHref} className="w-full sm:w-auto text-center justify-center min-h-[48px]">
               {signedIn ? "Upload a photo" : "Explore how it works"}
             </Button>
             <a
               href={uploadHref}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "var(--s-2)",
-                minHeight: 52,
-                padding: "0 var(--s-5)",
-                fontSize: "var(--step-1)",
-                fontWeight: 600,
-                color: "#E8EEF0",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                borderRadius: "var(--r-ctl)",
-                textDecoration: "none",
-                transition: "background 120ms",
-              }}
+              className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center gap-2 px-6 rounded-lg text-base font-semibold text-slate-100 bg-white/10 hover:bg-white/15 active:bg-white/20 border border-white/20 transition-colors text-center"
             >
               {signedIn ? "View your reports" : "Sign in to report"}
             </a>

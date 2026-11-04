@@ -22,6 +22,7 @@ export interface IncidentTriageCardProps {
   reviewerName?: string | null;
   eventName?: string | null;
   canReview?: boolean;
+  onOpenDetails?: (report: ReportRowData) => void;
 }
 
 const INCIDENT_LABEL: Record<string, string> = {
@@ -53,6 +54,7 @@ export function IncidentTriageCard({
   reviewerName,
   eventName,
   canReview = false,
+  onOpenDetails,
 }: IncidentTriageCardProps) {
   const state = stateFromReport({ status: report.status, reviewOutcome: report.review_outcome });
   const severity = toSeverityLevel(report.severity);
@@ -70,7 +72,11 @@ export function IncidentTriageCard({
 
   const isPending = state === "pending";
   const targetHref = canReview && isPending ? `/review/${report.id}` : `/reports/${report.id}`;
-  const ctaLabel = canReview && isPending ? "Launch Review Workbench" : "Inspect Incident Report";
+  const ctaLabel = onOpenDetails
+    ? "Inspect Incident Details"
+    : canReview && isPending
+    ? "Launch Review Workbench"
+    : "Inspect Incident Report";
 
   return (
     <article className="triage-card" data-sev={report.severity == null ? undefined : severity} aria-label={`${title} — ${report.severity == null ? "severity not assessed" : `provisional severity ${severity}/5`}`}>
@@ -90,7 +96,27 @@ export function IncidentTriageCard({
         </div>
 
         <div>
-          <h3 style={{ margin: 0, fontSize: "var(--step-1)", lineHeight: 1.25 }}>{title}</h3>
+          <h3 style={{ margin: 0, fontSize: "var(--step-1)", lineHeight: 1.25 }}>
+            {onOpenDetails ? (
+              <button
+                type="button"
+                onClick={() => onOpenDetails(report)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  font: "inherit",
+                  color: "inherit",
+                  textAlign: "left",
+                  cursor: "pointer",
+                }}
+              >
+                {title}
+              </button>
+            ) : (
+              title
+            )}
+          </h3>
           <p className="t-meta" style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
             <MapPin size={13} aria-hidden="true" style={{ flexShrink: 0, color: "var(--ink-3)" }} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -99,8 +125,17 @@ export function IncidentTriageCard({
           </p>
         </div>
 
-        <div className="triage-card__media">
-          <ReportThumb reportId={report.id} state={state} alt={title} />
+        <div
+          className="triage-card__media"
+          onClick={onOpenDetails ? () => onOpenDetails(report) : undefined}
+          style={onOpenDetails ? { cursor: "pointer" } : undefined}
+        >
+          <ReportThumb
+            reportId={report.id}
+            state={state}
+            alt={title}
+            className="triage-card__thumb w-full h-full object-cover"
+          />
           <div className="triage-card__overlay">
             <SealBadge state={state} reviewerName={reviewerName} />
           </div>
@@ -137,14 +172,26 @@ export function IncidentTriageCard({
             gap: "var(--s-2)",
           }}
         >
-          <Link
-            href={targetHref}
-            className={`btn ${isPending && canReview ? "btn--primary" : ""}`}
-            style={{ flex: 1 }}
-          >
-            <span>{ctaLabel}</span>
-            <ArrowRight size={15} aria-hidden="true" />
-          </Link>
+          {onOpenDetails ? (
+            <button
+              type="button"
+              onClick={() => onOpenDetails(report)}
+              className={`btn ${isPending && canReview ? "btn--primary" : ""}`}
+              style={{ flex: 1 }}
+            >
+              <span>{ctaLabel}</span>
+              <ArrowRight size={15} aria-hidden="true" />
+            </button>
+          ) : (
+            <Link
+              href={targetHref}
+              className={`btn ${isPending && canReview ? "btn--primary" : ""}`}
+              style={{ flex: 1 }}
+            >
+              <span>{ctaLabel}</span>
+              <ArrowRight size={15} aria-hidden="true" />
+            </Link>
+          )}
           <ShareReportButton reportId={report.id} title={title} variant="quiet" size="md" />
         </div>
       </div>

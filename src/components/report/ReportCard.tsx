@@ -52,6 +52,7 @@ export function ReportCard({ report, reviewerName, eventName }: ReportCardProps)
           reportId={report.id}
           state={state}
           alt={title}
+          className="triage-card__thumb w-full h-full object-cover"
         />
       </div>
       <div style={{ display: "grid", gap: 8 }}>

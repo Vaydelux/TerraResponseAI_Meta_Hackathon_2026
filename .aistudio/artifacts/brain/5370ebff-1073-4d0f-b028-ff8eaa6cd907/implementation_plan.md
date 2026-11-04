@@ -1,57 +1,80 @@
-# Full-App Screen Utilization & Command Hub Visual Consistency Plan
+# Material 3 & shadcn Decongested Redesign Plan
 
-## 1. Overview & Goals
-Following our codebase audit across all pages and components, this plan unifies every screen in **TerraResponse AI** around the **Tactical Command Hub** aesthetic established on `/dashboard` and `/map`, wires all 5 built-but-unmounted UI components into their respective workflows, and transforms sparse views (including Upload Photo Step 3, Incident Thread Detail, Audit Log, Admin Roles, and Profile) into rich, high-density operational screens.
-
----
-
-## 2. Wire All 5 Unused Components Into Their Pages
-
-1. **`FilterRail` (`/src/components/layout/FilterRail.tsx`)**
-   - Mount `FilterRail` on `/reports` (`showMine={true}`) and `/review` (`showMine={false}`).
-   - Update `ReportList` (`/src/components/report/ReportList.tsx`) and `ReviewQueueTable` (`/src/components/review/ReviewQueueTable.tsx`) to read URL `useSearchParams()` (`status`, `severity`, `mine`) alongside a live search input so toggling any pill filters the displayed rows/cards immediately.
-2. **`ReportCard` (`/src/components/report/ReportCard.tsx`)**
-   - Add a **List View (`ReportRow`) / Grid View (`ReportCard`)** segmented toggle inside `ReportList` on `/reports` so operators can inspect reports either as compact tactical rows or visual 16:10 thumbnail cards.
-3. **`PriorityOverride` (`/src/components/admin/PriorityOverride.tsx`)**
-   - Mount `PriorityOverride` in the right-hand column of `ReviewWorkbench` (`/src/components/review/ReviewWorkbench.tsx`) when `!readOnly`, allowing reviewers and admins to override the computed priority score (`0–100`) with a required audit log reason and live score state update.
-4. **`AuditLogFilters` (`/src/components/admin/AuditLogFilters.tsx`)**
-   - Connect `AuditLogFilters` inside `AuditLogTable` (`/src/components/admin/AuditLogTable.tsx`) and `/audit` so reviewers/admins can filter audit entries in real time by `action`, `actor`, and free-text `query`.
-5. **`EventSwitcher` (`/src/components/layout/EventSwitcher.tsx`)**
-   - Integrate `EventSwitcher` into the workspace header / `TopBar` context so operators can switch active disaster incident events (`tr-active-event`) from any operational screen.
+## 1. Executive Summary & Core Objectives
+Based on your feedback, this plan replaces the legacy 4-state theme system (`day`, `mist`, `night ops`, `auto`) with a standard, elegant **System / Light / Dark** mode, anchored by a clean dropdown menu. It applies **Material 3 design principles** (tonal surfaces, soft elevation, refined spacing) and integrates **shadcn Dialogs & Drawers** to decongest dense map and dashboard screens so users are never overwhelmed by floating boxes or crowded panels.
 
 ---
 
-## 3. Upload Photo Step 3 ("Ready to Submit") Overhaul (`/src/components/upload/UploadFlow.tsx`)
-Replace the sparse 3-line text box on Step 3 with a comprehensive **Pre-Submission Command Review Card**:
-- **Photo Evidence Preview**: 16:10 thumbnail preview of the selected/pasted photo with filename, file size, and source badge (`EXIF GPS Verified` vs. `Manual Pin Placement`).
-- **Structured Metadata Grid**: Report title, incident description preview, exact formatted latitude/longitude coordinates (`formatCoords`), capture timestamp, and quick **"Edit Photo (Step 1)"** / **"Edit Details & Location (Step 2)"** jump buttons.
-- **AI Telemetry & Verification Pipeline Card**: Live summary of the pre-scanned Meta AI / Gemini 2.5 Flash Vision hazard assessment (detected hazard class, severity estimate, confidence score) and pipeline readiness indicators (`Gemini 2.5 Flash Structured Observation`, `SAM 3 Flood/Damage Masking`, `Priority Index Calculation`).
+## 2. Theme Architecture Simplification (System, Light, Dark)
+
+### A. Remove Legacy Themes
+- Deprecate custom theme states: `day`, `mist`, `night_ops`, and `auto`.
+- Standardize on `next-themes` standard values:
+  - `system`: automatically syncs with OS preference (`prefers-color-scheme`).
+  - `light`: clean, high-contrast Material 3 light theme (soft off-white/surface tones `#F8FAFC`, `#FFFFFF`, subtle cool slate borders).
+  - `dark`: refined dark mode (deep slate `#090D10`, `#0F171E`, `#15222B`, without eye-straining pure black).
+
+### B. Clean Dropdown Menu Navigation Component (`ThemeToggle.tsx`)
+- Replace the legacy 4-button segmented pill control in the navigation topbar with a clean, compact dropdown button.
+- Trigger button displays the active theme icon (`Sun` for light, `Moon` for dark, `Monitor` for system) with a subtle label or tooltip.
+- Dropdown menu options using shadcn `DropdownMenu`:
+  - **Light** (`Sun` icon)
+  - **Dark** (`Moon` icon)
+  - **System** (`Monitor` icon)
+- Active selection highlighted with a gentle indicator or checkmark.
+
+### C. Tokens & CSS Cleanup
+- Update `src/app/styles/tokens.css` and `globals.css`:
+  - Remove `--mist` and custom night-ops overrides.
+  - Establish Material 3 tonal elevation variables:
+    - `--md-sys-color-surface`: base page background
+    - `--md-sys-color-surface-container-low`: cards, panels
+    - `--md-sys-color-surface-container`: elevated cards, active items
+    - `--md-sys-color-surface-container-high`: dialogs, modals, popovers
+    - `--md-sys-elevation-1` to `--md-sys-elevation-3`: soft, diffuse shadows.
 
 ---
 
-## 4. Command Hub Visual Polish Across All Secondary Pages
+## 3. UI Decongestion via Modals & Dialogs (Material 3 + shadcn)
 
-- **Reports Hub (`/src/app/reports/page.tsx` & `/src/components/report/ReportList.tsx`)**
-  - Add a 4-card KPI summary strip (`Total Reports`, `Pending Triage`, `Verified / Confirmed`, `Critical Severity 4–5`).
-  - Add a search bar + `FilterRail` + List/Grid (`ReportRow` / `ReportCard`) view switcher.
-- **Review Queue (`/src/app/review/page.tsx` & `/src/components/review/ReviewQueueTable.tsx`)**
-  - Add a Reviewer Triage KPI strip (`Queue Depth`, `High Priority >= 75`, `Critical Severity`, `Keyboard Nav J/K + Enter`).
-  - Mount `FilterRail` + search input above the queue table.
-- **Incident Threads (`/src/app/incidents/page.tsx` & `/src/app/incidents/[id]/page.tsx`)**
-  - Upgrade `/incidents` with cluster KPI counters, radius/window telemetry pills, and `SealBadge` status indicators.
-  - Redesign `/incidents/[id]` from plain paragraphs into a Command Hub cluster dossier with a 4-metric KPI strip (`Cluster Radius`, `Time Window`, `Linked Reports`, `Verification Status`) and rich linked report cards featuring `ReportThumb`, `SealBadge`, `SeverityMeter`, coordinates, and direct links to `/reports/[id]` and `/review/[id]`.
-- **Notifications (`/src/app/notifications/page.tsx`)**
-  - Add a notification summary strip (`Total Alerts`, `Unread`, `Cluster Triggers`) and structured alert cards with semantic icon badges and quick action buttons (`Open Thread`, `Inspect Report`).
-- **Audit Log (`/src/app/audit/page.tsx` & `/src/components/admin/AuditLogTable.tsx`)**
-  - Add an Audit Telemetry summary strip (`Total Events`, `Human Decisions`, `Priority Overrides`, `Role Changes`), mount `AuditLogFilters`, and render semantic badges for action types.
-- **Admin User Roles (`/src/app/admin/users/page.tsx` & `/src/app/admin/users/role-manager-client.tsx`)**
-  - Add a Role Distribution KPI strip (`Total Accounts`, `Admins`, `Reviewers`, `Contributors`), search & role filter bar, semantic role badges, and styled `ui-tr` `Select` controls.
-- **Operator Profile (`/src/app/profile/page.tsx`)**
-  - Upgrade the profile header into an Operator Dossier card with role badge, clearance indicator, and submission stats, and enrich the Recent Submissions list with report titles, `SealBadge`, and timestamps.
-- **Account Unavailable (`/src/app/account-unavailable/page.tsx`)**
-  - Wrap in `.tr-shell` with `Wordmark`, `ThemeToggle`, and a styled `.panel` status card with clear navigation actions.
+### A. Incident Details & Action Dispatch Modal (`IncidentDetailsDialog.tsx`)
+- **Current Issue**: On `/map`, the large incident panel sits persistently over the canvas, competing with the scrubber, legend, and search filters, creating visual congestion.
+- **New Pattern**:
+  - Tapping an incident pin opens a clean, compact floating preview chip (`title`, `severity badge`, `one-click view details button`).
+  - Clicking "View Details" opens a spacious, beautifully organized shadcn `Dialog`:
+    - **Header**: Incident title, location coordinates with copy button, severity level badge, and verification status.
+    - **Evidence & Vision Analysis**: Side-by-side or stacked photo evidence with SAM 3.1 segmentation mask toggle.
+    - **Observations & Evidence Points**: Structured model findings and flagged uncertainties in clean Material 3 tonal list items.
+    - **Footer / Agency Dispatch Actions**: Primary action buttons (`Review & Verify`, `Dispatch MMDA`, `Dispatch Coast Guard`, `Print Triage PDF`).
+
+### B. Regional Weather & Seismic Radar Advisory Dialog (`RegionalHazardDialog.tsx`)
+- **Current Issue**: The static 370px regional alert box occupies significant screen real estate on desktop and mobile.
+- **New Pattern**:
+  - Converted into a subtle, non-intrusive floating status chip in the map top-left (`Seismic Advisory Active` or `Weather Normal`).
+  - Clicking the chip triggers the **Regional Hazard Radar Dialog**:
+    - Comprehensive PHIVOLCS fault-line and liquefaction safety advisory.
+    - Live Open-Meteo rainfall, wind speed, and riverway stage telemetry.
+    - Grounding sources and evacuation guidance.
+
+### C. Map Filter & Hazard Rail
+- Keep the top filter bar clean and minimal: simple horizontal pill scroll for hazard types (`All`, `Floods`, `Road Closures`, `Medical`).
+- Advance filters (date range, confidence slider, agency filter) accessible via a clean "Filters" popover or slide-over drawer rather than cluttering the primary canvas.
 
 ---
 
-## 5. Verification
-- Run `compile_applet` and `lint_applet` to verify zero TypeScript, build, or lint errors across all updated routes and components.
+## 4. Material 3 Visual Polish & Component Refinement
+
+- **Card Surfaces**: Rounded corners (`rounded-2xl`), subtle borders (`border-border/60`), and soft elevation shadows (`shadow-sm` transitioning to `shadow-md` on hover).
+- **Typography & Hierarchy**: Fluid type scaling with strong contrast ratios, eliminating dense visual noise.
+- **Buttons & Interactive Targets**: Minimum $44 \times 44\text{px}$ touch targets, ripple-like active states, clean Lucide iconography.
+- **Zero-Clutter Guarantee**: Ample whitespace around critical indicators so emergency commanders can immediately parse priority signals without cognitive fatigue.
+
+---
+
+## 5. Implementation Roadmap & Verification
+
+1. **Step 1**: Overhaul `ThemeToggle.tsx` and theme state management to standard System / Light / Dark dropdown. Clean up `providers.tsx` and CSS token definitions.
+2. **Step 2**: Create the shadcn `IncidentDetailsDialog` and `RegionalHazardDialog` components.
+3. **Step 3**: Refactor `/src/components/map/IncidentMap.tsx`, `IncidentPanel.tsx`, and `RegionalAlertOverlay.tsx` to wire the new modal workflows and eliminate persistent screen clutter.
+4. **Step 4**: Update TopBar and page headers across the app for visual consistency with the new Material 3 design language.
+5. **Step 5**: Run `compile_applet`, `lint_applet`, unit tests, and Playwright verification across mobile (390px) and desktop (1440px).

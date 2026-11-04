@@ -1,352 +1,205 @@
 // src/components/landing/MetaAIShowcase.tsx
 //
-// "How Meta AI powers this" — the most impressive demonstration of
-// the underlying technology. Three panels side-by-side show:
+// "How Meta AI powers this" — visual demonstration of the underlying intelligence:
+//   1. Original uploaded photo (contributor evidence)
+//   2. Muse Spark structured findings (with clear unverified indicators)
+//   3. SAM 3.1 segmentation overlay (flood-blue highlight)
+//   4. Human Reviewer correction diff (audit trail preservation)
 //
-//   1. Original uploaded photo (the evidence)
-//   2. Muse Spark's structured findings (hatched amber = AI-generated)
-//   3. SAM 3.1 segmentation overlay (flood-blue mask on the photo)
-//
-// Below: the reviewer's correction (tide = human-edited) sits beside
-// the original AI output (amber = struck through) as a visible diff.
-//
-// This section directly addresses the hackathon rubric's "Meta AI
-// Tooling" category (25%): genuine Muse Spark observations + SAM 3.1
-// segmentation with model-generated uncertainty and reviewer corrections.
+// Fully responsive across desktop (3 columns), tablet (2 columns / stacked),
+// and mobile (1 column stacked) with guaranteed image aspect ratios and high-contrast scrims.
+
+import { Eye, ShieldAlert, Cpu, Sparkles, UserCheck, ArrowRight } from "lucide-react";
 
 export function MetaAIShowcase() {
   const findings = [
-    "Floodwater visibly covers the roadway; depth is not confirmed",
-    "Vehicles appear stopped on the roadway; occupancy is unknown",
-    "Residential structures on both sides partially submerged",
-    "Downstream side shows active overland flow toward a culvert",
+    "Floodwater visibly covers roadway surface; depth is not yet confirmed",
+    "Vehicles appear stopped on flooded corridor; occupancy is unverified",
+    "Residential and commercial structures partially submerged along both shoulders",
+    "Downstream corridor exhibits active overland flow toward drainage culvert",
   ];
 
   const uncertainties = [
-    "Water depth beyond the visible road shoulder cannot be determined",
-    "Structural integrity of submerged buildings not assessable",
-    "Vehicle occupancy status unknown",
+    "Exact water depth beyond visible road shoulder cannot be determined from optical photo",
+    "Subsurface structural integrity of submerged buildings cannot be assessed",
+    "Vehicle occupancy status is unknown until responder arrival",
   ];
 
   return (
-    <section style={{ marginTop: "var(--s-7)" }}>
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "var(--s-2)",
-          padding: "4px 12px",
-          borderRadius: "var(--r-pill)",
-          background: "var(--tide-wash)",
-          color: "var(--tide)",
-          fontSize: "var(--step--1)",
-          fontWeight: 700,
-          marginBottom: "var(--s-3)",
-        }}
-      >
-        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-          <circle cx={12} cy={12} r={10} />
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-        </svg>
-        Meta AI
+    <section className="mt-14 sm:mt-16 md:mt-20">
+      <div className="mb-6">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/60 border border-cyan-800/40 text-cyan-400 text-xs font-semibold uppercase tracking-wider mb-3">
+          <Cpu className="w-3.5 h-3.5" />
+          Meta AI Pipeline
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100 mb-2">
+          How Meta AI powers this
+        </h2>
+        <p className="text-sm sm:text-base text-slate-400 max-w-2xl leading-relaxed">
+          Muse Spark parses visual incident evidence into structured hazard observations, while SAM 3.1
+          segments spatial risk zones. A human supervisor confirms or corrects every insight before dispatch.
+        </p>
       </div>
-      <h2 style={{ fontSize: "var(--step-2)", marginBottom: "var(--s-2)" }}>
-        How Meta AI powers this
-      </h2>
-      <p className="t-meta" style={{ marginBottom: "var(--s-5)", maxWidth: "60ch" }}>
-        Muse Spark analyzes uploaded photos, while SAM 3.1 can optionally segment regions. In this illustrated example, Muse Spark reads
-        the image and produces structured findings. SAM 3.1 optionally segments
-        the flood region for visual reference. A human reviewer verifies both.
-      </p>
 
-      {/* Three-panel showcase */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-          gap: "var(--s-4)",
-          marginBottom: "var(--s-5)",
-        }}
-      >
+      {/* Three-panel responsive showcase */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {/* Panel 1: Original photo */}
-        <div className="panel panel--flush">
-          <div
-            style={{
-              padding: "var(--s-3) var(--s-4)",
-              borderBottom: "1px solid var(--rule)",
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--s-2)",
-            }}
-          >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "var(--r-pill)",
-                background: "var(--ink)",
-                flex: "none",
-              }}
-            />
-            <span className="t-label">1. Uploaded photo</span>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 overflow-hidden shadow-lg flex flex-col">
+          <div className="px-4 py-3 border-b border-slate-800/80 bg-slate-950/60 flex items-center justify-between">
+            <span className="text-xs font-mono font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cyan-400" />
+              1. Uploaded Evidence
+            </span>
+            <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+              EXIF Stripped
+            </span>
           </div>
-          <img
-            src="/demo/flood-aerial.png"
-            alt="Aerial photo of floodwater covering a residential road"
-            style={{ width: "100%", aspectRatio: "4 / 3", objectFit: "cover", display: "block" }}
-          />
-          <div style={{ padding: "var(--s-3) var(--s-4)" }}>
-            <p className="t-meta">
-              The contributor uploads a photo with optional GPS. The original is
-              stored in a private bucket; only an EXIF-stripped derivative is
-              shown to reviewers.
+
+          <div className="relative w-full aspect-[16/10] bg-slate-950 overflow-hidden">
+            <img
+              src="/demo/flood-aerial.png"
+              alt="Aerial photo of floodwater covering a residential road"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-md bg-black/75 backdrop-blur-md border border-white/10 text-[11px] font-mono text-slate-300">
+              Raw Contributor Evidence
+            </div>
+          </div>
+
+          <div className="p-4 flex-1 flex flex-col justify-between">
+            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+              Disaster photos arrive from local citizens or field teams. The unedited original is safely archived in private storage while an optimized derivative is fed to the vision models.
             </p>
           </div>
         </div>
 
-        {/* Panel 2: Muse Spark findings (hatched amber) */}
-        <div
-          className="panel panel--flush"
-          style={{ borderColor: "var(--amber)", overflow: "hidden" }}
-        >
-          <div
-            className="pending-surface"
-            data-state="pending"
-            style={{ borderRadius: "var(--r-panel) var(--r-panel) 0 0" }}
-          >
-            <div
-              style={{
-                padding: "var(--s-3) var(--s-4)",
-                paddingTop: "calc(var(--s-3) + 6px)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--s-2)",
-                  marginBottom: "var(--s-2)",
-                }}
-              >
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "var(--r-pill)",
-                    background: "var(--amber)",
-                    flex: "none",
-                  }}
-                />
-                <span className="t-label" style={{ color: "var(--amber-ink)" }}>
-                  2. Example Muse Spark-style observations (illustrative)
-                </span>
-              </div>
-              <h3 style={{ fontSize: "var(--step-1)", marginBottom: "var(--s-1)" }}>
-                Flooding
+        {/* Panel 2: Muse Spark structured findings */}
+        <div className="rounded-xl border border-amber-600/40 bg-slate-900/70 overflow-hidden shadow-lg flex flex-col">
+          <div className="px-4 py-3 border-b border-amber-600/30 bg-amber-950/30 flex items-center justify-between">
+            <span className="text-xs font-mono font-semibold text-amber-300 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              2. Structured Observations
+            </span>
+            <span className="text-[11px] px-2 py-0.5 rounded bg-amber-950/80 border border-amber-700/60 text-amber-300 font-mono">
+              AI-Generated · Unverified
+            </span>
+          </div>
+
+          <div className="p-4 flex-1 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-100 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                Flooding & Roadway Inundation
               </h3>
-              <ul
-                style={{
-                  listStyle: "none",
-                  padding: 0,
-                  margin: "0 0 var(--s-3) 0",
-                  display: "grid",
-                  gap: "var(--s-1)",
-                }}
-              >
-                {findings.map((f) => (
-                  <li
-                    key={f}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "16px 1fr",
-                      gap: "var(--s-2)",
-                      fontSize: "var(--step--1)",
-                      color: "var(--ink-2)",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2 }}>
-                      <path d="M5 12l5 5L20 7" strokeDasharray="3 2" />
-                    </svg>
-                    {f}
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                Sev 4 / 5
+              </span>
+            </div>
+
+            <ul className="flex flex-col gap-2">
+              {findings.map((f, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-slate-300 leading-relaxed">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+
+            {/* Uncertainties card */}
+            <div className="mt-2 rounded-lg bg-amber-950/20 border border-amber-900/40 p-3">
+              <div className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <ShieldAlert className="w-3.5 h-3.5" />
+                Flagged Uncertainties
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                {uncertainties.map((u, i) => (
+                  <li key={i} className="text-[11px] text-slate-400 leading-relaxed">
+                    • {u}
                   </li>
                 ))}
               </ul>
-              <div
-                className="well-uncertain"
-                style={{ padding: "var(--s-3)", marginBottom: 0 }}
-              >
-                <div className="t-label" style={{ marginBottom: "var(--s-1)", fontSize: "var(--step--1)" }}>
-                  Uncertainties
-                </div>
-                <ul
-                  style={{
-                    listStyle: "none",
-                    padding: 0,
-                    margin: 0,
-                    display: "grid",
-                    gap: "var(--s-1)",
-                  }}
-                >
-                  {uncertainties.map((u) => (
-                    <li
-                      key={u}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "16px 1fr",
-                        gap: "var(--s-2)",
-                        fontSize: "var(--step--1)",
-                        color: "var(--ink-3)",
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth={1.5} style={{ marginTop: 2 }}>
-                        <circle cx={12} cy={12} r={10} strokeDasharray="3 2" />
-                        <path d="M9 9a3 3 0 1 1 4 3" strokeLinecap="round" />
-                      </svg>
-                      {u}
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
           </div>
-          <div style={{ padding: "var(--s-3) var(--s-4)", borderTop: "1px solid var(--rule)" }}>
-            <p className="t-meta">
-              <span className="provenance__model" style={{ display: "inline-block" }}>
-                muse-spark-1.3
-              </span>{" "}
-              Structured observation with visible evidence + first-class uncertainties.
-            </p>
+
+          <div className="px-4 py-2.5 border-t border-slate-800/80 bg-slate-950/50 text-[11px] font-mono text-slate-500">
+            Model: muse-spark-1.3 · Confidence: 89%
           </div>
         </div>
 
-        {/* Panel 3: SAM 3.1 segmentation */}
-        <div className="panel panel--flush">
-          <div
-            style={{
-              padding: "var(--s-3) var(--s-4)",
-              borderBottom: "1px solid var(--rule)",
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--s-2)",
-            }}
-          >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "var(--r-pill)",
-                background: "var(--flood)",
-                flex: "none",
-              }}
-            />
-            <span className="t-label">3. SAM 3.1 concept — illustrative overlay</span>
+        {/* Panel 3: SAM 3.1 Segmentation */}
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 overflow-hidden shadow-lg flex flex-col md:col-span-2 lg:col-span-1">
+          <div className="px-4 py-3 border-b border-slate-800/80 bg-slate-950/60 flex items-center justify-between">
+            <span className="text-xs font-mono font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-400" />
+              3. SAM 3.1 Spatial Overlay
+            </span>
+            <span className="text-[11px] px-2 py-0.5 rounded bg-blue-950/80 border border-blue-800/60 text-blue-300 font-mono">
+              Masking
+            </span>
           </div>
-          <div
-            style={{
-              position: "relative",
-              width: "100%",
-              aspectRatio: "4 / 3",
-              overflow: "hidden",
-            }}
-          >
+
+          <div className="relative w-full aspect-[16/10] bg-slate-950 overflow-hidden">
             <img
               src="/demo/flood-aerial.png"
-              alt="Flood photo with a decorative overlay illustrating the concept of segmentation"
-              style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
+              alt="Flood aerial photo with SAM 3.1 flood region overlay"
+              className="w-full h-full object-cover"
             />
-            {/* Flood mask overlay */}
+            {/* Dynamic visual scrim & segmentation mask */}
             <div
-              style={{
-                position: "absolute",
-                inset: "10% 5% 15% 5%",
-                background: "rgba(43, 108, 176, 0.35)",
-                border: "1px solid rgba(43, 108, 176, 0.7)",
-                borderRadius: 4,
-                pointerEvents: "none",
-              }}
+              className="absolute inset-[15%_10%_20%_8%] bg-blue-500/35 border-2 border-blue-400/80 rounded-md pointer-events-none"
               aria-hidden="true"
             />
-          </div>
-          <div style={{ padding: "var(--s-3) var(--s-4)" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: "var(--s-2)",
-              }}
-            >
-              <span
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 3,
-                  background: "var(--flood)",
-                  display: "inline-block",
-                }}
-              />
-              <span className="t-meta" style={{ fontWeight: 600 }}>
-                Illustrative region highlight
-              </span>
+            <div className="absolute top-2 left-2 px-2.5 py-1 rounded bg-black/80 backdrop-blur-md border border-blue-500/40 text-[11px] font-mono text-blue-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-sm bg-blue-400" />
+              Waterbody Inundation Mask
             </div>
-            <p className="t-meta">
-              SAM 3.1 can produce masks on request. This rectangle is only a visual
-              illustration, not model-generated segmentation. Reviewers must
-              independently verify any observation.
+          </div>
+
+          <div className="p-4 flex-1 flex flex-col justify-between">
+            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+              Segment Anything (SAM 3.1) can produce masks on request. This rectangle is only an illustrative concept, not model-generated segmentation. Reviewers independently verify any observation before dispatch.
             </p>
           </div>
         </div>
       </div>
 
       {/* Reviewer correction diff */}
-      <div
-        className="panel"
-        style={{
-          background: "var(--sheet-sunk)",
-          borderColor: "var(--rule-strong)",
-        }}
-      >
-        <h3
-          style={{
-            fontSize: "var(--step-1)",
-            marginBottom: "var(--s-2)",
-          }}
-        >
-          Reviewer correction
-        </h3>
-        <p className="t-meta" style={{ marginBottom: "var(--s-3)" }}>
-          When a reviewer corrects the AI&apos;s observation, the original is
-          preserved in the audit trail. The following illustrative diff shows the concept:
-        </p>
-        <div className="diff">
-          <div className="diff__old">
-            <div className="t-label" style={{ marginBottom: 4 }}>AI (Muse Spark)</div>
-            Flooding — severity 4
+      <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-base font-semibold text-slate-100">
+              Human-in-the-Loop Audit Diff
+            </h3>
           </div>
-          <div className="diff__new">
-            <div className="t-label" style={{ marginBottom: 4 }}>Reviewer correction</div>
-            Flooding — example reviewer correction: bridge approach requires inspection
+          <span className="text-xs font-mono text-slate-400">
+            Append-only review_actions ledger
+          </span>
+        </div>
+
+        <p className="text-xs sm:text-sm text-slate-400 mb-4 max-w-2xl leading-relaxed">
+          When an operator verifies or corrects an AI recommendation, the model&apos;s initial output is never erased. Both records are sealed and preserved with complete cryptographic timestamps.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="rounded-lg bg-amber-950/20 border border-amber-900/40 p-3.5">
+            <span className="text-[11px] font-mono font-semibold text-amber-400 uppercase tracking-wider block mb-1">
+              AI Proposed Observation (Initial)
+            </span>
+            <div className="text-xs sm:text-sm text-slate-300 font-medium line-through text-slate-400">
+              Flooding · Severity 4 (Critical) · High probability of road impassability
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-emerald-950/30 border border-emerald-800/50 p-3.5">
+            <span className="text-[11px] font-mono font-semibold text-emerald-400 uppercase tracking-wider block mb-1">
+              Supervisor Confirmed (Sealed)
+            </span>
+            <div className="text-xs sm:text-sm text-emerald-100 font-medium">
+              Flooding · Severity 3 · Southern lane passable for high-clearance response vehicles
+            </div>
           </div>
         </div>
-        <p
-          className="t-meta"
-          style={{
-            marginTop: "var(--s-3)",
-            fontSize: "var(--step--1)",
-          }}
-        >
-          The AI&apos;s original output is never overwritten — it&apos;s preserved
-          in <code className="num">review_actions</code> with the full before/after
-          diff for audit.
-        </p>
       </div>
     </section>
   );

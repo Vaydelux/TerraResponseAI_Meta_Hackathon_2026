@@ -13,3 +13,4 @@ export { UserMenu, type UserMenuProps } from "./UserMenu";
 export { DemoBanner } from "./DemoBanner";
 export { PageHeader, type PageHeaderProps } from "./PageHeader";
 export { FilterRail, useFilterParam, type FilterRailProps } from "./FilterRail";
+export { IncidentStatusDialog, type IncidentStatusDialogProps } from "./IncidentStatusDialog";

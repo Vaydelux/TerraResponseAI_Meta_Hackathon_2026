@@ -14,6 +14,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, PlusCircle } from "lucide-react";
 import { Wordmark } from "./Wordmark";
 import { ThemeToggle } from "./ThemeToggle";
+import { IncidentStatusDialog } from "./IncidentStatusDialog";
 import { UserMenu } from "./UserMenu";
 import { NavPendingIndicator } from "./NavPendingIndicator";
 import { isNavHrefActive } from "@/lib/upload/upload-ux-helpers";
@@ -143,6 +144,7 @@ export function TopBar({
         <div className="topbar__spacer" />
 
         <div className="topbar__desktop-only">
+          <IncidentStatusDialog />
           <Link
             href="/reports/new"
             className="btn btn--primary btn--sm"
@@ -199,6 +201,7 @@ export function TopBar({
             })}
           </nav>
           <div className="mobile-nav-drawer__controls">
+            <IncidentStatusDialog />
             <Link
               href="/reports/new"
               className="btn btn--primary btn--sm"

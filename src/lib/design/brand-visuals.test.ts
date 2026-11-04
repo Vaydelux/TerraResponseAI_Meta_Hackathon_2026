@@ -42,13 +42,12 @@ describe("TerraResponse AI visual identity", () => {
       expect(fileContent).not.toMatch(/#7B2CBF|#FF416C|--accent-violet|--accent-crimson/i);
     }
   });
-  it("keeps four usable themes and reduces motion safely", () => {
+  it("supports system, light, and dark themes and reduces motion safely", () => {
     const themes = read("src/components/layout/ThemeToggle.tsx");
-    for (const mode of ["day", "mist", "night", "auto"]) {
-      expect(themes).toContain('value: "' + mode + '"');
+    for (const mode of ["system", "light", "dark"]) {
+      expect(themes).toContain(`"${mode}"`);
     }
     const vars = read("src/app/styles/tokens.css");
-    expect(vars).toContain(':root[data-theme="mist"]');
     expect(vars).toContain('--t-theme: 220ms');
     const css = read("src/app/globals.css");
     expect(css).not.toContain("transition: background-color 200ms ease, border-color 200ms ease, color 150ms ease");
