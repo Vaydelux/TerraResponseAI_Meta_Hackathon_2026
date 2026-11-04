@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-const topbar=readFileSync("src/components/layout/TopBar.tsx","utf8");
+const sidebar=readFileSync("src/components/layout/WorkspaceSidebar.tsx","utf8");
 const shell=readFileSync("src/components/layout/AppShell.tsx","utf8");
 const layout=readFileSync("src/app/(app)/layout.tsx","utf8");
 const review=readFileSync("src/app/api/reports/[id]/review/route.ts","utf8");
@@ -18,8 +18,8 @@ describe("role-scoped notification UI and reviewer transactions", () => {
   it("shows navigation only in feature-enabled environments", () => {
     expect(layout).toContain("showIncidentNotifications={isTriageEnabled()}");
     expect(shell).toContain("showIncidentNotifications={showIncidentNotifications}");
-    expect(topbar).toContain("showIncidentNotifications ?");
-    expect(topbar).toContain('href: "/notifications"');
+    expect(sidebar).toContain("(!link.requiresTriage || options.showIncidentNotifications)");
+    expect(sidebar).toContain('href: "/notifications"');
   });
   it("notifies after the verified atomic review succeeds", () => {
     expect(processing).toContain("export async function notifyReviewCompleted");
