@@ -81,7 +81,7 @@ export async function POST(
   const supabase = await createSupabaseServerClient();
   const { data: report, error: reportErr } = await supabase
     .from("reports")
-    .select("id, event_id, status, derivative_storage_key, image_width, image_height")
+    .select("id, event_id, creator_id, retention_state, status, derivative_storage_key, image_width, image_height")
     .eq("id", id)
     .single();
 
@@ -104,11 +104,14 @@ export async function POST(
     );
   }
 
-  if (report.status !== "needs_review" && report.status !== "reviewed") {
-    return NextResponse.json(
-      { error: { code: "INVALID_STATE", message: `Segmentation requires the report to be analyzed first (needs_review or reviewed). Current state: '${report.status}'.` } },
-      { status: 409 },
-    );
+  if (ctx.user.role !== "admin" && report.creator_id === user.id) {
+    return NextResponse.json({ error: { code: "FORBIDDEN", message: "You cannot request paid segmentation for your own report." } }, { status: 403 });
+  }
+  if (report.retention_state !== "active") {
+    return NextResponse.json({ error: { code: "EVIDENCE_UNAVAILABLE", message: "Evidence has been removed or is unavailable." } }, { status: 410 });
+  }
+  if (!["needs_review", "reviewed", "needs_manual_review"].includes(report.status)) {
+    return NextResponse.json({ error: { code: "INVALID_STATE", message: "The report is not yet ready for reviewer-guided segmentation." } }, { status: 409 });
   }
 
   // 4. Parse the optional request body (the caller can override the
@@ -126,11 +129,18 @@ export async function POST(
     );
   }
   const userPrompt = body.prompt?.trim();
+  if (report.status === "needs_manual_review" && !userPrompt) {
+    return NextResponse.json({ error: { code: "MANUAL_TARGET_REQUIRED",
+      message: "Muse analysis was unavailable. Enter a concrete mask target to request optional SAM." } }, { status: 422 });
+  }
+  if (userPrompt && (userPrompt.length < 2 || userPrompt.length > 100)) {
+    return NextResponse.json({ error: { code: "BAD_REQUEST", message: "Mask target must contain 2–100 characters." } }, { status: 400 });
+  }
 
   // 5. Fetch the Muse Spark analysis to get the segmentation_target.
   const { data: analysis, error: analysisError } = await supabase
     .from("report_analyses")
-    .select("structured_observation, raw_usage_metadata")
+    .select("structured_observation, processing_status, raw_usage_metadata")
     .eq("report_id", id)
     .single();
   if (analysisError || !analysis) {
@@ -140,7 +150,8 @@ export async function POST(
     );
   }
 
-  const observed = analysis.structured_observation as { segmentation_target?: string | null } | null;
+  const observed = analysis.processing_status === "succeeded"
+    ? analysis.structured_observation as { segmentation_target?: string | null } | null : null;
   const analysisTarget = observed?.segmentation_target ?? null;
   const prompt = userPrompt || analysisTarget;
 
@@ -153,9 +164,11 @@ export async function POST(
 
   const priorMetadata = (analysis.raw_usage_metadata ?? {}) as Record<string, unknown>;
   const previouslySaved = priorMetadata._sam_overlay as
-    | { prompt?: string; created_at?: string }
+    | { format?: string; masks?: unknown[]; prompt?: string; created_at?: string }
     | undefined;
-  if (previouslySaved?.prompt === prompt) {
+  if (previouslySaved?.format === "meta-sam-mask-v1" &&
+      Array.isArray(previouslySaved.masks) && previouslySaved.masks.length > 0 &&
+      previouslySaved.prompt === prompt) {
     return NextResponse.json({ ok: true, reportId: id, overlay: previouslySaved, fromCache: true });
   }
   const lastAttemptAt = previouslySaved?.created_at ? Date.parse(previouslySaved.created_at) : NaN;
@@ -181,7 +194,7 @@ export async function POST(
   });
 
   const dervKey = report.derivative_storage_key;
-  if (!dervKey) {
+  if (!dervKey || !dervKey.includes("/")) {
     return NextResponse.json(
       { error: { code: "NO_DERIVATIVE", message: "The report has no derivative image." } },
       { status: 422 },
@@ -257,9 +270,9 @@ export async function POST(
   //    report_analyses row as a jsonb field. We don't store the mask
   //    as a separate image — the client renders the RLE overlay.
   const overlayData = {
-    rle: result.rle,
+    format: "meta-sam-mask-v1",
+    masks: result.masks,
     score: result.score,
-    box: result.box,
     image_width: result.imageWidth || report.image_width,
     image_height: result.imageHeight || report.image_height,
     model_id: result.modelId,
@@ -347,7 +360,11 @@ export async function GET(
 
   const metadata = analysis.raw_usage_metadata as Record<string, unknown> | null;
   const legacy = analysis.structured_observation as Record<string, unknown> | null;
-  const overlay = metadata?._sam_overlay ?? legacy?._sam_overlay ?? null;
+  const candidate = metadata?._sam_overlay ?? legacy?._sam_overlay ?? null;
+  const overlay = candidate && typeof candidate === "object" &&
+    (candidate as { format?: string }).format === "meta-sam-mask-v1" &&
+    Array.isArray((candidate as { masks?: unknown[] }).masks)
+    ? candidate : null;
 
   return NextResponse.json({
     ok: true,
