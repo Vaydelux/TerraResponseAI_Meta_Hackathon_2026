@@ -1,3 +1,91 @@
+# ACTIVE PLAN — Fix SAM segmentation in manual-review workflow and render genuine masks
+
+**Date:** 2026-11-05 Asia/Manila.
+**Status:** DRAFT — STOP FOR OWNER REVIEW BEFORE IMPLEMENTING APPLICATION CHANGES.
+**Baseline:** main \`9aab7016ea91b6e116bb418af1b3cb3522d465f1\`; PR #69 has merged with exact-head CI passing, but its production release remains blocked by Vercel 402 daily deployment quota. Public production still served \`3cf9f1d4\` at last inspection.
+**Product:** TerraResponse AI, human-reviewed photo evidence and map-oriented incident triage, not an emergency dispatch service.
+**Core demo:** Reporter uploads consented clearly labeled evidence; Muse Spark yields a provisional observation OR the report remains safe for manual review; independent reviewer optionally requests SAM when useful; real validated mask overlays the *correct photo pixels*; reviewer confirms/corrects/rejects; map displays appropriately reviewed report.
+**Stack:** Next.js App Router, TypeScript, React, Tailwind/semantic CSS tokens, Supabase Auth/Postgres/RLS/private Storage, Meta Muse Spark Standard, Meta SAM 3.1 Responses API, MapLibre, Vercel.
+
+## 1 — FINDINGS: verified concrete defects and staging conditions
+
+1. **The screenshot reproduces a predictable state mismatch, not a transient segmentation timeout.** \`src/app/api/reports/[id]/segment/route.ts\` rejects all states except \`needs_review\` and \`reviewed\` with HTTP 409 \`INVALID_STATE\`. However \`ReviewWorkbench\` passes \`samAvailable\` based solely on API key configuration to \`EvidenceViewer\` / \`MaskControl\` even for \`needs_manual_review\`; \`MaskControl\` always offers Request mask and a Retry toast for errors other than 401/403. Retry repeats an unchanged status and cannot succeed.
+2. **Staging read-only inspection:** two reports are \`needs_manual_review\` with failed analysis rows; one is \`needs_review\` with successful analysis; zero persisted SAM overlays. This confirms no actual mask was available in those examined rows and that existing evidence remains saved. Do not mutate these rows without explicit later acceptance-run approval.
+3. **Actual mask parsing is incorrect.** \`src/lib/ai/sam.ts\` detects raw text by looking for \`<mask>\`, \`<box>\`, \`rle\`, or the word \`segmentation\`, but Meta SAM 3.1's documented wire grammar contains \`<|box;...|>\` and \`<|mask;...|>\` special tokens. A valid response can be wrongly classified as \`no_match\`. On apparent success, code stores raw special-token text under \`rle\`, invents \`score:1.0\`, leaves \`box:null\`, and assigns zero geometry; this is not a decoded mask. Official references: https://dev.meta.ai/docs/sam/reading-segmentation and https://dev.meta.ai/docs/sam/client-libraries.
+4. **The evidence viewer currently fabricates a mask.** \`src/components/review/EvidenceViewer.tsx\` renders a fixed SVG rectangle x=20%, y=20%, 60% width/height for any saved overlay instead of actually decoding the model's mask; this violates the project's source-truth requirements and must be removed. It also renders from \`initialOverlay\` rather than the new \`onMask\` callback, so a freshly returned overlay is not reliably reflected in the viewer. The alternative \`src/components/terra/segmentation-overlay.tsx\` assumes whitespace RLE integer runs, also inconsistent with Meta's documented special-token grammar.
+5. **The present backend's paid safeguards are useful and should be preserved.** SAM is opt-in and reviewer-gated with event membership, budget checks, existing-overlay reuse, cooldown, private derivative input, and a saved overlay under \`report_analyses.raw_usage_metadata._sam_overlay\`. It should never run silently during upload or due to a toast Retry. Zero matches is a legitimate result per Meta docs.
+6. **Review itself is available for failed-analysis records.** The reviewer queue includes \`needs_manual_review\`, and the atomic-review API delegates to a permitted RLS-backed database function. A blocked SAM operation must not prevent the human reviewer from assessing the saved photo.
+
+## 2 — PLAN in mandatory priority order
+
+### 1. ENHANCE — user-visible demo path, truthful recovery
+- [ ] Remove the false Request mask affordance for any status the backend will reject. Show the actual reason inline, not after a paid/failed request.
+- [ ] Implement a deliberately separate, reviewer-only **Manual SAM assist** for a saved failed-analysis report in \`needs_manual_review\`, only after the reviewer supplies a concrete 2–100 character noun phrase and explicitly clicks Generate. SAM 3.1 supports concept segmentation without a prior Muse answer; this does NOT convert a failed Muse analysis into a valid one, mark the report reviewed, or bypass independent review. If the product owner prefers the earlier strict “valid Muse first” policy, retain the backend gate and show only Continue manual review / retry eligible analysis. **Default recommendation for the hackathon demo: allow explicit reviewer-guided SAM with the same capped paid safeguards** because it makes failed Muse gracefully recoverable without inventing an analysis.
+- [ ] Preserve the distinct valid-analysis flow: \`needs_review\` / \`reviewed\` uses verified saved segmentation target when present or an explicit reviewer prompt. If no stored \`report_analyses\` row exists, show a clear non-billable unavailable state rather than create fabricated observations.
+- [ ] Stop providing Retry for permanent 409 \`INVALID_STATE\`, auth denial, missing analysis, and invalid prompt; provide helpful next actions (Return to human review, refresh saved report, or request explicit manual assist where authorized).
+
+### 2. REFINE — single real mask data contract, no needless dependencies
+- [ ] Parse the real SAM stream through the officially documented \`@meta-sam/parser\` library (or a narrowly tested equivalent) including object IDs, geometry, masks and frame dimensions; do not treat unparsed text as an RLE mask.
+- [ ] Introduce one typed \`SamMaskOverlay\` representing validated decoded mask data or a safe compact mask transport, true bounding boxes and source dimensions, plus prompt, model, optional reported confidence and AI-generated provenance. Never default confidence to 1.0 when absent.
+- [ ] Reuse one mask renderer for \`EvidenceViewer\` (and retire/redirect the stale \`terra/segmentation-overlay.tsx\` implementation if unused). Both initial cached overlay and newly generated overlay use the same state and renderer.
+- [ ] Store only authenticated, user-scope authorized artifacts, with current separate segmentation metadata on failed analysis rows. Preserve original observation, review status and audit history.
+
+### 3. POLISH — resilient, theme-aligned review UX
+- [ ] Disabled SAM state contains short copy: “Muse analysis unavailable. Review the evidence manually, or use optional reviewer-guided SAM with a specific target.” Distinguish API not configured from invalid report status.
+- [ ] A clearly named \`Generate mask for "[target]"\` action, visible potential cost/opt-in, accessible progress, no-match and error states; show mask transparency and toggle only if REAL validated pixels exist.
+- [ ] Use brand semantic tokens, 44px touch targets and responsive imagery. Mobile 320–480: photo then progress + target + stacked full-width action; Tablet 768–1024: photo first with 400px region; Desktop >=1440: review 65/35 evidence/observation within usable area; no horizontal overflow or clipped toast. Do not show extra decorative “X” controls unless semantically distinct error icon vs dismiss.
+- [ ] Mask and box alignment must remain correct on object-contain image, zoom/pan, image rotation and resize; do not stretch an overlay into letterboxed padding. Keep the explicit banner “AI-generated region — not verified proof of damage.”
+
+### 4. SOLIDIFY — permissions, privacy, costs and real-data guarantees
+- [ ] API authorizes reviewer/admin and event membership (and excludes self-review where policy requires); manual-assist only in \`needs_manual_review\` with explicit prompt and existing private derivative; fail closed for unowned/stale/retained/purged evidence, bad dimensions, and missing saved analysis row.
+- [ ] Keep SAM separate from Muse and review transitions; never turn \`needs_manual_review\` into \`needs_review\` merely because SAM returned geometry. A failed mask call does not delete evidence or inhibit the human's ReviewActionBar.
+- [ ] Rate/cost check happens before each real SAM request, and duplicate exact-prompt results use cache. Enforce bounded stream payload/decoded raster size, sensible timeout/cooldown and no unauthenticated raw masks, model key or evidence URLs in error logs.
+- [ ] Zero-match, malformed special tokens, missing dimensions and provider timeouts must display an honest empty/unavailable state; **never fabricate a rectangle, mask, box or confidence**.
+- [ ] Existing Vercel deployment quota remains an independent blocker; do not move a preview to production if env sources differ.
+
+### 5. TEST — only after stages 1–4
+- [ ] Unit parser fixtures from Meta's documented SAM 3.1 wire grammar: valid mask(s), different object counts/IDs, scores absent, zero matches, malformed geometry, truncated stream and oversized mask.
+- [ ] Component tests for \`needs_manual_review\`, \`needs_review\`, \`reviewed\`, missing config, 403/409, permanent error with no Retry, no-match with no image highlight, cached overlay, newly returned overlay, and correct image-mask alignment.
+- [ ] API integration for manual-review explicit SAM (if approved), reviewer/admin/event guard, no-analysis, no derivative, rate ceiling, cache/cooldown, atomic metadata persistence and unchanged review state.
+- [ ] Lint, typecheck, Vitest, production build and Playwright at 320/768/1440 with keyboard/reduced motion/touch; verify there are no masks/boxes generated on mock failure. Use a clearly labeled deterministic sample *only in isolated tests*.
+- [ ] Stage one consented, authorized real SAM inference with a concrete target to validate decoded mask alignment and spending; only then include it in the 2–3 minute demonstration. Full project acceptance still requires two consecutive real reporter → Muse/known failure → independent reviewer → reviewed map demo runs.
+- [ ] Update \`docs/DEMO_SCRIPT.md\` and known limitations with a short manual-review fallback. Do not claim accurate SAM masks without a real decoded model output.
+
+## 3 — Target component tree
+
+\`\`\`text
+Authenticated ReviewWorkbench (report, actual processing state, current reviewer/event auth)
+  ├── EvidenceViewer (private derivative, aspect-correct zoom & pan)
+  │    ├── RealSamMaskCanvas (validated decoder output; never placeholder rectangle)
+  │    └── MaskControl (status + allowed action, user-supplied concept, explicit opt-in)
+  ├── ObservationPanel (Muse validated OR manual review required)
+  ├── ReviewActionBar (independent human confirm/correct/flag/reject, always usable)
+  └── StatusTimeline (truthful report + model state)
+API /reports/[id]/segment
+  ├── RLS/authz + state / analysis + prompt gate
+  ├── replay/cache/budget/timeout guards
+  ├── OfficialSamTextParser -> SamMaskOverlay
+  └── authorized metadata artifact + usage audit, no report-state auto-transition
+\`\`\`
+
+**Tokens:** Reuse \`--paper\`, \`--sheet\`, \`--sheet-sunk\`, \`--ink\`, \`--ink-2\`, \`--ink-3\`, \`--tide\`, \`--on-tide\`, \`--rule\`, \`--amber\`, \`--brick\`, \`--s-*\`, \`--r-ctl\`, \`--r-panel\`; do not add one-off colors or gratuitous motion.
+
+## 4 — Risks / limitations
+
+- This screenshot alone does not prove the SAM API key or model is broken: the server rejected the call before it invoked the provider. Actual stream decoding has not been live-validated.
+- Current rows include failed-analysis metadata but must not be modified as part of a plan-only PR. No production or staging writes, no AI provider calls, no deployment or secret changes in this plan.
+- Optional manual SAM may incur charges. Meta advertises SAM 3.1 image segmentation at approx USD $2.50 / 1,000 images, excluding other provider costs; always verify actual billing. Source: https://dev.meta.ai/models/sam-3-1.
+- Current code has mismatched raw output detection and fake visual geometry, so it is NOT safe to advertise a correct segmentation overlay yet.
+- Preserving fallback human review is more important than making segmentation a mandatory step.
+
+## 5 — Next action (owner approval gate)
+
+**Approve this plan to implement reviewer-guided optional segmentation for \`needs_manual_review\`, fix the 409/Retry UX, and replace placeholder masks with parsed real SAM geometry.** Execute focused stages 1–4, run stage 5 CI, and merge only after exact-head checks pass. Report production deployment quota separately from the merge.
+
+---
+
+# Earlier plans (archived verbatim)
+
 # ACTIVE PLAN — Fix empty Meta analysis response + replace schematic pin pad with real searchable map
 
 **Date:** 2026-11-05 (Asia/Manila).
