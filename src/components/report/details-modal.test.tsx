@@ -75,7 +75,7 @@ function TestThemeConsumer() {
 }
 
 describe("DetailsModal component", () => {
-  it("renders incident details, horizontal Recharts audit status timeline, SAM 3.1 overlay toggle, and agency dispatch SOP when open", () => {
+  it("renders actual report evidence, provisional severity and human-review provenance without fake dispatch", () => {
     render(
       <DetailsModal
         report={mockReport}
@@ -85,33 +85,18 @@ describe("DetailsModal component", () => {
       />
     );
 
-    // Title & Severity
     expect(screen.getByText("Flash Flooding along C-5 Corridor")).toBeDefined();
-    expect(screen.getByText(/SEV 4 · High Priority/i)).toBeDefined();
-
-    // Priority Score & Location
+    expect(screen.getByText("4/5")).toBeDefined();
     expect(screen.getByText("85")).toBeDefined();
-    expect(screen.getByText(/14.6219° N, 121.0856° E/i)).toBeDefined();
-
-    // Recharts Horizontal Audit Trail & Status Progression Timeline
-    expect(screen.getByTestId("incident-status-timeline-chart")).toBeDefined();
-    expect(
-      screen.getByText(/Audit Trail & Incident Status Progression Timeline/i)
-    ).toBeDefined();
-    expect(screen.getByText(/1\. Creation/i)).toBeDefined();
-    expect(screen.getByText(/2\. Triage/i)).toBeDefined();
-    expect(screen.getByText(/3\. Needs Review/i)).toBeDefined();
-    expect(screen.getByText(/4\. Confirmation/i)).toBeDefined();
-    expect(screen.getByText("needs_review")).toBeDefined();
+    expect(screen.getByText(/14\.6219° N, 121\.0856° E/i)).toBeDefined();
+    expect(screen.getByText("AI generated, not verified")).toBeDefined();
+    expect(screen.getByText("Provisional severity")).toBeDefined();
+    expect(screen.getByText("Submitted description")).toBeDefined();
     expect(screen.getByText("Responder Elena")).toBeDefined();
-
-    // SAM 3.1 Mask Control
-    expect(screen.getByText(/SAM 3.1 Mask/i)).toBeDefined();
-
-    // Agency Dispatch
-    expect(screen.getByText("MMDA Road Ops")).toBeDefined();
-    expect(screen.getByText("Coast Guard Rescue")).toBeDefined();
-    expect(screen.getByText("Red Cross Triage")).toBeDefined();
+    expect(screen.getByRole("link", { name: /Open full report/i })).toBeDefined();
+    expect(screen.getByRole("link", { name: /Open review workbench/i })).toBeDefined();
+    expect(screen.queryByText("MMDA Road Ops")).toBeNull();
+    expect(screen.queryByText("SAM 3.1 Mask")).toBeNull();
   });
 
   it("does not render when open is false", () => {
