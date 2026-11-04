@@ -49,6 +49,14 @@ describe("login callback and session redirect", () => {
     expect(mocks.refreshSupabaseSession).not.toHaveBeenCalled();
   });
 
+  it("keeps forgot-password, reset-password and recovery confirmation public", async () => {
+    for (const path of ["/forgot-password", "/reset-password", "/auth/confirm?flow=recovery"]) {
+      const response = await middleware(request(path));
+      expect(response.headers.get("location")).toBeNull();
+    }
+    expect(mocks.refreshSupabaseSession).not.toHaveBeenCalled();
+  });
+
   it("does not guard the recoverable account-unavailable page", async () => {
     const res = await middleware(request("/account-unavailable"));
     expect(res.headers.get("location")).toBeNull();
