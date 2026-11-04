@@ -76,6 +76,7 @@ export default async function ReviewWorkbenchPage({
       currentUserId={user.id}
       currentUserDisplayName={ctx.user.name}
       currentUserRole={ctx.user.role}
+      currentUserEventRoles={ctx.events.map((e) => ({ eventId: e.event_id, role: e.role }))}
       nextReportId={nextReportId}
       queuePosition={queuePosition}
     />
