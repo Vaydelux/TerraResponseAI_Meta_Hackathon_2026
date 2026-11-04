@@ -98,9 +98,9 @@ export function FilterRail({
         {hasActiveFilters && (
           <button
             type="button"
-            className="btn btn--sm"
+            className="btn btn--sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tide"
             onClick={() => router.replace(pathname)}
-            style={{ minHeight: 26, paddingInline: 8, fontSize: "0.72rem" }}
+            style={{ minHeight: 44, paddingInline: 12, fontSize: "0.875rem" }}
           >
             Reset
           </button>
