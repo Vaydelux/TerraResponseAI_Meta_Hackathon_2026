@@ -346,6 +346,9 @@ export function ReviewWorkbench({
                 <ReviewActionBar
                   canReview={capabilities.canReview}
                   restrictionReason={capabilities.reason}
+                  onReviewCommitted={({ status, reviewOutcome }) => {
+                    setDetail((prev) => prev ? { ...prev, status, review_outcome: reviewOutcome } : prev);
+                  }}
                   reportId={reportId}
                   isOwnReport={isOwnReport}
                   isLastInQueue={isLastInQueue}
