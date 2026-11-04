@@ -24,6 +24,17 @@
   html {
     -webkit-text-size-adjust: 100%;
     color-scheme: light;
+    /* Keep landing anchors and focused sections below sticky headers. */
+    scroll-padding-top: calc(4rem + var(--s-3));
+  }
+
+  /* CSS-native anchor/API scrolling; do not intercept wheel, touch or MapLibre. */
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto !important; }
   }
 
   html[data-theme="night"] {
