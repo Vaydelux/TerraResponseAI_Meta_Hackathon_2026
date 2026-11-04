@@ -7,6 +7,7 @@ const upload = readFileSync("src/app/api/reports/route.ts", "utf8");
 const list = readFileSync("src/components/report/ReportList.tsx", "utf8");
 const review = readFileSync("src/components/review/ReviewQueueTable.tsx", "utf8");
 const topbar = readFileSync("src/components/layout/TopBar.tsx", "utf8");
+const sidebar = readFileSync("src/components/layout/WorkspaceSidebar.tsx", "utf8");
 describe("global report-first intake and permissions", () => {
   it("creates only a fixed system-owned intake without fabricating an administrator", () => {
     expect(sql).toContain("created_by is not null or slug = 'community-intake'");
@@ -24,7 +25,7 @@ describe("global report-first intake and permissions", () => {
   it("loads reports and moderation through RLS without an event-picker dependency", () => {
     expect(list).toContain('if (eventId) params.set("event_id", eventId)');
     expect(review).toContain('if (eventId) params.set("event_id", eventId)');
-    expect(topbar).toContain('{ href: "/reports/new", label: "Upload Photo" }');
+    expect(sidebar).toContain('{ href: "/reports/new", label: "Upload photo", icon: FilePlus2 }');
     expect(topbar).not.toContain("<EventSwitcher");
   });
 });
