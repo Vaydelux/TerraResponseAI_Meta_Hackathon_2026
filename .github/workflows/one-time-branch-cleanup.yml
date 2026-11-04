@@ -1,0 +1,110 @@
+name: One-time Superseded Branch Cleanup
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-branch-cleanup.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  prune:
+    if: github.event.head_commit.message == 'chore(repository): retire superseded branches'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch topology
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify audits and discard-only branch scope
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # The full history scanner ran before deletion with 11 branches.
+          audit="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/41931327692" --jq '.conclusion')"
+          if [[ "$audit" != "success" ]]; then
+            echo "::error::Full Git-history secret audit has not passed."
+            exit 1
+          fi
+          git fetch --force --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          current="$(git ls-remote --heads origin main | awk '{print $1}')"
+          if [[ "$current" != "$GITHUB_SHA" ]]; then
+            echo "::error::Main moved after this review; no branch deletion."
+            exit 1
+          fi
+
+          # Explicit list of reviewed, superseded refs. No wildcards.
+          branches=(
+            'deploy/hackathon-preview-20261104'
+            'docs/hackathon-submission-readme-cleanup-20261105'
+            'feat/supabase-forgot-password-20261104'
+            'plan/demo-readiness-latest-audit-20261104'
+            'plan/demo-two-pass-acceptance-20261105'
+            'plan/full-app-truth-ux-ai-cost-audit-20261105'
+            'plan/global-smooth-scroll-20261105'
+            'plan/production-public-assets-20261105'
+            'plan/real-location-map-and-muse-empty-response-20261105'
+            'plan/sam-manual-review-mask-integrity-20261105'
+          )
+          mapfile -t actual < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/branches?per_page=100" --jq '.[].name' | sort)
+          mapfile -t expected < <(printf '%s\n' main "${branches[@]}" | sort)
+          if ! diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}"); then
+            echo "::error::Unexpected branch inventory, refusing cleanup."
+            exit 1
+          fi
+
+          # Do not discard an app file that doesn't exist on main.
+          for branch in "${branches[@]}"; do
+            if ! git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
+              echo "::error::Branch missing from fetched refs: ${branch}"
+              exit 1
+            fi
+            if comm -23 \
+              <(git ls-tree -r --name-only "origin/${branch}" src/ | sort) \
+              <(git ls-tree -r --name-only HEAD src/ | sort) | grep -q .; then
+              echo "::error::Branch has app source paths absent from main: ${branch}"
+              exit 1
+            fi
+          done
+
+          echo "Verified 10 superseded branches, zero branch-only source paths, passing prior history scan."
+
+      - name: Delete only the 10 reviewed superseded refs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branches=(
+            'deploy/hackathon-preview-20261104'
+            'docs/hackathon-submission-readme-cleanup-20261105'
+            'feat/supabase-forgot-password-20261104'
+            'plan/demo-readiness-latest-audit-20261104'
+            'plan/demo-two-pass-acceptance-20261105'
+            'plan/full-app-truth-ux-ai-cost-audit-20261105'
+            'plan/global-smooth-scroll-20261105'
+            'plan/production-public-assets-20261105'
+            'plan/real-location-map-and-muse-empty-response-20261105'
+            'plan/sam-manual-review-mask-integrity-20261105'
+          )
+          for branch in "${branches[@]}"; do
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" --silent
+            echo "Deleted: ${branch}"
+          done
+
+          mapfile -t left < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/branches?per_page=100" --jq '.[].name' | sort)
+          if [[ "${#left[@]}" != "1" || "${left[0]}" != "main" ]]; then
+            echo "::error::Not down to main only."
+            printf 'Remaining: %s\n' "${left[@]}"
+            exit 1
+          fi
+          echo "Confirmed exactly one remaining Git branch: main"
