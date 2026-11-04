@@ -1361,7 +1361,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <CheckCircle2 size={14} aria-hidden="true" style={{ color: "var(--tide)", flexShrink: 0 }} />
-                        <span>SAM 3 flood &amp; structural mask ready on Reviewer Workbench</span>
+                        <span>Optional SAM segmentation is available only when a real model result is returned; it is not performed during this upload.</span>
                       </div>
                     </div>
                   </div>
@@ -1436,8 +1436,8 @@ export function UploadFlow({ className }: UploadFlowProps) {
           )}
           {state.kind === "queued" && (
             <div className="panel" role="status">
-              <h3 style={{ fontSize: "var(--step-1)" }}>Saved for reconnection</h3>
-              <p className="t-meta" style={{ marginTop: "var(--s-2)" }}>{state.message}</p>
+              <h3 style={{ fontSize: "var(--step-1)" }}>Saved on this device only</h3>
+              <p className="t-meta" style={{ marginTop: "var(--s-2)" }}>This is not yet a submitted report or an AI analysis. Reconnect and return to this upload page to retry sending the locally saved photo.</p>
               <Button variant="quiet" style={{ marginTop: "var(--s-3)" }} onClick={() => setState({ kind: "idle" })}>
                 Keep working
               </Button>
@@ -1462,7 +1462,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
           {state.kind === "success" && (
             <div className="tr-stack">
               <div className="panel">
-                <h3 style={{ fontSize: "var(--step-2)" }}>Upload received</h3>
+                <h3 style={{ fontSize: "var(--step-2)" }}>Report saved · human review required</h3>
                 <p style={{ marginTop: "var(--s-2)" }}>
                   Your photo was saved privately. Nothing was sent to emergency services. AI
                   observations require human verification before becoming confirmed findings.
@@ -1470,8 +1470,15 @@ export function UploadFlow({ className }: UploadFlowProps) {
                 <p role="status" aria-live="polite" className="t-meta" style={{ marginTop: "var(--s-2)" }}>
                   {state.analysis.message}
                 </p>
+                <div className="grid min-w-0 gap-1 rounded-ctl border border-rule bg-[var(--sheet-sunk)] p-3" aria-label="Submission handoff">
+                  <p className="m-0 break-words text-xs font-bold text-tide">Saved report ID · {state.reportId.slice(0, 8)}</p>
+                  <p className="m-0 break-words text-sm text-[var(--ink-2)]">
+                    Next: open the report to inspect its current AI status. A separate authorized reviewer can then
+                    confirm or correct the findings in the review queue. Nothing is automatically approved or dispatched.
+                  </p>
+                </div>
                 <div className="tr-cluster" style={{ marginTop: "var(--s-3)" }}>
-                  <Link className="btn btn--primary" href={`/reports/${state.reportId}`}>
+                  <Link data-testid="submitted-report-link" className="btn btn--primary" href={`/reports/${state.reportId}`}>
                     Open the report
                   </Link>
                   {(state.analysis.kind === "unavailable" ||
