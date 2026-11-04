@@ -20,7 +20,6 @@ export interface GeoCanvasProps {
 
 /** A controlled, read-only canvas. Panning never changes the workspace's data window. */
 export function GeoCanvas({ reports, selectedId, onSelectReport }: GeoCanvasProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<Array<{ marker: maplibregl.Marker; id: string | null }>>([]);
   const focusedMarkerRef = useRef<string | null>(null);
@@ -50,17 +49,21 @@ export function GeoCanvas({ reports, selectedId, onSelectReport }: GeoCanvasProp
     map.fitBounds(bounds, { padding: 56, maxZoom: 14, duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 300 });
   }, []);
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+  // MapLibre is owned by React's ref-attach/cleanup lifecycle.
+  // A failed WebGL constructor updates failure state in the commit callback,
+  // rather than issuing a synchronous state update inside an effect.
+  const attachMap = useCallback((container: HTMLDivElement | null) => {
+    if (!container) return;
     let map: maplibregl.Map;
     let disposed = false;
-    setStatus("loading");
     try {
       map = new maplibregl.Map({
-        container: containerRef.current,
+        container,
         style: buildSurveyStyle(resolveIsNight(readInitialTheme())),
-        // This is a default camera position, never a substitute report location.
-        center: locatedRef.current[0] ? [locatedRef.current[0].longitude, locatedRef.current[0].latitude] : [121, 14.6],
+        // Default camera is never used as a report location.
+        center: locatedRef.current[0]
+          ? [locatedRef.current[0].longitude, locatedRef.current[0].latitude]
+          : [121, 14.6],
         zoom: 11,
         scrollZoom: false,
         attributionControl: {},
@@ -69,24 +72,31 @@ export function GeoCanvas({ reports, selectedId, onSelectReport }: GeoCanvasProp
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
       fitReports();
     } catch {
-      mapRef.current?.remove();
+      try { mapRef.current?.remove(); } catch { /* WebGL constructor may have partially failed. */ }
       mapRef.current = null;
       setStatus("unavailable");
       return;
     }
+
     const onLoad = () => {
       if (!disposed) setStatus((current) => current === "tiles-unavailable" ? current : "ready");
     };
     const onError = () => { if (!disposed) setStatus("tiles-unavailable"); };
+    const onContextLost = () => { if (!disposed) setStatus("unavailable"); };
     const onMove = () => { if (!disposed) setZoom(map.getZoom()); };
     const onTheme = () => {
       try { map.setStyle(buildSurveyStyle(resolveIsNight(readInitialTheme()))); }
       catch { onError(); }
     };
-    const resize = () => { if (!disposed) map.resize(); };
+    const resize = () => {
+      if (disposed) return;
+      try { map.resize(); } catch { onError(); }
+    };
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(resize);
-    observer?.observe(containerRef.current);
+    observer?.observe(container);
     window.addEventListener("resize", resize);
+    const canvas = map.getCanvas();
+    canvas.addEventListener("webglcontextlost", onContextLost);
     map.on("load", onLoad);
     map.on("error", onError);
     map.on("moveend", onMove);
@@ -94,16 +104,19 @@ export function GeoCanvas({ reports, selectedId, onSelectReport }: GeoCanvasProp
     const slowLoad = setTimeout(() => {
       if (!disposed) setStatus((current) => current === "loading" ? "tiles-unavailable" : current);
     }, 12000);
+
+    // React 19 ref cleanup runs on unmount and whenever retry changes identity.
     return () => {
       disposed = true;
       clearTimeout(slowLoad);
       observer?.disconnect();
       window.removeEventListener("resize", resize);
       window.removeEventListener("tr-theme-change", onTheme);
+      canvas.removeEventListener("webglcontextlost", onContextLost);
       markersRef.current.forEach(({ marker }) => marker.remove());
       markersRef.current = [];
-      map.remove();
-      mapRef.current = null;
+      try { map.remove(); } catch { /* Do not crash the report queue. */ }
+      if (mapRef.current === map) mapRef.current = null;
     };
   }, [attempt, fitReports]);
 
@@ -157,13 +170,13 @@ export function GeoCanvas({ reports, selectedId, onSelectReport }: GeoCanvasProp
   return (
     <div className="grid min-w-0 gap-3">
       <div className="grid min-w-0 overflow-hidden rounded-panel border border-rule bg-[var(--sheet-sunk)] [grid-template-areas:'map'] [&_.maplibregl-ctrl-group_button]:size-11 [&_.maplibregl-ctrl-attrib]:max-w-full [&_.maplibregl-ctrl-attrib]:text-[10px]">
-        <div ref={containerRef} className={`${viewportClass} min-w-0 w-full [grid-area:map]`} role="region" aria-label="Incident map. Select a pin or use the priority queue below." data-testid="workspace-map" />
+        <div ref={attachMap} className={`${viewportClass} min-w-0 w-full [grid-area:map]`} role="region" aria-label="Incident map. Select a pin or use the priority queue below." data-testid="workspace-map" />
         {(status === "unavailable" || status === "loading") && (
           <div className={`${viewportClass} z-10 flex flex-col items-center justify-center gap-3 bg-[var(--sheet-sunk)] px-6 text-center [grid-area:map]`} role="status">
             <MapPinOff className="size-8 text-[var(--ink-3)]" aria-hidden="true" />
             <strong>{status === "loading" ? "Preparing incident map…" : "Interactive map unavailable"}</strong>
             <p className="max-w-sm text-sm text-[var(--ink-2)]">{status === "loading" ? "The report queue is ready to use while the map loads." : "Your browser could not start the map. Use the queue, timeline, and report details below."}</p>
-            {status === "unavailable" && <button type="button" className={actionClass} onClick={() => setAttempt((value) => value + 1)}>Retry map</button>}
+            {status === "unavailable" && <button type="button" className={actionClass} onClick={() => { setStatus("loading"); setAttempt((value) => value + 1); }}>Retry map</button>}
           </div>
         )}
       </div>
@@ -172,7 +185,7 @@ export function GeoCanvas({ reports, selectedId, onSelectReport }: GeoCanvasProp
           {status === "tiles-unavailable" ? "Basemap tiles unavailable. Report pins and the queue remain usable." : status === "unavailable" ? "Map unavailable; report data is unchanged." : `${located.length} located reports · ? pending · ✓ human confirmed · numbers group nearby reports`}
         </p>
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-          {status === "tiles-unavailable" && <button type="button" className={actionClass} onClick={() => setAttempt((value) => value + 1)}><RotateCcw size={16} aria-hidden="true" />Retry tiles</button>}
+          {status === "tiles-unavailable" && <button type="button" className={actionClass} onClick={() => { setStatus("loading"); setAttempt((value) => value + 1); }}><RotateCcw size={16} aria-hidden="true" />Retry tiles</button>}
           <button type="button" className={actionClass} onClick={fitReports} disabled={!located.length || status === "unavailable"}><LocateFixed size={16} aria-hidden="true" />Fit reports</button>
         </div>
       </div>
