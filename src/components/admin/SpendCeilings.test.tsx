@@ -15,7 +15,7 @@ describe("auditable admin AI spend view", () => {
   it("validates shape before displaying costs", () => {
     expect(isUsableAiUsage(payload)).toBe(true);
     expect(isUsableAiUsage({ ok: true, summary: {} })).toBe(false);
-    expect(isUsableAiUsage({ ok: true, ...payload, summary: { ...payload.summary, totalCostUsd: NaN } })).toBe(false);
+    expect(isUsableAiUsage({ ...payload, summary: { ...payload.summary, totalCostUsd: NaN } })).toBe(false);
   });
 
   it("only renders true global totals", async () => {
