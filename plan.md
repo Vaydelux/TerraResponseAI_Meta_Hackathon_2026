@@ -1,10 +1,14 @@
 # ACTIVE PLAN — TerraResponse AI full-app trust, UX, map, report and AI cost hardening
 
-**Date:** 2026-11-05 Asia/Manila. **Status:** DRAFT — owner review required before application code changes.
+**Date:** 2026-11-05 Asia/Manila. **Status:** APPROVED and IMPLEMENTED on PR #67 branch; final CI and separate authenticated staging acceptance are required before full sign-off.
 **Baseline:** main a12d68dcaf8977d24045f0cddb0927d7b572bad8 (PR #66 merged), Vercel READY on matching SHA.
 **Product:** A human-reviewed disaster-photo triage prototype for reporters, reviewers and coordinators; not emergency dispatch.
 **Demo:** In 2–3 minutes, reporter uploads a labeled test image and location; real Meta Muse Spark provides provisional observations; independent reviewer decides; authorized, human-reviewed map evidence appears with an audit record. A separate fictional sample tour is available if live dependencies fail.
 **Stack:** Next.js App Router, React/TS, Tailwind + existing semantic CSS tokens, Supabase/Postgres/PostGIS/Auth/RLS/private storage, Muse Spark 1.3 Standard, optional SAM 3.1 and sourced contextual intelligence, Vercel.
+
+## Implementation checkpoint (approval received)
+
+The user authorized implementation of this plan. Code changes committed on this PR: truth-first incident/read-notification handling, official Standard-mode Muse prices, non-billable cache/preflight accounting, real global spend display and explicit unavailable state, mobile review cards, keyboard-accessible admin tabs, 44px filter/location touch targets, schematic-location disclosures and empty-map hardening. Regression tests and route-level audit added. Exact final-head CI must pass before merge; live staging E2E is still not observed and is not represented as passing. For detailed route-by-route assessment and known limits see docs/ROUTE_QUALITY_REVIEW_20261105.md.
 
 ## 1. Findings — source-audited defects, not speculative screenshots
 
