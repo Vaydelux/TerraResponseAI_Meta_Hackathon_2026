@@ -83,26 +83,21 @@ describe("KeyboardShortcutsDock & KeyboardShortcutsDialog (Desktop/Laptop only)"
   });
 });
 
-describe("MapPreview (.map-panel) zoom controls & hover", () => {
-  it("renders .map-panel with terra-card-hover and Material 3 44x44px zoom controls", () => {
+describe("Landing MapPreview accessible, honest sample interactions", () => {
+  it("renders large keyboard-usable pins and keeps fiction visibly labeled", () => {
     const { container } = render(<MapPreview />);
-
-    const mapPanel = container.querySelector(".map-panel.terra-card-hover");
-    expect(mapPanel).not.toBeNull();
-
-    const zoomGroup = screen.getByRole("group", { name: /Map zoom controls/i });
-    expect(zoomGroup).toBeDefined();
-
-    const zoomInBtn = screen.getByRole("button", { name: /Zoom in map preview/i });
-    const zoomOutBtn = screen.getByRole("button", { name: /Zoom out map preview/i });
-
-    expect(zoomInBtn.className).toContain("min-w-[44px]");
-    expect(zoomInBtn.className).toContain("min-h-[44px]");
-    expect(zoomOutBtn.className).toContain("min-w-[44px]");
-    expect(zoomOutBtn.className).toContain("min-h-[44px]");
-
-    // Click zoom in -> should update zoom percentage indicator to 120%
-    fireEvent.click(zoomInBtn);
-    expect(screen.getByText("120%")).toBeDefined();
+    const illustration = screen.getByRole("group", { name: /Illustrative map, select a sample incident/i });
+    expect(illustration).toBeDefined();
+    const points = screen.getAllByRole("button", { name: /Select sample:/i });
+    expect(points.length).toBeGreaterThan(1);
+    expect(points[0].className).toContain("size-12");
+    expect(points[0].className).toContain("focus-visible:outline-2");
+    fireEvent.click(points[1]);
+    expect(points[1].getAttribute("aria-pressed")).toBe("true");
+    const detail = container.querySelector("#preview-incident-detail");
+    expect(detail?.textContent).toContain("Selected fictional report");
+    expect(detail?.textContent).toContain("Unverified sample");
+    expect(detail?.textContent).toContain("Still unknown");
+    expect(screen.getByText(/fictional reports are an illustration/i)).toBeDefined();
   });
 });
