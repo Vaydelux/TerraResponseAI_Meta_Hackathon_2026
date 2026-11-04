@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   prune:
-    if: github.event.head_commit.message == 'chore(repository): retire superseded branches'
+    if: "github.event.head_commit.message == 'chore(repository): retire superseded branches'"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
