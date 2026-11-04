@@ -201,6 +201,11 @@ test.describe("Authenticated staging acceptance flow", () => {
       // The reviewed index remains accessible if map tiles/WebGL fail.
       // A visual map pin must be demonstrated separately in the live rehearsal.
       await expect(reviewerPage.getByTestId(`reviewed-map-report-${reportId}`).getByText(/Human confirmed/)).toBeVisible();
+
+      // Deliberately print only non-secret evidence; no user identifiers,
+      // private report IDs, image content, signed URLs, or auth state.
+      const safeModel = (latest?.model_id ?? "unknown").replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 48);
+      console.info(`[demo-acceptance] pass=${test.info().repeatEachIndex + 1}; model=${safeModel}; independent_review=true; durable_audit=true; map_index=true; commit=${(process.env.GITHUB_SHA ?? "local").slice(0, 12)}`);
     } finally {
       // Never leave an active synthetic report in staging after acceptance.
       // Purging storage remains an explicit admin retention operation.
@@ -210,7 +215,14 @@ test.describe("Authenticated staging acceptance flow", () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ reason: "STAGING E2E cleanup — synthetic acceptance evidence." }),
         });
-        expect([200, 409]).toContain(cleanup.status);
+        if (cleanup.status === 409) {
+          // Only ALREADY_DELETED is an acceptable idempotent cleanup.
+          // A different 409 is a real staging hygiene failure.
+          const code = (cleanup.body as { error?: { code?: string } } | null)?.error?.code;
+          expect(code).toBe("ALREADY_DELETED");
+        } else {
+          expect(cleanup.status).toBe(200);
+        }
       }
       await reviewerContext?.close();
       await reporterContext.close();
