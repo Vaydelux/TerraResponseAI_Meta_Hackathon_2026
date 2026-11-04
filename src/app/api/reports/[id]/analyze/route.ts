@@ -310,6 +310,7 @@ export async function POST(
         promptVersion: cached.promptVersion,
         schemaVersion: cached.schemaVersion,
         outcome: "succeeded",
+        noProviderCall: true,
         errorMessage: "cache hit (no model call)",
       });
       if (cacheInsertErr) {
