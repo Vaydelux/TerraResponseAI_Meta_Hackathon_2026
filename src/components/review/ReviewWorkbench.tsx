@@ -40,6 +40,7 @@ import { toSeverityLevel } from "@/lib/design/severity";
 import { formatRelativeTime, shortReportId } from "@/lib/design/format";
 import { COPY } from "@/lib/design/copy";
 import { cn } from "@/lib/utils";
+import { getReviewCapabilities, type EventRole } from "@/lib/review/capabilities";
 
 export interface ReviewWorkbenchProps {
   reportId: string;
@@ -51,6 +52,8 @@ export interface ReviewWorkbenchProps {
   currentUserDisplayName?: string | null;
   /** The reviewer's role (for the role gate). */
   currentUserRole?: string;
+  /** Event-scoped roles assembled server-side for the authenticated actor. */
+  currentUserEventRoles?: Array<{ eventId: string; role: EventRole }>;
   /** The next report's id (prefetched + navigated after a review action). */
   nextReportId?: string | null;
   /** Queue position (1-indexed) for the toast template. */
@@ -85,6 +88,7 @@ interface ReportDetail {
     schema_version: string;
     structured_observation: Record<string, unknown>;
     raw_usage_metadata?: Record<string, unknown> | null;
+    processing_status?: string | null;
     created_at: string;
   }>;
 }
@@ -123,14 +127,17 @@ interface ReviewBody {
 
 function readObservation(detail: ReportDetail): ObservationData {
   const a = Array.isArray(detail.report_analyses) ? detail.report_analyses[0] : detail.report_analyses;
-  const obs = (a?.structured_observation ?? {}) as Record<string, unknown>;
+  const hasHumanCorrection = a?.raw_usage_metadata?._corrected_by != null;
+  const valid = a?.processing_status === "succeeded" || hasHumanCorrection;
+  const obs = (valid ? a?.structured_observation : null) as Record<string, unknown> | null;
   return {
-    incidentType: (obs.incident_type as string) ?? null,
-    summary: (obs.summary_en as string) ?? null,
-    severity: (obs.preliminary_severity as number) ?? null,
-    visibleEvidence: (obs.visible_evidence as string[]) ?? [],
-    uncertainties: (obs.uncertainties as string[]) ?? [],
-    modelId: a?.model_id,
+    incidentType: (obs?.incident_type as string) ?? null,
+    summary: (obs?.summary_en as string) ?? null,
+    severity: (obs?.preliminary_severity as number) ?? null,
+    visibleEvidence: (obs?.visible_evidence as string[]) ?? [],
+    uncertainties: (obs?.uncertainties as string[]) ?? [],
+    modelId: valid ? a?.model_id : undefined,
+    analysisAvailable: valid,
     isDemo: a?.model_id === "demo-mock-v1",
   };
 }
@@ -141,6 +148,7 @@ export function ReviewWorkbench({
   currentUserId,
   currentUserDisplayName,
   currentUserRole,
+  currentUserEventRoles = [],
   nextReportId = null,
   queuePosition,
   className,
@@ -249,6 +257,12 @@ export function ReviewWorkbench({
   }
 
   const observation = readObservation(detail);
+  const eventRole = currentUserEventRoles.find((e) => e.eventId === detail.event_id)?.role ?? null;
+  const capabilities = getReviewCapabilities({
+    globalRole: currentUserRole, eventRole, actorId: currentUserId,
+    creatorId: detail.creator_id, status: detail.status,
+    retentionState: detail.retention_state,
+  });
   const primaryAnalysis = Array.isArray(detail.report_analyses) ? detail.report_analyses[0] : detail.report_analyses;
   const rawStructuredObs = ((primaryAnalysis as { structured_observation?: Record<string, unknown> } | undefined)?.structured_observation ?? {}) as Record<string, unknown>;
   const rawAnalysisMetadata =
@@ -260,7 +274,7 @@ export function ReviewWorkbench({
     ? "corrected"
     : stateFromReport({ status: detail.status, reviewOutcome: detail.review_outcome });
   const altText = `Uploaded photo; unverified description: ${observation.summary ?? "no AI summary available"}`;
-  const isOwnReport = !!currentUserId && currentUserId === detail.creator_id;
+  const isOwnReport = capabilities.isOwn;
   const isLastInQueue = queuePosition ? queuePosition.current >= queuePosition.total : false;
 
   // Map the priority factors to the component shape.
@@ -308,8 +322,11 @@ export function ReviewWorkbench({
             isContributor={isOwnReport}
             status={detail.status}
             reviewOutcome={detail.review_outcome}
-            analysisTarget={(observation as ObservationData & { segmentation_target?: string }).segmentation_target ?? null}
+            analysisTarget={observation.analysisAvailable && typeof rawStructuredObs.segmentation_target === "string"
+              ? rawStructuredObs.segmentation_target : null}
             samAvailable={samAvailable}
+            canRequestSegmentation={capabilities.canSegment}
+            segmentationUnavailableReason={capabilities.reason}
             initialOverlay={overlay}
           />
         </div>
@@ -327,6 +344,8 @@ export function ReviewWorkbench({
               !readOnly &&
               (currentUserRole === "reviewer" || currentUserRole === "admin") && (
                 <ReviewActionBar
+                  canReview={capabilities.canReview}
+                  restrictionReason={capabilities.reason}
                   reportId={reportId}
                   isOwnReport={isOwnReport}
                   isLastInQueue={isLastInQueue}
@@ -340,7 +359,7 @@ export function ReviewWorkbench({
               )
             }
           />
-          {!readOnly && (currentUserRole === "reviewer" || currentUserRole === "admin") && (
+          {!readOnly && capabilities.canOverridePriority && (
             <PriorityOverride
               reportId={reportId}
               computedScore={priority.computedScore}
