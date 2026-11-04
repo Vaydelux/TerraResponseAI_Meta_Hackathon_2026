@@ -7,6 +7,7 @@ import { Providers } from "@/components/terra/providers";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { DemoBanner } from "@/components/layout/DemoBanner";
 import { ToastRegion } from "@/components/ui-tr/Toast";
+import { BackToTop } from "@/components/layout/BackToTop";
 import { isDemoMode } from "@/lib/demo-mode";
 
 // TerraResponse AI design system fonts (per docs/DESIGN.md §4):
@@ -121,6 +122,7 @@ export default function RootLayout({
             closeButton
           />
           <ToastRegion />
+          <BackToTop />
         </Providers>
       </body>
     </html>
