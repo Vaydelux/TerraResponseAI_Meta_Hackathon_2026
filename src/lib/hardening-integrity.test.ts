@@ -14,7 +14,11 @@ describe("hackathon UX and evidence safeguards", () => {
     const map = file("src/components/map/IncidentMap.tsx");
     expect(map).not.toMatch(/\.innerHTML\s*=/);
     expect(map).toContain('document.createElement("button")');
-    expect(map).toContain("fetchControllerRef.current?.abort()");
+    // The newer read-only map uses an already authorized server snapshot.
+    // Validate real MapLibre listener cleanup instead of a removed viewport fetch.
+    expect(map).toContain('map.on("error", onMapError)');
+    expect(map).toContain('canvas.addEventListener("webglcontextlost", onContextLost)');
+    expect(map).toContain('observer?.disconnect()');
   });
   it("has real browser-side EXIF parsing with a no-location fallback", () => {
     const upload = file("src/components/upload/UploadFlow.tsx");
