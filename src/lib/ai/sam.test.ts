@@ -1,259 +1,133 @@
-// src/lib/ai/sam.test.ts
-//
-// Unit tests for the SAM 3.1 segmentation client. Uses a MOCKED
-// transport (no real API calls). The tests verify:
-//   1. A valid SSE stream with mask data in the output text passes.
-//   2. A stream with no output text is classified as no_match.
-//   3. A stream with output text but no mask tokens is no_match.
-//   4. A 429 is classified as transient.
-//   5. A 500 is classified as transient.
-//   6. A 400 is classified as permanent.
-//   7. No SAM_API_KEY → not_configured.
-//   8. A vague prompt is rejected.
-//   9. An empty prompt is rejected.
-//  10. A timeout is classified as timeout.
-//  11. The request body uses the Responses API format (input array
-//      with input_text + input_image content blocks, stream: true).
-//
-// The live API integration smoke test is in sam.smoke.test.ts
-// (opt-in, gated by SAM_API_KEY).
+// Fully mocked SAM contract tests. NO paid calls are made.
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import upstreamEvents from "@/lib/vendor/meta-sam/image-wheel.events.json";
+import { segmentImage, isSamConfigured } from "@/lib/ai/sam";
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { segmentImage, isSamConfigured, type SegmentResult } from "@/lib/ai/sam";
+type Event = { type: string; [key: string]: unknown };
 
-/** Build a mock SSE stream response (text/event-stream) with the
- *  Responses API event format. Each event is a `data: {...}\n\n` block. */
-function makeSseResponse(events: Array<{ type: string; [key: string]: unknown }>): Response {
-  const sse = events
-    .map((e) => `data: ${JSON.stringify(e)}\n\n`)
-    .join("") + "data: [DONE]\n\n";
-  return new Response(sse, {
-    status: 200,
-    headers: { "Content-Type": "text/event-stream" },
+function makeSseResponse(events: Event[]): Response {
+  return new Response(events.map((event) => "data: " + JSON.stringify(event) + "\n\n").join("") +
+    "data: [DONE]\n\n", { status: 200,
+    headers: { "Content-Type": "text/event-stream" } });
+}
+const source = upstreamEvents as Event[];
+const sample = { imageBytes: new Uint8Array([0xff, 0xd8, 0xff]),
+  imageMimeType: "image/jpeg", prompt: "damaged building" };
+const orig = {
+  key: process.env.SAM_API_KEY,
+  base: process.env.SAM_MODEL_BASE_URL,
+  model: process.env.SAM_MODEL,
+};
+
+function replaceOutput(text: string): Event[] {
+  return source.map((event) => {
+    if (event.type === "response.output_text.delta") return { ...event, delta: text };
+    if (event.type === "response.content_part.done" &&
+      event.part && typeof event.part === "object") {
+      return { ...event, part: { ...event.part as Record<string, unknown>, text } };
+    }
+    return event;
   });
 }
 
-/** Build a mock error response. */
-function makeErrorResponse(status: number, message: string): Response {
-  return new Response(message, { status });
-}
-
-describe("segmentImage (mocked transport)", () => {
-  const origKey = process.env.SAM_API_KEY;
-
+describe("SAM 3.1 image segmentation, official Meta parser", () => {
   beforeEach(() => {
     process.env.SAM_API_KEY = "test-sam-key";
     process.env.SAM_MODEL_BASE_URL = "https://api.meta.ai/v1";
     process.env.SAM_MODEL = "sam-3.1";
   });
-
   afterEach(() => {
-    if (origKey === undefined) delete process.env.SAM_API_KEY;
-    else process.env.SAM_API_KEY = origKey;
+    for (const [key, value] of Object.entries({
+      SAM_API_KEY: orig.key,
+      SAM_MODEL_BASE_URL: orig.base,
+      SAM_MODEL: orig.model,
+    })) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
-  it("returns a valid mask on a successful SSE stream with mask data", async () => {
-    const stream = makeSseResponse([
-      { type: "response.output_text.delta", delta: "<mask>" },
-      { type: "response.output_text.delta", delta: "100 50 100 50 100" },
-      { type: "response.output_text.delta", delta: "</mask>" },
-      { type: "response.output_text.delta", delta: "<box>" },
-      { type: "response.output_text.delta", delta: "0.5 0.5 0.3 0.3" },
-      { type: "response.output_text.delta", delta: "</box>" },
-      {
-        type: "response.completed",
-        response: { usage: { inference_time_ms: 1200 } },
-      },
-    ]);
-    const transport = vi.fn(async () => stream);
-    const result = await segmentImage(
-      { imageBytes: new Uint8Array([0xff]), imageMimeType: "image/jpeg", prompt: "floodwater" },
-      transport as unknown as typeof fetch,
-    );
+  it("decodes the upstream privacy-reviewed image fixture into genuine model geometry", async () => {
+    const transport = vi.fn(async () => makeSseResponse(source));
+    const result = await segmentImage(sample, transport as unknown as typeof fetch);
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.rle).toContain("<mask>");
-      expect(result.rle).toContain("100 50 100 50 100");
-      expect(result.rle).toContain("</mask>");
-      expect(result.rle).toContain("<box>");
-      expect(result.modelId).toBe("sam-3.1");
-      expect(result.prompt).toBe("floodwater");
-      expect(result.usageMetadata).toEqual({ inference_time_ms: 1200 });
-    }
+    if (!result.ok) return;
+    expect(result.masks.length).toBeGreaterThan(0);
+    expect(result.imageWidth).toBe(1800);
+    expect(result.imageHeight).toBe(1200);
+    expect(result.masks[0].bounds.left).toBe(445);
+    expect(result.masks[0].bounds.top).toBe(626);
+    expect(result.masks[0].mask.height).toBe(224);
+    expect(result.masks[0].mask.width).toBe(231);
+    expect(result.score).toBeNull(); // missing confidence is NOT an invented 100%
   });
 
-  it("returns no_match for a stream with no output text (empty deltas)", async () => {
-    const stream = makeSseResponse([
-      { type: "response.completed", response: { usage: {} } },
-    ]);
-    const transport = vi.fn(async () => stream);
-    const result = await segmentImage(
-      { imageBytes: new Uint8Array([0xff]), imageMimeType: "image/jpeg", prompt: "floodwater" },
-      transport as unknown as typeof fetch,
-    );
+  it("classifies a complete empty output as a valid no-match (not an exception)", async () => {
+    const result = await segmentImage(sample,
+      vi.fn(async () => makeSseResponse(replaceOutput(""))) as unknown as typeof fetch);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.kind).toBe("no_match");
+  });
+
+  it("never accepts fabricated legacy <mask> text as an actual decoded overlay", async () => {
+    const result = await segmentImage(sample,
+      vi.fn(async () => makeSseResponse(replaceOutput("<mask>100 50 100</mask>"))) as unknown as typeof fetch);
+    expect(result.ok).toBe(false);
+  });
+
+  it.each([429, 500, 400])("classifies HTTP %s without exposing provider response bodies", async (code) => {
+    const result = await segmentImage(sample,
+      vi.fn(async () => new Response("private provider response body", { status: code })) as unknown as typeof fetch);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.kind).toBe("no_match");
-      expect(result.error).toContain("no output text");
+      expect(result.kind).toBe(code === 400 ? "permanent" : "transient");
+      expect(result.error).not.toContain("private provider");
     }
   });
 
-  it("returns no_match for a stream with output text but no mask tokens", async () => {
-    const stream = makeSseResponse([
-      { type: "response.output_text.delta", delta: "No matching objects found." },
-      { type: "response.completed", response: { usage: {} } },
-    ]);
-    const transport = vi.fn(async () => stream);
-    const result = await segmentImage(
-      { imageBytes: new Uint8Array([0xff]), imageMimeType: "image/jpeg", prompt: "submerged vehicle" },
-      transport as unknown as typeof fetch,
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.kind).toBe("no_match");
-      expect(result.error).toContain("no mask data");
-    }
-  });
-
-  it("classifies a 429 as transient", async () => {
-    const transport = vi.fn(async () => makeErrorResponse(429, "rate limited"));
-    const result = await segmentImage(
-      { imageBytes: new Uint8Array([0xff]), imageMimeType: "image/jpeg", prompt: "floodwater" },
-      transport as unknown as typeof fetch,
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.kind).toBe("transient");
-      expect(result.statusCode).toBe(429);
-    }
-  });
-
-  it("classifies a 500 as transient", async () => {
-    const transport = vi.fn(async () => makeErrorResponse(500, "server error"));
-    const result = await segmentImage(
-      { imageBytes: new Uint8Array([0xff]), imageMimeType: "image/jpeg", prompt: "floodwater" },
-      transport as unknown as typeof fetch,
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.kind).toBe("transient");
-    }
-  });
-
-  it("classifies a 400 as permanent", async () => {
-    const transport = vi.fn(async () => makeErrorResponse(400, "bad request"));
-    const result = await segmentImage(
-      { imageBytes: new Uint8Array([0xff]), imageMimeType: "image/jpeg", prompt: "floodwater" },
-      transport as unknown as typeof fetch,
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.kind).toBe("permanent");
-    }
-  });
-
-  it("returns not_configured when SAM_API_KEY is empty", async () => {
+  it("rejects unconfigured, vague and empty prompts without a model request", async () => {
     delete process.env.SAM_API_KEY;
-    const result = await segmentImage({
-      imageBytes: new Uint8Array([0xff]),
-      imageMimeType: "image/jpeg",
-      prompt: "floodwater",
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.kind).toBe("not_configured");
+    const noKey = await segmentImage(sample);
+    expect(noKey.ok).toBe(false);
+    if (!noKey.ok) expect(noKey.kind).toBe("not_configured");
+    process.env.SAM_API_KEY = "test-key";
+    for (const prompt of ["", "everything", "disaster"]) {
+      const result = await segmentImage({ ...sample, prompt });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.kind).toBe("permanent");
     }
   });
 
-  it("rejects a vague prompt ('everything')", async () => {
-    const result = await segmentImage({
-      imageBytes: new Uint8Array([0xff]),
-      imageMimeType: "image/jpeg",
-      prompt: "everything",
-    });
+  it("times out without a result", async () => {
+    const result = await segmentImage({ ...sample, timeoutMs: 100 },
+      vi.fn(async () => { throw Object.assign(new Error("Aborted"), { name: "AbortError" }); }) as unknown as typeof fetch);
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.kind).toBe("permanent");
-      expect(result.error).toContain("too vague");
-    }
+    if (!result.ok) expect(result.kind).toBe("timeout");
   });
 
-  it("rejects an empty prompt", async () => {
-    const result = await segmentImage({
-      imageBytes: new Uint8Array([0xff]),
-      imageMimeType: "image/jpeg",
-      prompt: "",
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.kind).toBe("permanent");
-    }
-  });
-
-  it("handles a timeout (AbortError)", async () => {
-    const transport = vi.fn(async () => {
-      throw Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
-    });
-    const result = await segmentImage(
-      { imageBytes: new Uint8Array([0xff]), imageMimeType: "image/jpeg", prompt: "floodwater", timeoutMs: 100 },
-      transport as unknown as typeof fetch,
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.kind).toBe("timeout");
-    }
-  });
-
-  it("uses the Responses API endpoint (/v1/responses) + the input messages format", async () => {
-    const transport = vi.fn(async () =>
-      makeSseResponse([
-        { type: "response.output_text.delta", delta: "<mask>rle_data</mask>" },
-        { type: "response.completed", response: { usage: {} } },
-      ]),
-    );
-    await segmentImage(
-      { imageBytes: new Uint8Array([0xff]), imageMimeType: "image/jpeg", prompt: "floodwater" },
-      transport as unknown as typeof fetch,
-    );
-    // Verify the transport was called with the Responses API endpoint.
+  it("uses correct Responses API format and the no-extra-call policy", async () => {
+    const transport = vi.fn(async () => makeSseResponse(source));
+    await segmentImage(sample, transport as unknown as typeof fetch);
     expect(transport).toHaveBeenCalledTimes(1);
-    const callArgs = transport.mock.calls[0] as unknown[];
-    const url = callArgs[0] as string;
-    expect(url).toContain("/v1/responses");
-    // Verify the request body has the `input` messages array.
-    const init = callArgs[1] as RequestInit;
-    const body = JSON.parse(init.body as string);
+    const [url, request] = transport.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.meta.ai/v1/responses");
+    const body = JSON.parse(String(request.body));
     expect(body.model).toBe("sam-3.1");
     expect(body.stream).toBe(true);
-    expect(body.input).toBeInstanceOf(Array);
-    expect(body.input[0].type).toBe("message");
-    expect(body.input[0].role).toBe("user");
-    expect(body.input[0].content).toBeInstanceOf(Array);
+    expect(body.metadata.mask_encoding).toBe("one_bit");
     expect(body.input[0].content[0].type).toBe("input_text");
-    expect(body.input[0].content[0].text).toBe("floodwater");
-    expect(body.input[0].content[1].type).toBe("input_image");
     expect(body.input[0].content[1].image_url).toContain("data:image/jpeg;base64,");
-    // Verify the Authorization header.
-    expect(init.headers).toEqual({
-      "Content-Type": "application/json",
-      Authorization: "Bearer test-sam-key",
-    });
   });
 });
 
-describe("isSamConfigured", () => {
-  it("returns false when SAM_API_KEY is empty", () => {
-    const orig = process.env.SAM_API_KEY;
+describe("SAM configuration", () => {
+  it("detects absence and presence of API keys", () => {
+    const prior = process.env.SAM_API_KEY;
     delete process.env.SAM_API_KEY;
     expect(isSamConfigured()).toBe(false);
-    if (orig !== undefined) process.env.SAM_API_KEY = orig;
-  });
-
-  it("returns true when SAM_API_KEY is set", () => {
-    const orig = process.env.SAM_API_KEY;
-    process.env.SAM_API_KEY = "test-key";
+    process.env.SAM_API_KEY = "x";
     expect(isSamConfigured()).toBe(true);
-    if (orig === undefined) delete process.env.SAM_API_KEY;
-    else process.env.SAM_API_KEY = orig;
+    if (prior === undefined) delete process.env.SAM_API_KEY;
+    else process.env.SAM_API_KEY = prior;
   });
 });
