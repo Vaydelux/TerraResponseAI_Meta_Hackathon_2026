@@ -21,6 +21,7 @@ export function IncidentQueue({ reports, selectedId, pinnedIds, onSelect, onTogg
       // An uploaded or manual-review report does not necessarily have a
       // saved AI observation. Keep the queue labels grounded in real data.
       const statusLabel =
+        report.status === "needs_manual_review" && !report.model_id ? "Human review pending · no AI finding" :
         state === "confirmed" ? "Human confirmed" :
         state === "failed" ? "Analysis unavailable" :
         state === "rejected" ? "Rejected" :
