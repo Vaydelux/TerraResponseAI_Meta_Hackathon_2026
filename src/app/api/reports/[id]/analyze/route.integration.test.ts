@@ -494,6 +494,38 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
     expect(mockLogUsage).toHaveBeenCalled();
   });
 
+  for (const scenario of [
+    { finish: "length", expectedCode: "MODEL_OUTPUT_LIMIT", failureKind: "output_limit", expectedStatus: 503 },
+    { finish: "stop", expectedCode: "MODEL_EMPTY_OUTPUT", failureKind: "empty_output", expectedStatus: 422 },
+  ]) {
+    it("classifies an empty Meta output as " + scenario.expectedCode + " without fabricating an observation", async () => {
+      mockFrom.mockReturnValueOnce(makeBuilder({
+        data: { id: REPORT_ID, event_id: EVENT_ID, status: "uploaded",
+          sha256: "abc", retry_count: 0, derivative_storage_key: "x/y.jpg", image_mime_type: "image/jpeg" },
+        error: null,
+      }));
+      mockLookupCachedAnalysis.mockResolvedValue(null);
+      mockCheckAllAiCallCeilings.mockResolvedValue({ ok: true });
+      mockFrom.mockReturnValueOnce(makeCasUpdateBuilder({ data: { id: REPORT_ID }, error: null }));
+      const image = { arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff]).buffer };
+      mockCreateClient.mockReturnValue({
+        from: mockFrom,
+        storage: { from: vi.fn(() => ({ download: vi.fn(async () => ({ data: image, error: null })) })) },
+      });
+      mockAnalyzeImage.mockResolvedValue({
+        ok: false, kind: "empty_output", error: scenario.expectedCode,
+        diagnostics: { finishReason: scenario.finish, reasoningTokens: 850, completionTokens: 900, choiceCount: 1 },
+      });
+      mockFrom.mockReturnValue(makeBuilder({ data: {}, error: null }));
+      const { request, context } = makeRequest();
+      const response = await POST(request, context);
+      expect(response.status).toBe(scenario.expectedStatus);
+      expect((await response.json()).error.code).toBe(scenario.expectedCode);
+      expect(mockAnalyzeImage).toHaveBeenCalledOnce();
+      expect(mockLogUsage).toHaveBeenCalledWith(expect.objectContaining({ failureKind: scenario.failureKind }));
+    });
+  }
+
   it("logs a successful AI call's telemetry", async () => {
     const validObservation = {
       incident_type: "flooding",
