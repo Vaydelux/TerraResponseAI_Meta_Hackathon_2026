@@ -45,14 +45,15 @@ export function LocationMapPicker({ selected, onSelect }: LocationMapPickerProps
         attributionControl: true,
       });
     } catch {
-      setStatus("unavailable");
+      // Report the WebGL initialization failure asynchronously; no effect-body setState.
+      queueMicrotask(() => setStatus("unavailable"));
       return;
     }
     mapRef.current = map;
     try {
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     } catch {
-      setStatus("unavailable");
+      queueMicrotask(() => setStatus("unavailable"));
       try { map.remove(); } catch { /* Partial WebGL init. */ }
       mapRef.current = null;
       return;
