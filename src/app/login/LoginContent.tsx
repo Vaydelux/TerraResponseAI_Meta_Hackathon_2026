@@ -43,6 +43,7 @@ export function LoginContent({ configured }: { configured: boolean }) {
   }
 
   const urlError = params.get("error") === "auth_callback_failed";
+  const passwordReset = params.get("password_reset") === "success";
 
   return (
     <div className="tr-shell" style={{ minHeight: "100dvh", gridTemplateRows: "var(--nav-h) 1fr auto" }}>
@@ -146,6 +147,12 @@ export function LoginContent({ configured }: { configured: boolean }) {
                 Enter your registered email address and password to continue to the workspace.
               </p>
             </div>
+
+            {passwordReset && (
+              <p role="status" className="auth-doctrine-box" aria-live="polite">
+                Your password has been updated. Sign in using your new password.
+              </p>
+            )}
 
             {(pending || redirectTo) && <AuthLoadingBanner mode="login" />}
 
@@ -251,6 +258,13 @@ export function LoginContent({ configured }: { configured: boolean }) {
                   </button>
                 </div>
               </Field>
+
+              <div style={{ textAlign: "right", marginTop: "calc(var(--s-2) * -1)" }}>
+                <Link href="/forgot-password"
+                  style={{ color: "var(--tide)", fontWeight: 600, textDecoration: "underline" }}>
+                  Forgot password?
+                </Link>
+              </div>
 
               <Button
                 type="submit"
