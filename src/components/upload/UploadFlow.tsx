@@ -84,9 +84,11 @@ async function directStorageUpload(
 
 export interface UploadFlowProps {
   className?: string;
+  /** Server-authenticated user id, used only to bind locally queued evidence to its owner. */
+  ownerId?: string;
 }
 
-export function UploadFlow({ className }: UploadFlowProps) {
+export function UploadFlow({ className, ownerId }: UploadFlowProps) {
   const [step, setStep] = useState<Step>(1);
   const [files, setFiles] = useState<File[]>([]);
   const [checks, setChecks] = useState<FileCheckItem[]>([]);
@@ -114,18 +116,39 @@ export function UploadFlow({ className }: UploadFlowProps) {
 
   useEffect(() => {
     const sendQueued = async (item: OfflineUpload) => {
+      if (!ownerId || item.ownerId !== ownerId) return false;
+      const client = createSupabaseBrowserClient();
+      if (!client) return false;
+      // A browser can switch accounts while an offline draft survives.
+      // Re-check the authenticated session before replaying private evidence.
+      const { data: { user }, error: authError } = await client.auth.getUser();
+      if (authError || user?.id !== ownerId) return false;
       const form = new FormData();
       form.append("file", new File([item.file], item.fileName, { type: "image/jpeg" }));
       form.append("meta", item.metadata);
       const response = await fetch("/api/reports", { method: "POST", body: form });
-      return response.ok;
+      const result = await response.json().catch(() => null);
+      const stored = response.ok && (
+        typeof result?.reportId === "string" || typeof result?.linkedTo === "string"
+      );
+      const duplicate = response.status === 409 &&
+        result?.error?.code === "DUPLICATE" &&
+        typeof result?.error?.existingReportId === "string";
+      if (stored || duplicate) {
+        toast.success("Your locally queued photo is now linked to a saved report. Open Reports to check its analysis status.");
+        return true;
+      }
+      return false;
     };
     const handleOnline = () => {
-      void flushOfflineUploads(sendQueued).catch(() => undefined);
+      if (!ownerId) return;
+      void flushOfflineUploads(sendQueued, ownerId).catch(() => undefined);
     };
     window.addEventListener("online", handleOnline);
+    // A user may return to this page already online after closing a tab.
+    if (navigator.onLine) handleOnline();
     return () => window.removeEventListener("online", handleOnline);
-  }, []);
+  }, [ownerId]);
 
   useEffect(() => {
     return () => {
@@ -379,7 +402,8 @@ export function UploadFlow({ className }: UploadFlowProps) {
       }
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         try {
-          await enqueueOfflineUpload({ file: preparedFile, fileName: preparedFile.name, metadata });
+          if (!ownerId) throw new Error("Cannot safely identify the owner of a local draft.");
+          await enqueueOfflineUpload({ file: preparedFile, fileName: preparedFile.name, metadata, ownerId });
           setState({ kind: "queued", message: "Stored locally, not submitted. Reopen this page after reconnecting to retry." });
           toast.success("Saved locally only. This is not a submitted report; revisit upload after reconnecting.");
         } catch {
