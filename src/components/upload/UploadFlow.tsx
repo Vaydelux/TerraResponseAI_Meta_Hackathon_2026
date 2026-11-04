@@ -380,8 +380,8 @@ export function UploadFlow({ className }: UploadFlowProps) {
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         try {
           await enqueueOfflineUpload({ file: preparedFile, fileName: preparedFile.name, metadata });
-          setState({ kind: "queued", message: "Saved on this device. It will upload automatically when you reconnect." });
-          toast.success("Saved offline; upload will resume when you reconnect.");
+          setState({ kind: "queued", message: "Stored locally, not submitted. Reopen this page after reconnecting to retry." });
+          toast.success("Saved locally only. This is not a submitted report; revisit upload after reconnecting.");
         } catch {
           setState({ kind: "error", message: "Network unavailable and this browser could not store the upload locally." });
           toast.error("Could not save the upload offline.");
