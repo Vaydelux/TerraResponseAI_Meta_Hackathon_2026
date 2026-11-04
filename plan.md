@@ -1,11 +1,19 @@
 # ACTIVE PLAN — Fix SAM segmentation in manual-review workflow and render genuine masks
 
 **Date:** 2026-11-05 Asia/Manila.
-**Status:** DRAFT — STOP FOR OWNER REVIEW BEFORE IMPLEMENTING APPLICATION CHANGES.
+**Status:** OWNER APPROVED PROCEED — IMPLEMENTED ON PR #70; exact-head CI and live authenticated staging acceptance remain separate release gates.
 **Baseline:** main \`9aab7016ea91b6e116bb418af1b3cb3522d465f1\`; PR #69 has merged with exact-head CI passing, but its production release remains blocked by Vercel 402 daily deployment quota. Public production still served \`3cf9f1d4\` at last inspection.
 **Product:** TerraResponse AI, human-reviewed photo evidence and map-oriented incident triage, not an emergency dispatch service.
 **Core demo:** Reporter uploads consented clearly labeled evidence; Muse Spark yields a provisional observation OR the report remains safe for manual review; independent reviewer optionally requests SAM when useful; real validated mask overlays the *correct photo pixels*; reviewer confirms/corrects/rejects; map displays appropriately reviewed report.
 **Stack:** Next.js App Router, TypeScript, React, Tailwind/semantic CSS tokens, Supabase Auth/Postgres/RLS/private Storage, Meta Muse Spark Standard, Meta SAM 3.1 Responses API, MapLibre, Vercel.
+
+## Implementation checkpoint — completed changes
+
+The owner authorized proceeding with PR #70 and expanded the scope to reviewer Confirm, Correct, Flag, Reject, priority override, functionality and roles. Source changes implemented: role-aware review workbench, no failed-AI severity fabrication, human-correction provenance, permanent-error retry guards, SAM on manual-review with a reviewer-supplied target and no automatic inference, official Meta mask parser with genuine image-aligned canvas, atomic idempotent coordinator/admin priority transaction, tests and documentation.
+
+**Staging DB gate:** `20261105001000_atomic_priority_override.sql` was applied to the staging project. Authenticated function execution is granted, anon execution rejected. No staging review or override records were modified as part of this migration. The production DB migration is intentionally **not** applied, so the code must NOT be marked production-ready without deploying it in production first.
+
+**Known limitations:** no real paid SAM or authenticated review transaction was executed here; end-to-end user-account acceptance remains open; prior Vercel 402 quota may block production deployment. See `docs/REVIEW_ROLE_AND_SAM_QA_20261105.md` for exact role matrix, test scope and demo fallback.
 
 ## 1 — FINDINGS: verified concrete defects and staging conditions
 
