@@ -29,6 +29,19 @@ describe("TerraResponse AI visual identity", () => {
     expect(c).toContain("--btn-fg: var(--on-tide)");
     expect(read("src/app/styles/seal.css")).toContain("color: var(--on-green)");
   });
+  it("aligns Night Ops and Tailwind tokens with the civic-cartographic brand palette", () => {
+    const vars = read("src/app/styles/tokens.css");
+    const base = read("src/app/styles/base.css");
+    const comp = read("src/app/styles/components.css");
+    const tw = read("tailwind.config.ts");
+
+    expect(vars).toContain("--brand-signal: #FF8552;");
+    expect(vars).toContain("--tide: #48B5C6;");
+    expect(vars).toContain("--paper: #0B1217;");
+    for (const fileContent of [vars, base, comp, tw]) {
+      expect(fileContent).not.toMatch(/#7B2CBF|#FF416C|--accent-violet|--accent-crimson/i);
+    }
+  });
   it("keeps four usable themes and reduces motion safely", () => {
     const themes = read("src/components/layout/ThemeToggle.tsx");
     for (const mode of ["day", "mist", "night", "auto"]) {

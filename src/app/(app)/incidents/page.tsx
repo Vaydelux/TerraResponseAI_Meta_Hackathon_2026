@@ -126,7 +126,7 @@ export default async function IncidentThreadsPage() {
         }>;
       };
       const incType =
-        row.report_analyses?.[0]?.structured_observation?.incident_type ?? "flooding";
+        ((Array.isArray(row.report_analyses) ? row.report_analyses[0] : row.report_analyses) as { structured_observation?: { incident_type?: string } } | undefined)?.structured_observation?.incident_type ?? "flooding";
       const key = `${row.event_id}:${incType}`;
       const existing = grouped.get(key);
       if (existing) {

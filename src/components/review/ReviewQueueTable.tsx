@@ -118,7 +118,8 @@ export function ReviewQueueTable({
     if (!rows) return null;
     return rows.filter((r) => {
       if (statusFilter && r.status !== statusFilter) return false;
-      const obs = r.report_analyses?.[0]?.structured_observation ?? {};
+      const analysisEntry = Array.isArray(r.report_analyses) ? r.report_analyses[0] : r.report_analyses;
+      const obs = (analysisEntry as { structured_observation?: { incident_type?: string; preliminary_severity?: number } } | undefined)?.structured_observation ?? {};
       const sev = (obs.preliminary_severity as number | undefined) ?? r.report_triage?.preliminary_severity ?? null;
       if (severityFilter) {
         const target = Number(severityFilter);
@@ -148,7 +149,8 @@ export function ReviewQueueTable({
     const total = all.length;
     const highPriority = all.filter((r) => (r.priority_score ?? 0) >= 75).length;
     const criticalSev = all.filter((r) => {
-      const obs = r.report_analyses?.[0]?.structured_observation ?? {};
+      const analysisEntry = Array.isArray(r.report_analyses) ? r.report_analyses[0] : r.report_analyses;
+      const obs = (analysisEntry as { structured_observation?: { incident_type?: string; preliminary_severity?: number } } | undefined)?.structured_observation ?? {};
       const sev = (obs.preliminary_severity as number | undefined) ?? r.report_triage?.preliminary_severity ?? 0;
       return sev >= 4;
     }).length;
@@ -290,7 +292,8 @@ export function ReviewQueueTable({
           </THead>
           <TBody>
             {filteredRows.map((r, i) => {
-              const obs = r.report_analyses?.[0]?.structured_observation ?? {};
+              const analysisEntry = Array.isArray(r.report_analyses) ? r.report_analyses[0] : r.report_analyses;
+      const obs = (analysisEntry as { structured_observation?: { incident_type?: string; preliminary_severity?: number } } | undefined)?.structured_observation ?? {};
               const incidentType = (obs.incident_type as string) ?? null;
               const severity = (obs.preliminary_severity as number) ?? null;
               const state = stateFromReport({ status: r.status, reviewOutcome: r.review_outcome });

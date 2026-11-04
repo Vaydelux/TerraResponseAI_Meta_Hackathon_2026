@@ -91,7 +91,8 @@ export function ReportList({
       .then((body) => {
         if (body?.ok && Array.isArray(body.reports)) {
           const normalized = body.reports.map((r) => {
-            const obs = r.report_analyses?.[0]?.structured_observation;
+            const analysisEntry = Array.isArray(r.report_analyses) ? r.report_analyses[0] : r.report_analyses;
+            const obs = (analysisEntry as { structured_observation?: { incident_type?: string; preliminary_severity?: number } } | undefined)?.structured_observation;
             return {
               ...r,
               incident_type: r.incident_type ?? obs?.incident_type ?? null,

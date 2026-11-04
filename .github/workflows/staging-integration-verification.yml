@@ -1,5 +1,6 @@
 # TerraResponse AI — opt-in, non-destructive staging verification.
-# No migrations, database writes, seeded records or deployment actions.
+# No migrations, database writes, seeded records or deployment actions
+# unless run_authenticated_e2e is explicitly selected by the owner.
 name: Staging integration verification
 
 on:
@@ -17,6 +18,11 @@ on:
       run_sam:
         description: "Call the real SAM model API (incurs API usage/cost)"
         required: true
+        type: boolean
+        default: false
+      run_authenticated_e2e:
+        description: "Run the full Reporter -> Muse Spark -> Reviewer -> Map staging E2E flow"
+        required: false
         type: boolean
         default: false
 
@@ -113,3 +119,55 @@ jobs:
       - name: SAM — real inference
         if: inputs.run_sam
         run: bun x vitest run src/lib/ai/sam.smoke.test.ts
+
+  authenticated_staging_e2e:
+    if: github.ref == 'refs/heads/main' && inputs.run_authenticated_e2e
+    needs: database_read_only
+    name: Optional authenticated staging E2E loop (Reporter -> Muse -> Reviewer -> Map)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      STAGING_SUPABASE_PROJECT_REF: ${{ inputs.project_ref || vars.STAGING_SUPABASE_PROJECT_REF || secrets.STAGING_SUPABASE_PROJECT_REF }}
+      PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF || 'ywopsafppyykhwrejliz' }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+      REPORT_FIRST_INTAKE_ENABLED: "true"
+      REPORT_FIRST_TRIAGE_ENABLED: "true"
+      REPORT_FIRST_CRITICAL_PUBLICATION_ENABLED: "false"
+      E2E_REPORTER_EMAIL: ${{ secrets.TEST_REPORTER_EMAIL }}
+      E2E_REPORTER_PASSWORD: ${{ secrets.TEST_REPORTER_PASSWORD }}
+      E2E_REVIEWER_EMAIL: ${{ secrets.TEST_REVIEWER_EMAIL }}
+      E2E_REVIEWER_PASSWORD: ${{ secrets.TEST_REVIEWER_PASSWORD }}
+      E2E_IMAGE_PATH: "public/demo/flood-aerial.png"
+      PRODUCTION_BASE_URL: "https://terra-response-ai.vercel.app"
+      E2E_REQUIRE_AUTHENTICATED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install frozen dependencies and Chromium
+        run: |
+          bun install --frozen-lockfile
+          bunx playwright install --with-deps chromium
+      - name: Build production server and execute authenticated staging E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "${MODEL_API_KEY:-}" ] || { echo "::error::MODEL_API_KEY is missing in staging environment."; exit 1; }
+          [ -n "${E2E_REPORTER_EMAIL:-}" ] || { echo "::error::TEST_REPORTER_EMAIL is missing in staging environment."; exit 1; }
+          [ -n "${E2E_REVIEWER_EMAIL:-}" ] || { echo "::error::TEST_REVIEWER_EMAIL is missing in staging environment."; exit 1; }
+          bun run build
+          bun run start &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/login >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          PLAYWRIGHT_BASE_URL=http://localhost:3000 bunx playwright test tests/e2e/authenticated-flow.spec.ts --project=chromium-desktop

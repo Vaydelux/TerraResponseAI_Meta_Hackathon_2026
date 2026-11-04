@@ -98,7 +98,8 @@ export async function lookupCachedAnalysis(args: {
   if (report.status !== "needs_review" && report.status !== "reviewed") {
     return null;
   }
-  const analyses = report.report_analyses ?? [];
+  const rawAnalyses = report.report_analyses;
+  const analyses = Array.isArray(rawAnalyses) ? rawAnalyses : rawAnalyses ? [rawAnalyses] : [];
   if (analyses.length === 0) return null;
   const a = analyses[0];
   if (!a || a.processing_status !== "succeeded") return null;

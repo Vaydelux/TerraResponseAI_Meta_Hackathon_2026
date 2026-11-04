@@ -44,8 +44,11 @@ The smoke tests use repository demo imagery and validate that a real model retur
 ## 4. Browser end-to-end acceptance (still required)
 
 The repository now contains an opt-in authenticated Playwright acceptance
-test at `tests/e2e/authenticated-flow.spec.ts`. It skips unless all protected
-inputs are present and the target is explicitly identified as staging. Run it
+test at `tests/e2e/authenticated-flow.spec.ts`. You can execute it directly in
+GitHub Actions via **Staging integration verification** → **Run workflow** with
+`run_authenticated_e2e = true` (which builds the standalone production server
+inside the protected `staging` environment and executes the full Reporter →
+Meta Muse Spark → Reviewer → Map loop using the staging QA secrets), or run it
 against a staging deployment with protected runner environment variables:
 
 ```bash

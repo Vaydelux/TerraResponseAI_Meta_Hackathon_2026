@@ -6,6 +6,7 @@
 // environment and are never printed or included in traces.
 
 import { readFileSync } from "node:fs";
+import sharp from "sharp";
 import { test, expect, type Page } from "@playwright/test";
 
 const reporterEmail = process.env.E2E_REPORTER_EMAIL;
@@ -58,7 +59,26 @@ test.describe("Authenticated staging acceptance flow", () => {
     expect(reporterEmail).toBeTruthy();
     expect(reviewerEmail).toBeTruthy();
     expect(reporterEmail).not.toBe(reviewerEmail);
-    const imageBytes = Array.from(readFileSync(imagePath!));
+    const seed = Date.now();
+    const stamp = Buffer.from([
+      seed & 0xff, (seed >> 8) & 0xff, (seed >> 16) & 0xff,
+      (seed >> 3) & 0xff, (seed >> 11) & 0xff, (seed >> 19) & 0xff,
+      (seed >> 5) & 0xff, (seed >> 13) & 0xff, (seed >> 21) & 0xff,
+      (seed >> 7) & 0xff, (seed >> 15) & 0xff, (seed >> 23) & 0xff,
+    ]);
+    const normalizedJpeg = await sharp(readFileSync(imagePath!))
+      .resize({ width: 768, withoutEnlargement: true })
+      .composite([
+        {
+          input: stamp,
+          raw: { width: 2, height: 2, channels: 3 },
+          left: 0,
+          top: 0,
+        },
+      ])
+      .jpeg({ quality: 82 })
+      .toBuffer();
+    const imageBytes = Array.from(normalizedJpeg);
 
     const reporterContext = await browser.newContext();
     const reporterPage = await reporterContext.newPage();
@@ -82,7 +102,7 @@ test.describe("Authenticated staging acceptance flow", () => {
         const response = await fetch("/api/reports", { method: "POST", body: form });
         return { status: response.status, body: await response.json().catch(() => null) };
       }, { imageBytes });
-      expect(upload.status, JSON.stringify(upload.body)).toBe(200);
+      expect([200, 201], JSON.stringify(upload.body)).toContain(upload.status);
       reportId = (upload.body as { reportId?: unknown }).reportId as string | undefined;
       expect(typeof reportId).toBe("string");
       if (!reportId) throw new Error("Upload response did not include a report id.");

@@ -1869,12 +1869,12 @@
   [data-slot="input"],
   [data-slot="select-trigger"],
   [data-slot="textarea"],
-  .icon-btn {
+  .icon-btn:not(.icon-btn--sm) {
     min-height: 48px;
   }
 
   [data-slot="button"][data-size="icon"],
-  .icon-btn {
+  .icon-btn:not(.icon-btn--sm) {
     min-width: 48px;
   }
 
@@ -1883,10 +1883,10 @@
     overflow: hidden;
     min-height: var(--nav-h);
     background: color-mix(in srgb, var(--sheet) 88%, transparent);
-    border-bottom-color: color-mix(in srgb, var(--tide) 24%, var(--rule));
-    box-shadow: 0 12px 35px -24px rgba(0, 0, 0, .7);
-    backdrop-filter: blur(18px) saturate(135%);
-    -webkit-backdrop-filter: blur(18px) saturate(135%);
+    border-bottom-color: color-mix(in srgb, var(--tide) 22%, var(--rule));
+    box-shadow: 0 12px 35px -24px rgba(0, 0, 0, .55);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
   }
 
   .topbar__depth {
@@ -1895,19 +1895,19 @@
     height: 2px;
     transform-origin: left center;
     transform: scaleX(calc(var(--reading-depth, 0%) / 100));
-    background: linear-gradient(90deg, var(--tide), var(--accent-violet, #7B2CBF));
-    box-shadow: 0 0 16px color-mix(in srgb, var(--tide) 70%, transparent);
+    background: linear-gradient(90deg, var(--tide), var(--brand-signal));
+    box-shadow: 0 0 14px color-mix(in srgb, var(--tide) 65%, transparent);
     pointer-events: none;
   }
 
-  .wordmark { letter-spacing: -0.035em; }
+  .wordmark { letter-spacing: -0.03em; }
   .wordmark__mark { box-shadow: 0 0 0 1px color-mix(in srgb, var(--tide) 30%, transparent), 0 8px 24px -12px var(--tide); }
 
   .nav { gap: 2px; }
   .nav__link {
     padding: 8px 11px;
     border: 1px solid transparent;
-    transition: transform var(--t-base) var(--ease-out), background-color var(--t-base), border-color var(--t-base), color var(--t-base);
+    transition: transform var(--t-base) var(--ease-spring, var(--ease-out)), background-color var(--t-base), border-color var(--t-base), color var(--t-base);
   }
   .nav__link:hover { transform: translateY(-1px); border-color: var(--rule); }
   .nav__link[aria-current="page"] {
@@ -1922,14 +1922,14 @@
     gap: var(--s-5);
     margin-bottom: var(--s-2);
   }
-  .command-page-header h1 { font-size: clamp(2rem, 1.4rem + 2.4vw, 3.8rem); letter-spacing: -0.055em; }
+  .command-page-header h1 { font-size: clamp(1.75rem, 1.35rem + 1.6vw, 2.55rem); letter-spacing: -0.028em; }
   .page-header__sub { max-width: 64ch; color: var(--ink-2); }
   .page-header__actions { flex-shrink: 0; }
 
   .panel {
     position: relative;
-    border-color: color-mix(in srgb, var(--tide) 13%, var(--rule));
-    border-radius: clamp(12px, 1.2vw, 18px);
+    border-color: color-mix(in srgb, var(--tide) 14%, var(--rule));
+    border-radius: clamp(12px, 1.2vw, 16px);
     box-shadow: var(--lift);
     background: linear-gradient(145deg, color-mix(in srgb, var(--sheet) 96%, transparent), color-mix(in srgb, var(--sheet-sunk) 28%, var(--sheet)));
   }
@@ -1939,8 +1939,8 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    background: linear-gradient(120deg, rgba(255,255,255,.08), transparent 25%, transparent 75%, rgba(73,197,214,.04));
-    opacity: .6;
+    background: linear-gradient(120deg, rgba(255,255,255,.07), transparent 25%, transparent 75%, color-mix(in srgb, var(--tide) 5%, transparent));
+    opacity: .65;
   }
   .panel--flush::before { display: none; }
 
@@ -1948,22 +1948,23 @@
     container-type: inline-size;
     container-name: telemetry;
   }
-  .kpi-card, .report-card, .triage-card { transition: transform var(--t-base) var(--ease-out), border-color var(--t-base), box-shadow var(--t-base); }
-  .kpi-card:hover, .report-card:hover, .triage-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--tide) 45%, var(--rule)); box-shadow: 0 22px 42px -26px color-mix(in srgb, var(--tide) 42%, transparent), var(--lift); }
-  .kpi-card__value { letter-spacing: -0.06em; }
+  .kpi-card, .report-card, .triage-card { transition: transform var(--t-base) var(--ease-spring, var(--ease-out)), border-color var(--t-base), box-shadow var(--t-base); }
+  .kpi-card:hover, .report-card:hover, .triage-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--tide) 42%, var(--rule)); box-shadow: 0 20px 38px -24px color-mix(in srgb, var(--tide) 38%, transparent), var(--lift); }
+  .kpi-card__value { letter-spacing: -0.04em; }
 
-  .btn { border-radius: 10px; font-weight: 650; transition: transform var(--t-base) var(--ease-out), background-color var(--t-base), border-color var(--t-base), box-shadow var(--t-base); }
+  .btn { border-radius: 10px; font-weight: 650; transition: transform var(--t-base) var(--ease-spring, var(--ease-out)), background-color var(--t-base), border-color var(--t-base), box-shadow var(--t-base); }
   .btn:hover { transform: translateY(-1px); }
-  .btn--primary { box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--tide) 90%, transparent); }
-  .btn--primary:hover { box-shadow: 0 14px 30px -14px color-mix(in srgb, var(--tide) 95%, transparent); }
+  .btn--primary { box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--tide) 85%, transparent); }
+  .btn--primary:hover { box-shadow: 0 14px 30px -14px color-mix(in srgb, var(--tide) 92%, transparent); }
 
-  .input, .select, .textarea { border-radius: 10px; background: color-mix(in srgb, var(--sheet) 78%, var(--paper)); }
+  .input, .select, .textarea { border-radius: 10px; background: color-mix(in srgb, var(--sheet) 82%, var(--paper)); }
   .input:focus-visible, .select:focus-visible, .textarea:focus-visible { transform: translateY(-1px); }
 
   .tr-status-footer {
     border-top-color: color-mix(in srgb, var(--tide) 18%, var(--rule));
-    background: color-mix(in srgb, var(--sheet) 80%, transparent);
+    background: color-mix(in srgb, var(--sheet) 84%, transparent);
     backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
   }
 
   .dashboard-ops-grid { container-type: inline-size; container-name: dashboard; }
@@ -1981,8 +1982,8 @@
   .welcome-hero-banner {
     position: relative;
     overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--tide) 28%, var(--rule));
-    border-radius: clamp(16px, 2vw, 24px);
+    border: 1px solid color-mix(in srgb, var(--tide) 26%, var(--rule));
+    border-radius: clamp(14px, 1.8vw, 20px);
     background: var(--grad-banner-wash), linear-gradient(135deg, var(--sheet), var(--sheet-sunk));
     box-shadow: var(--lift);
   }
@@ -1994,8 +1995,8 @@
     right: -8rem;
     top: -12rem;
     border-radius: 50%;
-    background: color-mix(in srgb, var(--accent-violet, var(--tide)) 16%, transparent);
-    filter: blur(24px);
+    background: radial-gradient(circle, color-mix(in srgb, var(--tide) 16%, transparent) 0%, color-mix(in srgb, var(--brand-signal) 8%, transparent) 55%, transparent 72%);
+    filter: blur(22px);
     pointer-events: none;
   }
 
@@ -2005,7 +2006,7 @@
   .table tbody tr { transition: background-color var(--t-fast), transform var(--t-fast); }
   .table tbody tr:hover { background: color-mix(in srgb, var(--tide-wash) 45%, transparent); }
 
-  .report-row { border-color: color-mix(in srgb, var(--tide) 15%, var(--rule)); border-radius: 14px; background: color-mix(in srgb, var(--sheet) 92%, transparent); transition: transform var(--t-base) var(--ease-out), border-color var(--t-base), box-shadow var(--t-base); }
+  .report-row { border-color: color-mix(in srgb, var(--tide) 15%, var(--rule)); border-radius: 14px; background: color-mix(in srgb, var(--sheet) 92%, transparent); transition: transform var(--t-base) var(--ease-spring, var(--ease-out)), border-color var(--t-base), box-shadow var(--t-base); }
   .report-row:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--tide) 42%, var(--rule)); box-shadow: var(--lift); }
   .obs { background: linear-gradient(145deg, color-mix(in srgb, var(--sheet) 94%, transparent), var(--sheet-sunk)); }
   .obs__type { color: var(--tide); letter-spacing: .02em; }

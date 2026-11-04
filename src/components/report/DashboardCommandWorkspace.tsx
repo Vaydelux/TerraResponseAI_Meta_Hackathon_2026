@@ -518,8 +518,8 @@ export function DashboardCommandWorkspace({
                     style={{
                       padding: "2px 7px",
                       borderRadius: 4,
-                      background: "var(--green-wash)",
-                      color: "var(--green-ink)",
+                      background: item.tone === "green" ? "var(--green-wash)" : item.tone === "brick" ? "var(--brick-wash)" : item.tone === "amber" ? "var(--amber-wash)" : "var(--tide-wash)",
+                      color: item.tone === "green" ? "var(--green-ink)" : item.tone === "brick" ? "var(--brick-ink)" : item.tone === "amber" ? "var(--amber-ink)" : "var(--tide)",
                       fontWeight: 700,
                       fontSize: "0.74rem",
                       whiteSpace: "nowrap",

@@ -114,7 +114,8 @@ export default async function DashboardPage() {
         structured_observation: { incident_type?: string; preliminary_severity?: number };
       }>;
     };
-    const obs = row.report_analyses?.[0]?.structured_observation ?? {};
+    const analysisEntry = Array.isArray(row.report_analyses) ? row.report_analyses[0] : row.report_analyses;
+    const obs = (analysisEntry as { structured_observation?: { incident_type?: string; preliminary_severity?: number } } | undefined)?.structured_observation ?? {};
     return {
       id: row.id,
       status: row.status,

@@ -19,12 +19,13 @@ export default async function MapPageRoute() {
   const user = await getServerUser();
   if (!user) redirect("/login?callbackUrl=" + encodeURIComponent("/map"));
   const ctx = await getAuthContext(user);
-  if (!ctx) redirect("/login?callbackUrl=" + encodeURIComponent("/map"));
+  if (!ctx) redirect("/account-unavailable");
 
   const cookieStore = await cookies();
   const cookieId = cookieStore.get("tr-active-event")?.value;
   const activeEvent =
     (cookieId ? ctx.events.find((e) => e.event_id === cookieId) : null) ??
+    ctx.events.find((e) => e.event_slug === "community-intake") ??
     ctx.events[0] ??
     null;
   const activeEventId = activeEvent?.event_id ?? null;
@@ -81,7 +82,8 @@ export default async function MapPageRoute() {
           };
         }> | null;
       };
-      const obs = row.report_analyses?.[0]?.structured_observation ?? {};
+      const analysisEntry = Array.isArray(row.report_analyses) ? row.report_analyses[0] : row.report_analyses;
+      const obs = (analysisEntry as { structured_observation?: { incident_type?: string; preliminary_severity?: number; summary_en?: string } } | undefined)?.structured_observation ?? {};
       return {
         id: row.id,
         title: row.title,

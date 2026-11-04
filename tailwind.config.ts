@@ -12,10 +12,12 @@ const config: Config = {
   	extend: {
 		colors: {
 			brand: {
-				obsidian: "#07070a",
-				teal: "#49c5d6",
-				silver: "#f4f4f7",
-				steel: "#9298a5",
+				obsidian: "#0b1217",
+				surface: "var(--sheet)",
+				teal: "#48b5c6",
+				coral: "#ff8552",
+				silver: "#ecf2f5",
+				steel: "#8799a6",
 			},
 			hazard: {
 				critical: "var(--brick)",

@@ -122,7 +122,7 @@ interface ReviewBody {
 }
 
 function readObservation(detail: ReportDetail): ObservationData {
-  const a = detail.report_analyses?.[0];
+  const a = Array.isArray(detail.report_analyses) ? detail.report_analyses[0] : detail.report_analyses;
   const obs = (a?.structured_observation ?? {}) as Record<string, unknown>;
   return {
     incidentType: (obs.incident_type as string) ?? null,
@@ -249,9 +249,10 @@ export function ReviewWorkbench({
   }
 
   const observation = readObservation(detail);
-  const rawStructuredObs = (detail.report_analyses?.[0]?.structured_observation ?? {}) as Record<string, unknown>;
+  const primaryAnalysis = Array.isArray(detail.report_analyses) ? detail.report_analyses[0] : detail.report_analyses;
+  const rawStructuredObs = ((primaryAnalysis as { structured_observation?: Record<string, unknown> } | undefined)?.structured_observation ?? {}) as Record<string, unknown>;
   const rawAnalysisMetadata =
-    detail.report_analyses?.[0]?.raw_usage_metadata ?? null;
+    (primaryAnalysis as { raw_usage_metadata?: Record<string, unknown> | null } | undefined)?.raw_usage_metadata ?? null;
   const initialContextualIntelligence =
     ((rawAnalysisMetadata?.contextual_intelligence ??
       rawStructuredObs.contextual_intelligence) as ContextualIntelligenceData | undefined) ?? null;

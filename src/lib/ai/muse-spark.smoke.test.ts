@@ -14,6 +14,8 @@
 
 import { describe, it, expect } from "vitest";
 import { analyzeImage } from "@/lib/ai/muse-spark";
+import { PROMPT_VERSION } from "@/lib/ai/prompt";
+import { OBSERVATION_SCHEMA_VERSION } from "@/lib/ai/observation-schema";
 import sharp from "sharp";
 import { readFileSync } from "node:fs";
 
@@ -43,8 +45,8 @@ describe.skipIf(SKIP)("muse-spark live smoke test", () => {
     expect(result.observation.needs_review).toBe(true);
     expect(result.observation.visible_evidence.length).toBeGreaterThan(0);
     expect(result.modelId).toBe("muse-spark-1.3");
-    expect(result.promptVersion).toBe("v1");
-    expect(result.schemaVersion).toBe("v2");
+    expect(result.promptVersion).toBe(PROMPT_VERSION);
+    expect(result.schemaVersion).toBe(OBSERVATION_SCHEMA_VERSION);
 
     console.log("[smoke] Validated observation received (content withheld from CI logs).");
     console.log("[smoke] usage:", result.usageMetadata);
