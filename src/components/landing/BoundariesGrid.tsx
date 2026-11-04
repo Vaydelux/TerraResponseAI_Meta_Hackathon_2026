@@ -15,7 +15,7 @@ const BOUNDARIES = [
   {
     icon: Shield,
     title: "No hallucinated coordinates or PII",
-    body: "Models are strictly forbidden from guessing ungrounded GPS or facial recognition. Unverified reports never appear on tactical maps.",
+    body: "Location comes from supplied evidence or a manual pin, never an AI guess. AI observations retain an unverified label until a human review decision.",
   },
   {
     icon: RadioTower,
@@ -30,42 +30,42 @@ const BOUNDARIES = [
   {
     icon: History,
     title: "Non-destructive corrections",
-    body: "Reviewer corrections never destroy original model predictions. Both states are cryptographically chained in immutable audit tables.",
+    body: "Reviewer corrections are recorded separately from original model predictions, preserving the distinction between an AI proposal and a human decision.",
   },
 ];
 
 export function BoundariesGrid({ className }: BoundariesGridProps) {
   return (
-    <section className={cn("mt-14 sm:mt-16 md:mt-20", className)}>
-      <div className="mb-6">
-        <span className="text-xs font-mono font-semibold text-cyan-400 uppercase tracking-wider block mb-1">
+    <section aria-labelledby="boundaries-heading" className={cn("mt-12 grid min-w-0 gap-6 sm:mt-16", className)}>
+      <div className="grid gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--tide)]">
           Safety Safeguards
         </span>
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100 mb-2">
+        <h2 id="boundaries-heading" className="font-[family-name:var(--font-display)] text-[length:var(--step-3)] font-bold text-[var(--ink)]">
           Responsible AI Guardrails
         </h2>
-        <p className="text-sm sm:text-base text-slate-400 max-w-2xl leading-relaxed">
+        <p className="max-w-2xl text-sm leading-relaxed text-[var(--ink-2)]">
           Artificial intelligence serves as an operational decision-support tool.
           The human supervisor is always the sole authority.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid min-w-0 gap-4 md:grid-cols-2 min-[1200px]:grid-cols-4">
         {BOUNDARIES.map((b) => {
           const Icon = b.icon;
           return (
             <div
               key={b.title}
-              className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 flex flex-col justify-between hover:border-slate-700 transition-colors shadow-sm"
+              className="grid min-w-0 content-start gap-4 rounded-[var(--r-panel)] border border-[var(--rule)] bg-[var(--sheet)] p-4 sm:p-6"
             >
-              <div>
-                <div className="w-9 h-9 rounded-lg bg-slate-800/80 border border-slate-700 flex items-center justify-center text-cyan-400 mb-3.5">
-                  <Icon className="w-4 h-4" />
+              <div className="grid min-w-0 gap-4">
+                <div className="grid size-12 place-items-center rounded-[var(--r-ctl)] bg-[var(--tide-wash)] text-[var(--tide)]">
+                  <Icon size={22} aria-hidden="true" />
                 </div>
-                <h3 className="text-sm sm:text-base font-semibold text-slate-200 mb-2 leading-snug">
+                <h3 className="text-base font-semibold leading-snug text-[var(--ink)]">
                   {b.title}
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                <p className="text-sm leading-relaxed text-[var(--ink-2)]">
                   {b.body}
                 </p>
               </div>

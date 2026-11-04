@@ -46,6 +46,7 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "off",
+    channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
   },
   projects: [
     // Desktop Chromium
@@ -53,14 +54,16 @@ export default defineConfig({
       name: "chromium-desktop",
       use: {
         ...devices["Desktop Chrome"],
-        viewport: { width: 1280, height: 720 },
+        viewport: { width: 1440, height: 900 },
       },
     },
-    // Mobile viewport (the brief: "Test mobile viewport")
+    { name: "chromium-tablet", use: { ...devices["Desktop Chrome"], viewport: { width: 768, height: 1024 } } },
+    // Smallest supported mobile viewport.
     {
       name: "chromium-mobile",
       use: {
         ...devices["Pixel 5"],
+        viewport: { width: 320, height: 800 },
       },
     },
   ],
@@ -69,7 +72,7 @@ export default defineConfig({
   // before a release.
   ...(process.env.PLAYWRIGHT_BASE_URL ? {} : {
     webServer: {
-      command: "bun run build && bun run start",
+      command: "node scripts/local-demo-check.mjs serve",
       url: "http://localhost:3000",
       reuseExistingServer: false,
       timeout: 120 * 1000,

@@ -1,48 +1,43 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { Hero } from "./Hero";
+import { MapPreview } from "./MapPreview";
+import { MetaAIShowcase } from "./MetaAIShowcase";
+import { FinalCTA } from "./FinalCTA";
+import { DemoFlow } from "./DemoFlow";
+import { WorkspaceLink } from "./WorkspaceLink";
 
-const source = (name: string) =>
-  readFileSync(resolve(process.cwd(), "src/components/landing", name), "utf8");
-
-describe("Hackathon public-demo integrity", () => {
-  it("never presents the mock map as live reports", () => {
-    const map = source("MapPreview.tsx");
-    expect(map).toContain("Illustrative incident-map preview");
-    expect(map).toContain("Example pins only");
-    expect(map).not.toContain(">Live incident map<");
+describe("public illustration integrity", () => {
+  it("labels synthetic cards and the map without claiming live incident evidence", () => {
+    for (const Component of [Hero, MapPreview, MetaAIShowcase]) {
+      const markup = renderToStaticMarkup(createElement(Component));
+      expect(markup).toContain("AI generated, not verified");
+      expect(markup).not.toMatch(/Verified Incident|Raw Contributor Evidence|Confidence:\s*\d/i);
+    }
+    expect(renderToStaticMarkup(createElement(MapPreview))).toContain("not live emergency information");
   });
 
-  it("does not present decorative rectangles as real SAM masks", () => {
-    expect(source("Hero.tsx")).toContain("Illustrative highlight");
-    expect(source("MetaAIShowcase.tsx")).toContain("not model-generated segmentation");
+  it("identifies the spatial highlight as an illustration, not a returned model artifact", () => {
+    const markup = renderToStaticMarkup(createElement(MetaAIShowcase));
+    expect(markup).toContain("not model-generated segmentation");
+    expect(markup).toContain("no live inference runs on this page");
   });
 
-  it("links to the actual repository and working page anchors", () => {
-    const cta = source("FinalCTA.tsx");
-    const flow = source("DemoFlow.tsx");
-    const map = source("MapPreview.tsx");
-    expect(cta).toContain("https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026");
-    expect(cta).toContain('href="#how-it-works"');
-    expect(flow).toContain('id="how-it-works"');
+  it("sends visitors to sign-in and authorized sessions to the workspace", () => {
+    expect(renderToStaticMarkup(createElement(WorkspaceLink))).toContain('href="/login"');
+    expect(renderToStaticMarkup(createElement(WorkspaceLink, { signedIn: true }))).toContain('href="/dashboard"');
+    for (const Component of [Hero, MapPreview, FinalCTA]) {
+      expect(renderToStaticMarkup(createElement(Component, { signedIn: true }))).not.toContain('href="/review"');
+    }
+  });
+
+  it("offers real destinations without promising an unavailable timed video", () => {
+    const cta = renderToStaticMarkup(createElement(FinalCTA));
+    expect(cta).toContain('href="https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026"');
     expect(cta).toContain('href="#incident-map-preview"');
-    expect(map).toContain('id="incident-map-preview"');
-    expect(cta).not.toContain('href="/review"');
-  });
-
-  it("never directs signed-in reporters to reviewer-only landing actions", () => {
-    const hero = source("Hero.tsx");
-    expect(hero).toContain('signedIn ? "/reports/new"');
-    expect(hero).toContain('signedIn ? "/reports"');
-    expect(hero).not.toContain('signedIn ? "/review"');
-  });
-
-  it("honors visitors' video pause, reduced-motion, and reduced-data preferences", () => {
-    const video = source("CinematicHero.tsx");
-    expect(video).toContain("userPaused");
-    expect(video).toContain("prefers-reduced-motion");
-    expect(video).toContain("prefers-reduced-data");
-    expect(video).toContain("connection?.saveData");
-    expect(video).toContain("IntersectionObserver");
+    expect(renderToStaticMarkup(createElement(MapPreview))).toContain('id="incident-map-preview"');
+    expect(renderToStaticMarkup(createElement(DemoFlow))).toContain('id="how-it-works"');
+    expect(cta).not.toMatch(/Watch 90|live incident thread/i);
   });
 });

@@ -1,66 +1,10 @@
-// src/components/map/MapLegend.tsx
-//
-// The map legend (components.css map.css §7.7). A small floating
-// panel at the bottom-left (bottom-right on mobile per the CSS)
-// explaining the pin states:
-//   - solid green = confirmed by a human
-//   - hatched amber = pending review (AI-generated, not verified)
-//   - ring weight = severity (1–5)
-//   - size = constant (never scaled by priority — pins never imply
-//     triage).
-//
-// Server-component friendly.
+export interface MapLegendProps { className?: string; showPending?: boolean }
 
-import { cn } from "@/lib/utils";
-
-export interface MapLegendProps {
-  className?: string;
-  /** When true, the legend includes the "pending" row (the user has
-   *  the "show pending" toggle on). */
-  showPending?: boolean;
-}
-
-export function MapLegend({ className, showPending }: MapLegendProps) {
-  return (
-    <div className={cn("legend", className)} aria-label="Map legend">
-      <div className="legend__row">
-        <span
-          className="pin"
-          aria-hidden="true"
-          data-state="confirmed"
-          style={{ position: "static", width: 14, height: 14, boxShadow: "none" }}
-        />
-        <span>Confirmed by a human</span>
-      </div>
-      {showPending && (
-        <div className="legend__row">
-          <span
-            className="pin"
-            aria-hidden="true"
-            data-state="pending"
-            style={{ position: "static", width: 14, height: 14, boxShadow: "none" }}
-          />
-          <span>Pending review</span>
-        </div>
-      )}
-      <div className="legend__row">
-        <span
-          aria-hidden="true"
-          style={{ display: "inline-grid", gap: 4, gridAutoFlow: "column", alignItems: "center" }}
-        >
-          {[1, 2, 3, 4, 5].map((s) => (
-            <span
-              key={s}
-              className="pin"
-              data-state="confirmed"
-              data-sev={s}
-              style={{ position: "static", width: 12, height: 12, boxShadow: "none" }}
-            />
-          ))}
-        </span>
-        <span>Ring weight = severity (1–5)</span>
-      </div>
-      <div className="legend__row t-meta">Pin size is constant — never implies triage</div>
-    </div>
-  );
+/** A normal-flow legend; verification meaning is never placed over the map image. */
+export function MapLegend({ className = "", showPending = false }: MapLegendProps) {
+  return <div className={`grid min-w-0 gap-2 rounded-panel border border-rule bg-sheet p-3 text-sm text-ink ${className}`} aria-label="Map legend">
+    <div className="flex items-center gap-2"><span aria-hidden="true" className="size-3 shrink-0 rounded-full bg-[var(--green)]" /><span>Confirmed by a human</span></div>
+    {showPending && <div className="flex items-center gap-2"><span aria-hidden="true" className="size-3 shrink-0 rounded-full border-2 border-dashed border-[var(--amber-ink)] bg-[var(--amber-wash)]" /><span>AI generated, not verified</span></div>}
+    <p className="text-xs text-[var(--ink-3)]">Ring weight represents provisional severity 1–5. Pin size is constant; it does not imply dispatch.</p>
+  </div>;
 }

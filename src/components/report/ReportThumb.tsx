@@ -1,118 +1,56 @@
-// src/components/report/ReportThumb.tsx
-//
-// A small thumbnail component for report rows + map panels. The
-// report's thumbnail is fetched via a signed URL — but signing a URL
-// on the server for each row is expensive (the rate limit is 60/min
-// per user). Instead, we render a placeholder block that uses the
-// report's status-derived color (the sheet-sunk background by
-// default). The actual thumbnail is loaded client-side via
-// /api/reports/[id]/evidence?kind=thumbnail if available — this
-// component handles that fetch.
-//
-// Client component — needs the fetch + image error handling. The
-// fallback (when the signed URL fetch fails or the report is purged)
-// is a neutral block with the Seal glyph as the placeholder.
-
 "use client";
 
 import { useEffect, useState } from "react";
-import { type VerificationState, SEAL_CLASS } from "@/lib/design/status";
+import { ImageOff, LoaderCircle, RotateCcw } from "lucide-react";
+import type { VerificationState } from "@/lib/design/status";
+import { cn } from "@/lib/utils";
+import { workspaceAction } from "@/lib/workspace/presentation";
 
 export interface ReportThumbProps {
   reportId: string;
-  /** When true (default), fetches a thumbnail signed URL on mount. */
   loadSignedUrl?: boolean;
-  /** The verification state — used for the placeholder glyph color. */
   state: VerificationState;
   alt: string;
-  /** Optional className — overrides the default .report-row__thumb. */
   className?: string;
+  /** Use only in full evidence views, never inside a clickable report row. */
+  showRetry?: boolean;
 }
 
-/**
- * Inline state-icon glyph for the placeholder (mirrors the SealBadge
- * icon set). Kept local to ReportThumb so we don't need a separate
- * SealIcons file.
- */
-function ThumbGlyph({ state }: { state: VerificationState }) {
-  const paths: Record<VerificationState, string> = {
-    pending:   "M9 9a3 3 0 1 1 4 3c-.7.4-1 .8-1 2M12 17h.01",
-    confirmed: "M5 12l5 5L20 7",
-    corrected: "M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4",
-    flagged:   "M5 21V4M5 4h11l-2 4 2 4H5",
-    rejected:  "M6 6l12 12M18 6L6 18",
-    failed:    "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM5 5l14 14",
-  };
-  const dashed = state === "pending" || state === "failed";
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={dashed ? 1.5 : 2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeDasharray={dashed ? "3 2" : undefined}
-      aria-hidden="true"
-    >
-      <path d={paths[state]} />
-    </svg>
-  );
-}
-
-export function ReportThumb({
-  reportId,
-  loadSignedUrl = true,
-  state,
-  alt,
-  className = "report-row__thumb",
-}: ReportThumbProps) {
+function SignedReportThumb({ reportId, loadSignedUrl = true, alt, className = "report-row__thumb", showRetry = false }: ReportThumbProps) {
   const [src, setSrc] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
+  const [failed, setFailed] = useState(!loadSignedUrl);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!loadSignedUrl) return;
-    let aborted = false;
-    fetch(`/api/reports/${reportId}/evidence?kind=thumbnail`)
-      .then((r) => r.json())
-      .then((body) => {
-        if (aborted) return;
-        if (body?.ok && body.signedUrl) setSrc(body.signedUrl);
-        else setFailed(true);
-      })
-      .catch(() => {
-        if (!aborted) setFailed(true);
-      });
-    return () => {
-      aborted = true;
-    };
-  }, [reportId, loadSignedUrl]);
+    const controller = new AbortController();
+    let disposed = false;
+    const timeout = setTimeout(() => { if (!disposed) { setFailed(true); controller.abort(); } }, 12000);
+    async function load() {
+      try {
+        const response = await fetch(`/api/reports/${encodeURIComponent(reportId)}/evidence?kind=thumbnail`, { signal: controller.signal });
+        if (!response.ok) throw new Error("Evidence unavailable");
+        const body: unknown = await response.json();
+        if (typeof body !== "object" || body === null || !("ok" in body) || !body.ok || !("signedUrl" in body) || typeof body.signedUrl !== "string") throw new Error("Evidence unavailable");
+        const url = new URL(body.signedUrl, window.location.origin);
+        if (url.protocol !== "https:" && !(url.protocol === "http:" && url.origin === window.location.origin)) throw new Error("Evidence unavailable");
+        if (!disposed && !controller.signal.aborted) setSrc(url.href);
+      } catch {
+        if (!disposed) setFailed(true);
+      } finally { clearTimeout(timeout); }
+    }
+    void load();
+    return () => { disposed = true; clearTimeout(timeout); controller.abort(); };
+  }, [reportId, loadSignedUrl, attempt]);
 
-  if (src && !failed) {
-    return <img className={className} src={src} alt={alt} loading="lazy" />;
-  }
+  if (src && !failed) return <img className={className} src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} />;
+  const Icon = failed ? ImageOff : LoaderCircle;
+  return <span className={cn(className, "grid content-center justify-items-center gap-3 bg-[var(--sheet-sunk)] p-3 text-[var(--ink-3)]")} role={showRetry ? "group" : "img"} aria-label={`${alt}. ${failed ? "Evidence image unavailable" : "Loading evidence image"}`}>
+    <Icon className={cn("size-6", !failed && "animate-spin motion-reduce:animate-none")} aria-hidden="true" />
+    {showRetry && <><span className="text-center text-xs">{failed ? "Evidence image unavailable" : "Loading private evidence…"}</span>{failed && loadSignedUrl && <button type="button" className={`${workspaceAction} text-xs`} onClick={(event) => { event.stopPropagation(); setSrc(null); setFailed(false); setAttempt((value) => value + 1); }}><RotateCcw size={14} aria-hidden="true" />Retry image</button>}</>}
+  </span>;
+}
 
-  // Placeholder: the Seal glyph in the state color, centered on the
-  // sheet-sunk background. The color comes from the SEAL_CLASS so it
-  // matches the SealBadge in the same row.
-  return (
-    <span
-      className={className}
-      aria-hidden="true"
-      style={{
-        display: "grid",
-        placeItems: "center",
-        color: state === "pending" ? "var(--amber-ink)" :
-               state === "confirmed" ? "var(--green)" :
-               state === "corrected" ? "var(--tide)" :
-               state === "flagged" ? "var(--amber-ink)" :
-               state === "rejected" ? "var(--brick-ink)" :
-               "var(--graphite)",
-      }}
-    >
-      <ThumbGlyph state={state} />
-    </span>
-  );
+/** Keying by identity prevents a previous report's image or error state leaking into a new selection. */
+export function ReportThumb(props: ReportThumbProps) {
+  return <SignedReportThumb key={`${props.reportId}:${props.loadSignedUrl !== false}`} {...props} />;
 }

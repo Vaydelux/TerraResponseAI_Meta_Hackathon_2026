@@ -52,7 +52,7 @@ export function RegionalAlertOverlay({
   return (
     <>
       <div
-        className="absolute top-12 left-3 z-20 pointer-events-auto max-w-[calc(100%-80px)] sm:max-w-md"
+        className="grid min-w-0 max-w-full"
         data-testid="regional-alert-container"
       >
         <AnimatePresence mode="wait">

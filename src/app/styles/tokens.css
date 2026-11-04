@@ -34,6 +34,7 @@
   --on-green:     #FFFFFF;   /* label on human-confirmed seal */
   --brand-signal: #E66A3D;   /* broadcast mark ONLY; not severity */
   --brand-tile:   #0B2432;
+  --on-brand-tile: #F5F7F7;  /* stable light ink on cinematic dark surfaces */
 
   /* Verification states — each means exactly one thing */
   --amber:        #E8A317;   /* AI-generated, not verified (hatch + fills) */

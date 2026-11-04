@@ -1,8 +1,3 @@
-// src/components/layout/AppShell.tsx
-//
-// Wraps the authenticated routes in the `tr-shell` grid (topbar + body + footer).
-// Renders the TopBar + DemoBanner + main content area + operational status footer.
-
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { TopBar } from "./TopBar";
@@ -17,6 +12,8 @@ export interface AppShellProps {
   children: ReactNode;
 }
 
+const FOOTER_LINK = "inline-flex min-h-11 items-center rounded-ctl px-2 text-[var(--ink-2)] underline-offset-4 transition-colors hover:text-tide hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tide active:bg-[var(--tide-wash)] motion-reduce:transition-none";
+
 export function AppShell({
   ctx,
   pendingReviewCount,
@@ -25,40 +22,23 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <div className="tr-shell command-shell" style={{ gridTemplateRows: "var(--nav-h) auto 1fr auto" }}>
-      <TopBar
-        ctx={ctx}
-        pendingReviewCount={pendingReviewCount}
-        showIncidentNotifications={showIncidentNotifications}
-        showRoleManagement={showRoleManagement}
-      />
+    <div className="isolate grid min-h-dvh min-w-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] bg-paper">
+      <TopBar ctx={ctx} pendingReviewCount={pendingReviewCount}
+        showIncidentNotifications={showIncidentNotifications} showRoleManagement={showRoleManagement} />
       <DemoBanner />
-      <main id="main-content" tabIndex={-1}>
+      <main id="main-content" tabIndex={-1} className="relative z-0 min-w-0">
         {children}
       </main>
-      <footer className="tr-status-footer">
-        <span>
-          TerraResponse AI · Civic Tech Disaster Coordination &amp; Humanitarian Logistics
-        </span>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "var(--s-4)",
-          }}
-        >
-          <span>Encrypted EOC Node · Human-Supervised Verification · RLS-Enforced</span>
-          <Link href="/dashboard" style={{ color: "var(--ink-2)", textDecoration: "none" }}>
-            Protocols &amp; SOP
-          </Link>
-          <Link href="/map" style={{ color: "var(--ink-2)", textDecoration: "none" }}>
-            Sector Map
-          </Link>
-          <Link href="/profile" style={{ color: "var(--ink-2)", textDecoration: "none" }}>
-            Privacy Framework
-          </Link>
+      <footer className="flex min-w-0 flex-col gap-3 border-t border-rule bg-sheet px-3 py-4 text-xs sm:px-6 min-[1025px]:flex-row min-[1025px]:items-center min-[1025px]:justify-between">
+        <div className="grid min-w-0 gap-1">
+          <span className="break-words font-semibold text-ink">TerraResponse AI · Decision-support prototype</span>
+          <span className="break-words text-[var(--ink-3)]">Human review required. No automatic dispatch.</span>
         </div>
+        <nav aria-label="Footer" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <Link href="/dashboard" className={FOOTER_LINK}>Workspace</Link>
+          <Link href="/map" className={FOOTER_LINK}>Incident map</Link>
+          <Link href="/profile" className={FOOTER_LINK}>Profile</Link>
+        </nav>
       </footer>
     </div>
   );

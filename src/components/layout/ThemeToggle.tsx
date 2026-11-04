@@ -6,12 +6,13 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { Sun, Moon, Monitor, Check, ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Sun, Moon, Monitor, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -64,19 +65,22 @@ export function readInitialTheme(): ThemeMode {
 }
 
 export function ThemeToggle() {
-  const [mode, setMode] = useState<ThemeMode>(() => {
-    if (typeof window === "undefined") return "system";
-    return readInitialTheme();
-  });
+  // The initial markup must match server rendering; storage is synchronized after mount.
+  const [mode, setMode] = useState<ThemeMode>("system");
+  const modeRef = useRef<ThemeMode>("system");
 
   useEffect(() => {
-    applyMode(mode);
+    const initial = readInitialTheme();
+    modeRef.current = initial;
+    setMode(initial);
+    applyMode(initial);
 
     const onExternalChange = (e: Event) => {
       const custom = e as CustomEvent<{ mode: ThemeMode; isNight: boolean }>;
       if (custom.detail?.mode) {
         const nextMode = custom.detail.mode;
         if (nextMode === "system" || nextMode === "light" || nextMode === "dark") {
+          modeRef.current = nextMode;
           setMode(nextMode);
         }
       }
@@ -84,7 +88,7 @@ export function ThemeToggle() {
 
     const mql = window.matchMedia?.("(prefers-color-scheme: dark)");
     const onMediaChange = () => {
-      const current = readInitialTheme();
+      const current = modeRef.current;
       if (current === "system") applyMode("system");
     };
 
@@ -94,9 +98,10 @@ export function ThemeToggle() {
       window.removeEventListener("tr-theme-change", onExternalChange);
       mql?.removeEventListener?.("change", onMediaChange);
     };
-  }, [mode]);
+  }, []);
 
   function change(next: ThemeMode) {
+    modeRef.current = next;
     setMode(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
@@ -129,65 +134,16 @@ export function ThemeToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 px-3 gap-2 border-slate-700/80 bg-slate-900/60 hover:bg-slate-800 text-slate-200 hover:text-white rounded-lg transition-colors font-medium text-xs focus-visible:ring-1 focus-visible:ring-cyan-500"
-          aria-label="Select theme"
-        >
-          <ActiveIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-          <span className="hidden sm:inline capitalize">{activeLabel}</span>
-          <ChevronDown className="w-3 h-3 text-slate-400 shrink-0 opacity-70" />
+        <Button variant="outline" size="sm" className="min-h-11 min-w-11 gap-2 rounded-ctl border-rule bg-sheet px-3 text-ink transition-colors hover:bg-[var(--tide-wash)] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tide active:bg-[var(--sheet-sunk)] motion-reduce:transition-none" aria-label={`Select theme. Current: ${activeLabel}`}>
+          <ActiveIcon className="size-4 shrink-0 text-tide" aria-hidden="true" /><span className="hidden sm:inline">{activeLabel}</span><ChevronDown className="hidden size-3 shrink-0 sm:block" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-36 bg-slate-950/95 border-slate-800 text-slate-200 shadow-xl backdrop-blur-md rounded-xl p-1"
-      >
-        <DropdownMenuItem
-          onClick={() => change("light")}
-          className={`flex items-center justify-between text-xs py-2 px-2.5 rounded-lg cursor-pointer ${
-            mode === "light"
-              ? "bg-cyan-950/60 text-cyan-300 font-semibold"
-              : "hover:bg-slate-800/80 text-slate-300"
-          }`}
-        >
-          <span className="flex items-center gap-2">
-            <Sun className="w-3.5 h-3.5 text-amber-400" />
-            Light
-          </span>
-          {mode === "light" && <Check className="w-3.5 h-3.5 text-cyan-400" />}
-        </DropdownMenuItem>
-
-        <DropdownMenuItem
-          onClick={() => change("dark")}
-          className={`flex items-center justify-between text-xs py-2 px-2.5 rounded-lg cursor-pointer ${
-            mode === "dark"
-              ? "bg-cyan-950/60 text-cyan-300 font-semibold"
-              : "hover:bg-slate-800/80 text-slate-300"
-          }`}
-        >
-          <span className="flex items-center gap-2">
-            <Moon className="w-3.5 h-3.5 text-cyan-400" />
-            Dark
-          </span>
-          {mode === "dark" && <Check className="w-3.5 h-3.5 text-cyan-400" />}
-        </DropdownMenuItem>
-
-        <DropdownMenuItem
-          onClick={() => change("system")}
-          className={`flex items-center justify-between text-xs py-2 px-2.5 rounded-lg cursor-pointer ${
-            mode === "system"
-              ? "bg-cyan-950/60 text-cyan-300 font-semibold"
-              : "hover:bg-slate-800/80 text-slate-300"
-          }`}
-        >
-          <span className="flex items-center gap-2">
-            <Monitor className="w-3.5 h-3.5 text-slate-400" />
-            System
-          </span>
-          {mode === "system" && <Check className="w-3.5 h-3.5 text-cyan-400" />}
-        </DropdownMenuItem>
+      <DropdownMenuContent align="end" className="w-44 max-w-[calc(100vw-24px)] rounded-panel border-rule bg-sheet p-1 text-ink shadow-md motion-reduce:animate-none">
+        <DropdownMenuRadioGroup value={mode} onValueChange={(value) => change(value as ThemeMode)}>
+          {([{ value: "light", label: "Light", icon: Sun }, { value: "dark", label: "Dark", icon: Moon }, { value: "system", label: "System", icon: Monitor }] as const).map(({ value, label, icon: Icon }) => (
+            <DropdownMenuRadioItem key={value} value={value} className="min-h-11 cursor-pointer gap-2 rounded-ctl pr-3 text-sm text-ink data-[state=checked]:bg-[var(--tide-wash)] data-[state=checked]:font-semibold data-[highlighted]:bg-[var(--sheet-sunk)] data-[highlighted]:text-ink focus-visible:outline-2 focus-visible:outline-tide active:bg-[var(--tide-wash)]"><Icon className="size-4 text-tide" aria-hidden="true" />{label}</DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { animate } from "framer-motion";
+import { animate, useReducedMotion } from "framer-motion";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
@@ -60,6 +60,9 @@ import { toSeverityLevel } from "@/lib/design/severity";
 import { formatRelativeTime } from "@/lib/design/format";
 import { readInitialTheme, resolveIsNight } from "@/components/layout/ThemeToggle";
 import { cn } from "@/lib/utils";
+import { buildSurveyStyle } from "./survey-style";
+import { formatCoords } from "@/lib/design/format";
+import { workspaceAction } from "@/lib/workspace/presentation";
 
 /** Zoom threshold at or above which custom hazard type text labels are shown on map pins. */
 const ZOOM_HAZARD_LABEL_THRESHOLD = 12;
@@ -79,6 +82,7 @@ export interface IncidentMapReport {
   uploaded_at?: string;
   incidentType?: string | null;
   summary?: string | null;
+  location_source?: string;
 }
 
 export interface IncidentMapProps {
@@ -87,44 +91,6 @@ export interface IncidentMapProps {
   canReview?: boolean;
   reports: IncidentMapReport[];
   className?: string;
-}
-
-function buildSurveyStyle(isNight: boolean) {
-  return {
-    version: 8 as const,
-    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-    sources: {
-      "osm-tiles": {
-        type: "raster" as const,
-        tiles: [
-          "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        ],
-        tileSize: 256,
-        attribution: "OpenStreetMap contributors",
-      },
-    },
-    layers: [
-      {
-        id: "background",
-        type: "background" as const,
-        paint: { "background-color": isNight ? "#0B141A" : "#E9EDE8" },
-      },
-      {
-        id: "tiles",
-        type: "raster" as const,
-        source: "osm-tiles",
-        paint: {
-          "raster-saturation": isNight ? -0.75 : -0.4,
-          "raster-contrast": isNight ? 0.25 : 0.05,
-          "raster-brightness-max": isNight ? 0.42 : 1.0,
-          "raster-brightness-min": isNight ? 0.04 : 0.0,
-          "raster-opacity": 0.88,
-        },
-      },
-    ],
-  };
 }
 
 const INCIDENT_LABEL: Record<string, string> = {
@@ -199,7 +165,9 @@ export function IncidentMap({
   const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
-  const fetchControllerRef = useRef<AbortController | null>(null);
+  const reducedMotion = useReducedMotion();
+  const [mapAttempt, setMapAttempt] = useState(0);
+  const [mapStatus, setMapStatus] = useState<"loading" | "ready" | "tiles-unavailable" | "unavailable">("loading");
 
   const [pendingMode, setPendingMode] = useState<PendingFilterMode>("all");
   const [selectedHazards, setSelectedHazards] = useState<HazardCategoryId[]>([]);
@@ -208,34 +176,36 @@ export function IncidentMap({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [scrubberPct, setScrubberPct] = useState<number>(100);
   const [selected, setSelected] = useState<IncidentMapReport | null>(reports[0] ?? null);
-  const [liveReports, setLiveReports] = useState<IncidentMapReport[]>(reports);
+  const loadedReports = reports;
   const [mapZoom, setMapZoom] = useState<number>(11);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lon: number }>({
     lat: reports[0]?.latitude ?? 14.6,
     lon: reports[0]?.longitude ?? 121.0,
   });
-  const [snapshotStatus, setSnapshotStatus] = useState<"idle" | "rendering" | "saved">("idle");
+  const [snapshotStatus, setSnapshotStatus] = useState<"idle" | "rendering" | "requested" | "failed">("idle");
   const [viewMode, setViewMode] = useState<"map" | "split">("split");
 
   function handleZoomIn() {
-    mapRef.current?.zoomIn({ duration: 300 });
+    mapRef.current?.zoomIn({ duration: reducedMotion ? 0 : 300 });
   }
   function handleZoomOut() {
-    mapRef.current?.zoomOut({ duration: 300 });
+    mapRef.current?.zoomOut({ duration: reducedMotion ? 0 : 300 });
   }
   function handleRecenter() {
-    if (reports[0] && Number.isFinite(reports[0].latitude)) {
-      mapRef.current?.flyTo({ center: [reports[0].longitude, reports[0].latitude], zoom: 12, duration: 600 });
+    const firstLocated = reports.find((report) => Number.isFinite(report.latitude) &&
+      Number.isFinite(report.longitude) && Math.abs(report.latitude) <= 90 && Math.abs(report.longitude) <= 180);
+    if (firstLocated) {
+      mapRef.current?.flyTo({ center: [firstLocated.longitude, firstLocated.latitude], zoom: 12, duration: reducedMotion ? 0 : 600 });
     } else {
-      mapRef.current?.flyTo({ center: [121.0, 14.6], zoom: 11, duration: 600 });
+      mapRef.current?.flyTo({ center: [121.0, 14.6], zoom: 11, duration: reducedMotion ? 0 : 600 });
     }
   }
 
-  // Localized weather/seismic alert state fetched from Google Search Grounding on region pan
+  // Optional regional context is fetched only after an explicit user request.
   const [regionalAlert, setRegionalAlert] = useState<RegionalHazardAlert | null>(null);
   const [alertLoading, setAlertLoading] = useState<boolean>(false);
   const [alertDismissed, setAlertDismissed] = useState<boolean>(false);
-  const lastAlertCenterRef = useRef<{ lat: number; lon: number } | null>(null);
+  const [alertError, setAlertError] = useState<string | null>(null);
   const alertAbortRef = useRef<AbortController | null>(null);
 
   const fetchRegionalAlertForCoords = useCallback(
@@ -245,6 +215,7 @@ export function IncidentMap({
       alertAbortRef.current = ctrl;
 
       setAlertLoading(true);
+      setAlertError(null);
       if (forceShow) {
         setAlertDismissed(false);
       }
@@ -257,15 +228,28 @@ export function IncidentMap({
         const res = await fetch(`/api/map/alerts?${params.toString()}`, {
           signal: ctrl.signal,
         });
-        if (!res.ok) return;
+        if (!res.ok) throw new Error("Regional context unavailable");
         const body = await res.json();
-        if (!ctrl.signal.aborted && body?.ok && body.alert) {
-          setRegionalAlert(body.alert as RegionalHazardAlert);
-          setAlertDismissed(false);
-          lastAlertCenterRef.current = { lat, lon };
-        }
+        if (ctrl.signal.aborted) return;
+        const alert = body?.alert;
+        const coordinates = alert?.coordinates;
+        const validSources = Array.isArray(alert?.sources) && alert.sources.length > 0 &&
+          alert.sources.every((source: { title?: unknown; uri?: unknown }) => {
+            if (typeof source?.title !== "string" || typeof source?.uri !== "string") return false;
+            try { return ["https:", "http:"].includes(new URL(source.uri).protocol); } catch { return false; }
+          });
+        if (!body?.ok || !alert || alert.grounded !== true || !validSources ||
+            typeof alert.id !== "string" || typeof alert.headline !== "string" ||
+            typeof alert.detail !== "string" || typeof alert.regionLabel !== "string" ||
+            !["weather", "seismic", "combined"].includes(alert.category) ||
+            !["critical", "warning", "advisory"].includes(alert.severity) ||
+            !Number.isFinite(coordinates?.lat) || !Number.isFinite(coordinates?.lon) ||
+            Math.abs(coordinates.lat) > 90 || Math.abs(coordinates.lon) > 180 ||
+            !Number.isFinite(Date.parse(alert.updatedAt))) throw new Error("No sourced regional context returned");
+        setRegionalAlert(alert as RegionalHazardAlert);
+        setAlertDismissed(false);
       } catch {
-        // Ignore aborted or network errors
+        if (!ctrl.signal.aborted) setAlertError("Regional context is unavailable. Any previously loaded advisory may be out of date; check official sources directly.");
       } finally {
         if (!ctrl.signal.aborted) {
           setAlertLoading(false);
@@ -275,27 +259,17 @@ export function IncidentMap({
     [],
   );
 
-  // Fetch initial regional alert on mount
-  useEffect(() => {
-    const initLat = reports[0]?.latitude ?? 14.6;
-    const initLon = reports[0]?.longitude ?? 121.0;
-    lastAlertCenterRef.current = { lat: initLat, lon: initLon };
-    // Existing mount-time fetch intentionally updates request status from its callback.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void fetchRegionalAlertForCoords(initLat, initLon, false);
-    return () => {
-      alertAbortRef.current?.abort();
-    };
-  }, [eventId, reports, fetchRegionalAlertForCoords]);
-
-  // Clear selected incident and stale pins when the active event changes.
-  useEffect(() => {
-    queueMicrotask(() => {
-      setSelected(reports[0] ?? null);
-      setLiveReports(reports);
-      setScrubberPct(100);
-    });
-  }, [eventId, reports]);
+  useEffect(() => () => alertAbortRef.current?.abort(), [eventId]);
+  const [reportSource, setReportSource] = useState({ eventId, reports });
+  if (reportSource.eventId !== eventId || reportSource.reports !== reports) {
+    setReportSource({ eventId, reports });
+    setSelected(null);
+    setScrubberPct(100);
+    if (reportSource.eventId !== eventId) {
+      setSelectedHazards([]); setSelectedSeverities([]); setSearchQuery(""); setPendingMode("all");
+      setRegionalAlert(null); setAlertError(null); setAlertLoading(false); setAlertDismissed(false);
+    }
+  }
 
   // Toggle a single hazard category in the multi-select filter
   function handleToggleHazard(category: HazardCategoryId) {
@@ -321,27 +295,25 @@ export function IncidentMap({
 
   // Compute min/max timestamps for the TemporalScrubber from `uploaded_at`
   const timeBounds = useMemo(() => {
-    const times = liveReports
+    const times = loadedReports
       .map((r) => (r.uploaded_at ? new Date(r.uploaded_at).getTime() : NaN))
       .filter((t) => Number.isFinite(t));
-    if (times.length === 0) {
-      const now = Date.now();
-      return { min: now - 6 * 3600_000, max: now };
-    }
+    if (times.length === 0) return null;
     const min = Math.min(...times);
     const max = Math.max(...times);
-    return { min: min === max ? min - 3600_000 : min, max };
-  }, [liveReports]);
+    return { min, max };
+  }, [loadedReports]);
 
   const cutoffTimestamp = useMemo(() => {
-    if (scrubberPct >= 100) return Infinity;
+    if (scrubberPct >= 100 || !timeBounds) return Infinity;
     return timeBounds.min + ((timeBounds.max - timeBounds.min) * scrubberPct) / 100;
   }, [scrubberPct, timeBounds]);
 
   // Filter reports by verification mode, hazard categories, severity levels, and `uploaded_at` scrubber
   const visibleReports = useMemo(() => {
-    return liveReports.filter((r) => {
+    return loadedReports.filter((r) => {
       if (r.retention_state && r.retention_state !== "active") return false;
+      if (r.review_outcome === "rejected" || r.location_source === "unknown") return false;
       if (
         !Number.isFinite(r.latitude) ||
         !Number.isFinite(r.longitude) ||
@@ -359,12 +331,12 @@ export function IncidentMap({
         if (!selectedHazards.includes(cat)) return false;
       }
       if (selectedSeverities.length > 0 && selectedSeverities.length < 5) {
-        const sev = toSeverityLevel(r.severity);
-        if (!selectedSeverities.includes(sev)) return false;
+        if (typeof r.severity !== "number" || !Number.isInteger(r.severity) ||
+            r.severity < 1 || r.severity > 5 || !selectedSeverities.includes(r.severity)) return false;
       }
-      if (scrubberPct < 100 && r.uploaded_at) {
-        const ts = new Date(r.uploaded_at).getTime();
-        if (Number.isFinite(ts) && ts > cutoffTimestamp) return false;
+      if (scrubberPct < 100) {
+        const ts = Date.parse(r.uploaded_at ?? "");
+        if (!Number.isFinite(ts) || ts > cutoffTimestamp) return false;
       }
       if (searchQuery.trim() !== "") {
         const q = searchQuery.trim().toLowerCase();
@@ -374,7 +346,7 @@ export function IncidentMap({
       return true;
     });
   }, [
-    liveReports,
+    loadedReports,
     pendingMode,
     selectedHazards,
     selectedSeverities,
@@ -382,6 +354,7 @@ export function IncidentMap({
     cutoffTimestamp,
     searchQuery,
   ]);
+  const selectedReport = visibleReports.find((report) => report.id === selected?.id) ?? null;
 
   // Consolidate overlapping pins at lower zoom levels using D3 quadtree clustering
   const clusteredNodes = useMemo(
@@ -431,105 +404,83 @@ export function IncidentMap({
     renderHeatmapCanvas();
   }, [renderHeatmapCanvas, mapCenter, mapZoom]);
 
-  // Initialize the map once per active event.
+  // A retry rebuilds the canvas; panning updates only the camera, never the snapshot.
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
-    const isNight = resolveIsNight(readInitialTheme());
-    const initialLat = reports[0]?.latitude ?? 14.6;
-    const initialLon = reports[0]?.longitude ?? 121.0;
+    const container = containerRef.current;
+    if (!container || mapRef.current) return;
+    let disposed = false;
+    let map: maplibregl.Map;
+    setMapStatus("loading");
+    const firstLocated = reports.find((report) => Number.isFinite(report.latitude) &&
+      Number.isFinite(report.longitude) && Math.abs(report.latitude) <= 90 && Math.abs(report.longitude) <= 180);
+    try {
+      map = new maplibregl.Map({
+        container,
+        style: buildSurveyStyle(resolveIsNight(readInitialTheme())),
+        // Default camera position only; no report is assigned these coordinates.
+        center: firstLocated ? [firstLocated.longitude, firstLocated.latitude] : [121, 14.6],
+        zoom: 11,
+        attributionControl: {},
+        canvasContextAttributes: { preserveDrawingBuffer: true },
+      });
+      mapRef.current = map;
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    } catch {
+      try { mapRef.current?.remove(); } catch { /* Initialization already failed. */ }
+      mapRef.current = null;
+      container.replaceChildren();
+      setMapStatus("unavailable");
+      return;
+    }
 
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: buildSurveyStyle(isNight),
-      center: [initialLon, initialLat],
-      zoom: 11,
-      attributionControl: {},
-      canvasContextAttributes: { preserveDrawingBuffer: true },
-    });
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    mapRef.current = map;
-
-    // Re-fetch on move (debounced) and update zoom for D3 clustering + heatmap.
-    let moveTimer: ReturnType<typeof setTimeout> | null = null;
     function onMove() {
-      const c = map.getCenter();
-      setMapCenter({ lat: c.lat, lon: c.lng });
+      if (disposed) return;
+      const center = map.getCenter();
+      setMapCenter({ lat: center.lat, lon: center.lng });
       setMapZoom(Number(map.getZoom().toFixed(2)));
-      if (moveTimer) clearTimeout(moveTimer);
-      moveTimer = setTimeout(async () => {
-        if (!eventId) return;
-        fetchControllerRef.current?.abort();
-        const controller = new AbortController();
-        fetchControllerRef.current = controller;
-        const b = map.getBounds();
-        const params = new URLSearchParams({
-          event_id: eventId,
-          sw_lat: b.getSouth().toFixed(6),
-          sw_lon: b.getWest().toFixed(6),
-          ne_lat: b.getNorth().toFixed(6),
-          ne_lon: b.getEast().toFixed(6),
-          limit: "200",
-        });
-        try {
-          const res = await fetch(`/api/reports/viewport?${params}`, { signal: controller.signal });
-          if (!res.ok) return;
-          const body = await res.json();
-          if (!controller.signal.aborted && body?.ok && Array.isArray(body.reports)) {
-            setLiveReports(body.reports as IncidentMapReport[]);
-          }
-        } catch {
-          // ignore — keep the previous reports
-        }
-
-        // Check if the user panned to a new region (>= 0.012 deg ~1.3 km shift)
-        const prevAlertCenter = lastAlertCenterRef.current;
-        const dist = prevAlertCenter
-          ? Math.hypot(c.lat - prevAlertCenter.lat, c.lng - prevAlertCenter.lon)
-          : Infinity;
-        if (dist >= 0.012) {
-          void fetchRegionalAlertForCoords(c.lat, c.lng, true);
-        }
-      }, 400);
     }
-
-    // Listen to Day / Night Ops theme changes so the basemap updates live
-    function onThemeChange(e: Event) {
-      const custom = e as CustomEvent<{ isNight: boolean }>;
-      const night = custom.detail?.isNight ?? resolveIsNight(readInitialTheme());
-      try {
-        if (map.getLayer("background")) {
-          map.setPaintProperty("background", "background-color", night ? "#0B141A" : "#E9EDE8");
-        }
-        if (map.getLayer("tiles")) {
-          map.setPaintProperty("tiles", "raster-saturation", night ? -0.75 : -0.4);
-          map.setPaintProperty("tiles", "raster-contrast", night ? 0.25 : 0.05);
-          map.setPaintProperty("tiles", "raster-brightness-max", night ? 0.42 : 1.0);
-          map.setPaintProperty("tiles", "raster-brightness-min", night ? 0.04 : 0.0);
-        }
-      } catch {
-        // style not yet loaded
-      }
+    function onLoad() {
+      if (disposed) return;
+      setMapStatus((current) => current === "tiles-unavailable" ? current : "ready");
+      onMove();
     }
-
-    map.on("move", () => {
-      const c = map.getCenter();
-      setMapCenter({ lat: c.lat, lon: c.lng });
-    });
+    function onMapError() { if (!disposed) setMapStatus("tiles-unavailable"); }
+    function onContextLost() { if (!disposed) setMapStatus("unavailable"); }
+    function onThemeChange() {
+      try { map.setStyle(buildSurveyStyle(resolveIsNight(readInitialTheme()))); }
+      catch { onMapError(); }
+    }
+    function resizeMap() {
+      if (disposed) return;
+      try { map.resize(); } catch { onMapError(); }
+    }
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(resizeMap) : null;
+    observer?.observe(container);
+    const canvas = map.getCanvas();
+    canvas.addEventListener("webglcontextlost", onContextLost);
+    map.on("move", onMove);
     map.on("moveend", onMove);
     map.on("zoomend", onMove);
-    map.on("load", onMove);
+    map.on("load", onLoad);
+    map.on("error", onMapError);
+    window.addEventListener("resize", resizeMap);
     window.addEventListener("tr-theme-change", onThemeChange);
+    const slowLoad = setTimeout(() => {
+      if (!disposed) setMapStatus((current) => current === "loading" ? "tiles-unavailable" : current);
+    }, 12000);
     return () => {
-      if (moveTimer) clearTimeout(moveTimer);
-      fetchControllerRef.current?.abort();
+      disposed = true;
+      clearTimeout(slowLoad);
+      observer?.disconnect();
+      canvas.removeEventListener("webglcontextlost", onContextLost);
+      window.removeEventListener("resize", resizeMap);
       window.removeEventListener("tr-theme-change", onThemeChange);
-      markersRef.current.forEach((m) => m.remove());
+      markersRef.current.forEach((marker) => marker.remove());
       markersRef.current = [];
-      map.remove();
+      try { map.remove(); } catch { /* Keep teardown from replacing the usable report UI. */ }
       mapRef.current = null;
     };
-  }, [eventId, reports]);
-
+  }, [eventId, reports, mapAttempt]);
   // Render HTML markers (single pins + D3 cluster markers) with Framer Motion
   // staggered scale-in entrance animation when filters or temporal scrubber change.
   useEffect(() => {
@@ -573,7 +524,7 @@ export function IncidentMap({
           map.flyTo({
             center: [node.longitude, node.latitude],
             zoom: Math.min(15.5, map.getZoom() + 2.2),
-            duration: 550,
+            duration: reducedMotion ? 0 : 550,
           });
         });
 
@@ -583,6 +534,7 @@ export function IncidentMap({
           .addTo(map);
         markersRef.current.push(marker);
 
+        if (reducedMotion) return;
         try {
           const controls = animate(
             button,
@@ -607,7 +559,7 @@ export function IncidentMap({
         const hazardLabelText =
           PIN_HAZARD_SHORT_LABEL[hazardCategory] ?? hazardCategory.toUpperCase();
         const isZoomedInForLabels =
-          mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD || selected?.id === r.id;
+          mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD || selectedReport?.id === r.id;
 
         const button = document.createElement("button");
         button.type = "button";
@@ -616,13 +568,11 @@ export function IncidentMap({
         button.dataset.sev = String(sev);
         button.dataset.hazard = hazardCategory;
         button.dataset.staggerIndex = String(idx);
-        if (selected?.id === r.id) {
-          button.setAttribute("aria-selected", "true");
-        }
+        button.setAttribute("aria-pressed", String(selectedReport?.id === r.id));
         const contextLabel =
           r.location_label ||
           r.title ||
-          `${r.latitude.toFixed(3)}° N, ${r.longitude.toFixed(3)}° E`;
+          formatCoords(r.latitude, r.longitude);
         button.setAttribute(
           "aria-label",
           `${r.title || "Incident"}; ${hazardLabelText}; ${state}; severity ${sev}`,
@@ -648,6 +598,7 @@ export function IncidentMap({
           .addTo(map);
         markersRef.current.push(marker);
 
+        if (reducedMotion) return;
         try {
           const controls = animate(
             button,
@@ -669,15 +620,16 @@ export function IncidentMap({
     return () => {
       activeAnimations.forEach((ctrl) => ctrl.stop());
     };
-  }, [clusteredNodes, selected?.id, filterAnimationKey, mapZoom]);
+  }, [clusteredNodes, selectedReport?.id, filterAnimationKey, mapZoom, mapAttempt, reducedMotion]);
 
   function focusReportOnMap(r: IncidentMapReport) {
     setSelected(r);
-    if (mapRef.current && Number.isFinite(r.latitude) && Number.isFinite(r.longitude)) {
+    if (mapRef.current && Number.isFinite(r.latitude) && Number.isFinite(r.longitude) &&
+        Math.abs(r.latitude) <= 90 && Math.abs(r.longitude) <= 180) {
       mapRef.current.flyTo({
         center: [r.longitude, r.latitude],
         zoom: Math.max(mapRef.current.getZoom(), 13),
-        duration: 600,
+        duration: reducedMotion ? 0 : 600,
       });
     }
   }
@@ -685,8 +637,10 @@ export function IncidentMap({
   // Generate and download a high-resolution PNG of the visible map area and incident overlay
   function handleDownloadMapSnapshot() {
     setSnapshotStatus("rendering");
+    try {
     const map = mapRef.current;
     const container = containerRef.current;
+    if (!map || !container || mapStatus !== "ready") throw new Error("Map export unavailable");
     const isNight = resolveIsNight(readInitialTheme());
 
     const rect = container?.getBoundingClientRect();
@@ -700,10 +654,7 @@ export function IncidentMap({
     exportCanvas.width = outW;
     exportCanvas.height = outH;
     const ctx = exportCanvas.getContext("2d");
-    if (!ctx) {
-      setSnapshotStatus("idle");
-      return;
-    }
+    if (!ctx) throw new Error("Map export unavailable");
 
     // 1. Fill base cartographic background
     ctx.fillStyle = isNight ? "#0B141A" : "#E9EDE8";
@@ -726,51 +677,12 @@ export function IncidentMap({
       ctx.stroke();
     }
 
-    // 2. Draw MapLibre WebGL canvas if untainted
-    let workingCanvas = exportCanvas;
-    let workingCtx = ctx;
-    if (map) {
-      try {
-        const glCanvas = map.getCanvas();
-        ctx.drawImage(glCanvas, 0, 0, outW, outH);
-        // Verify canvas is not CORS-tainted before drawing overlays
-        exportCanvas.toDataURL("image/png");
-      } catch {
-        // Fallback to clean untainted canvas if external OSM tiles tainted WebGL
-        const fallbackCanvas = document.createElement("canvas");
-        fallbackCanvas.width = outW;
-        fallbackCanvas.height = outH;
-        const fCtx = fallbackCanvas.getContext("2d");
-        if (fCtx) {
-          fCtx.fillStyle = isNight ? "#0B141A" : "#E9EDE8";
-          fCtx.fillRect(0, 0, outW, outH);
-          fCtx.strokeStyle = isNight ? "rgba(72, 181, 198, 0.12)" : "rgba(11, 101, 116, 0.12)";
-          fCtx.lineWidth = 1 * scale;
-          for (let gx = step; gx < outW; gx += step) {
-            fCtx.beginPath();
-            fCtx.moveTo(gx, 0);
-            fCtx.lineTo(gx, outH);
-            fCtx.stroke();
-          }
-          for (let gy = step; gy < outH; gy += step) {
-            fCtx.beginPath();
-            fCtx.moveTo(0, gy);
-            fCtx.lineTo(outW, gy);
-            fCtx.stroke();
-          }
-          workingCanvas = fallbackCanvas;
-          workingCtx = fCtx;
-        }
-      }
-    }
-
-    const projectPoint = (lon: number, lat: number) => {
-      if (map) {
-        return map.project([lon, lat]);
-      }
-      return { x: cssW / 2, y: cssH / 2 };
-    };
-
+    // Export the actual ready basemap. CORS/graphics failures surface as errors.
+    const workingCanvas = exportCanvas;
+    const workingCtx = ctx;
+    ctx.drawImage(map.getCanvas(), 0, 0, outW, outH);
+    exportCanvas.toDataURL("image/png");
+    const projectPoint = (lon: number, lat: number) => map.project([lon, lat]);
     // 3. Draw Heatmap Density Overlay if active
     if (showHeatmap) {
       const hmTemp = document.createElement("canvas");
@@ -866,7 +778,7 @@ export function IncidentMap({
       bannerH / 2,
     );
 
-    const metaText = `${mapCenter.lat.toFixed(4)}° N, ${mapCenter.lon.toFixed(4)}° E  |  ${visibleReports.length} Pins (${confirmedCount} Confirmed, ${pendingCount} Pending)${showHeatmap ? "  |  Heatmap Active" : ""}  |  ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`;
+    const metaText = `${formatCoords(mapCenter.lat, mapCenter.lon)}  |  ${visibleReports.length} Pins (${confirmedCount} Confirmed, ${pendingCount} Unconfirmed)${showHeatmap ? "  |  Density overlay" : ""}  |  ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`;
     workingCtx.fillStyle = isNight ? "#B7C6CF" : "#3A4B57";
     workingCtx.font = `600 ${12 * scale}px sans-serif`;
     workingCtx.textAlign = "right";
@@ -882,28 +794,31 @@ export function IncidentMap({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      setSnapshotStatus("saved");
-      setTimeout(() => setSnapshotStatus("idle"), 2500);
+      setSnapshotStatus("requested");
     } catch {
-      setSnapshotStatus("idle");
+      setSnapshotStatus("failed");
+    }
+    } catch {
+      setSnapshotStatus("failed");
     }
   }
 
-  const panelReport: IncidentPanelData | null = selected
+  const panelReport: IncidentPanelData | null = selectedReport
     ? {
-        id: selected.id,
-        status: selected.status,
-        review_outcome: selected.review_outcome,
-        title: selected.title,
-        description: selected.description ?? null,
-        latitude: selected.latitude,
-        longitude: selected.longitude,
-        location_label: selected.location_label ?? null,
-        uploaded_at: selected.uploaded_at ?? new Date().toISOString(),
-        priority_score: selected.priority_score ?? null,
-        severity: selected.severity ?? null,
-        incidentType: selected.incidentType ?? null,
-        summary: selected.summary ?? null,
+        id: selectedReport.id,
+        status: selectedReport.status,
+        review_outcome: selectedReport.review_outcome,
+        title: selectedReport.title,
+        description: selectedReport.description ?? null,
+        latitude: selectedReport.latitude,
+        longitude: selectedReport.longitude,
+        location_source: selectedReport.location_source,
+        location_label: selectedReport.location_label ?? null,
+        uploaded_at: selectedReport.uploaded_at ?? "",
+        priority_score: selectedReport.priority_score ?? null,
+        severity: selectedReport.severity ?? null,
+        incidentType: selectedReport.incidentType ?? null,
+        summary: selectedReport.summary ?? null,
       }
     : null;
 
@@ -933,7 +848,7 @@ export function IncidentMap({
     <div className="tactical-map-shell flex flex-col gap-3 sm:gap-4 w-full">
       {/* Top Filter Bar: Search + Hazard Category + Severity Level + Heatmap + View Mode */}
       <MapFilterBar
-        reports={liveReports}
+        reports={loadedReports}
         visibleCount={visibleReports.length}
         confirmedCount={confirmedCount}
         selectedHazards={selectedHazards}
@@ -962,138 +877,47 @@ export function IncidentMap({
         className={cn(
           "w-full grid gap-4 items-start",
           viewMode === "split"
-            ? "grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_410px]"
+            ? "grid-cols-1 min-[1440px]:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]"
             : "grid-cols-1",
         )}
       >
-        {/* Map Stage Container */}
-        <div className="relative w-full h-[calc(100vh-210px)] min-h-[580px] rounded-2xl overflow-hidden border border-slate-800 bg-[#0B141A] shadow-2xl">
-          <div
-            className={cn("w-full h-full relative", className)}
-            ref={containerRef}
-            data-zoomed-labels={mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD ? "true" : "false"}
-          >
-            {/* Gradient Density Heatmap Canvas Overlay */}
-            <canvas
-              ref={heatmapCanvasRef}
-              className="map-heatmap-overlay"
-              aria-hidden="true"
-              style={{ opacity: showHeatmap ? 1 : 0 }}
-            />
-
-            {/* Top-left GPS Pill Readout */}
-            <div className="tactical-gps-pill num">
-              <Compass
-                size={13}
-                aria-hidden="true"
-                style={{ display: "inline", marginRight: 6, verticalAlign: "-2px", color: "var(--tide)" }}
-              />
-              {mapCenter.lat.toFixed(4)}° N, {mapCenter.lon.toFixed(4)}° E · {visibleReports.length}{" "}
-              {visibleReports.length === 1 ? "pin" : "pins"} shown
-              {clusteredNodes.length < visibleReports.length
-                ? ` (${clusteredNodes.length} markers · D3 clustered)`
-                : ""}
-              {mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD ? " · Hazard Labels On" : ""}
-              {showHeatmap ? " · Heatmap On" : ""}
-            </div>
-
-            {/* Non-intrusive Dismissible Regional Weather & Seismic Alert */}
-            <RegionalAlertOverlay
-              alert={regionalAlert}
-              loading={alertLoading}
-              dismissed={alertDismissed}
-              onDismiss={() => setAlertDismissed(true)}
-              onRefreshRegion={() =>
-                void fetchRegionalAlertForCoords(mapCenter.lat, mapCenter.lon, true)
-              }
-            />
-
-            {/* Floating Tactical Map Controls on Right Edge */}
-            <div className="absolute top-4 right-4 z-20 flex flex-col gap-1.5 shadow-xl">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => setShowHeatmap((prev) => !prev)}
-                title={showHeatmap ? "Disable Heatmap" : "Enable Heatmap"}
-                className={cn(
-                  "size-9 rounded-xl border-slate-800 backdrop-blur-md transition-all shadow-md",
-                  showHeatmap
-                    ? "bg-amber-600 text-white border-amber-500 hover:bg-amber-500"
-                    : "bg-slate-950/90 text-slate-300 hover:bg-slate-800 hover:text-white",
-                )}
-              >
-                <Layers className="size-4" />
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={handleRecenter}
-                title="Re-center map"
-                className="size-9 rounded-xl bg-slate-950/90 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white backdrop-blur-md shadow-md"
-              >
-                <LocateFixed className="size-4 text-teal-400" />
-              </Button>
-
-              <div className="flex flex-col bg-slate-950/90 border border-slate-800 rounded-xl overflow-hidden backdrop-blur-md shadow-md mt-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleZoomIn}
-                  title="Zoom In"
-                  className="size-9 text-slate-300 hover:bg-slate-800 hover:text-white rounded-none"
-                >
-                  <Plus className="size-4" />
-                </Button>
-                <div className="h-px bg-slate-800" />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleZoomOut}
-                  title="Zoom Out"
-                  className="size-9 text-slate-300 hover:bg-slate-800 hover:text-white rounded-none"
-                >
-                  <Minus className="size-4" />
-                </Button>
-              </div>
-            </div>
-
-            <MapLegend showPending={pendingMode === "all"} />
-
-            {/* Selected Incident Inspector Panel (elevated above bottom scrubber) */}
-            {panelReport && (
-              <IncidentPanel
-                report={panelReport}
-                canReview={canReview}
-                onClose={() => setSelected(null)}
-              />
-            )}
-
-            {/* Bottom Temporal Progression Scrubber */}
-            <TemporalScrubber
-              reports={liveReports}
-              visibleCount={visibleReports.length}
-              scrubberPct={scrubberPct}
-              onChangePct={setScrubberPct}
-              timeBounds={timeBounds}
-              cutoffTimestamp={cutoffTimestamp}
-            />
+        <section className="grid min-w-0 gap-4" aria-label="Map and timeline">
+          <div className="relative h-[320px] min-[481px]:h-[360px] md:h-[400px] min-[1025px]:h-[480px] min-[1440px]:h-[560px] min-w-0 overflow-hidden rounded-panel border border-rule bg-[var(--sheet-sunk)] [&_.maplibregl-ctrl-group_button]:size-11">
+            <div className={cn("relative h-full w-full", className)} ref={containerRef} data-zoomed-labels={mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD ? "true" : "false"} />
+            <canvas ref={heatmapCanvasRef} className="map-heatmap-overlay" aria-hidden="true" style={{ opacity: showHeatmap ? 1 : 0 }} />
           </div>
-        </div>
-
+          <div className="flex min-w-0 flex-col gap-2 rounded-panel border border-rule bg-sheet p-3 text-sm text-[var(--ink-2)] sm:flex-row sm:items-center sm:justify-between" role="status">
+            <p>{mapStatus === "loading" ? "Preparing the map. The report list remains available." : mapStatus === "unavailable" ? "Interactive map unavailable. Use the report list, filters, and timeline." : mapStatus === "tiles-unavailable" ? "Basemap tiles are unavailable. Report data and pins are unchanged." : "Map ready. Report data is limited to the loaded snapshot."}</p>
+            {(mapStatus === "unavailable" || mapStatus === "tiles-unavailable") && <button type="button" className={workspaceAction} onClick={() => setMapAttempt((value) => value + 1)}>Retry map</button>}
+          </div>
+          <div className="grid min-w-0 gap-2 rounded-panel border border-rule bg-sheet p-3 text-sm text-ink">
+            <span className="break-words font-mono [overflow-wrap:anywhere]">Camera center: {formatCoords(mapCenter.lat, mapCenter.lon)} · {visibleReports.length} pins in this loaded window</span>
+            <p className="text-xs text-[var(--ink-3)]">Panning changes the camera, not the loaded report set. Refresh the page to fetch newer reports.</p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="button" variant="outline" onClick={() => setShowHeatmap((value) => !value)} aria-pressed={showHeatmap} className="min-h-11 bg-sheet text-ink hover:bg-[var(--tide-wash)] active:bg-[var(--sheet-sunk)]"><Layers className="size-4" aria-hidden="true" />{showHeatmap ? "Hide density overlay" : "Show density overlay"}</Button>
+            <Button type="button" variant="outline" onClick={handleRecenter} className="min-h-11 bg-sheet text-ink hover:bg-[var(--tide-wash)] active:bg-[var(--sheet-sunk)]"><LocateFixed className="size-4" aria-hidden="true" />Recenter map</Button>
+          </div>
+          <MapLegend showPending={pendingMode === "all"} className="!static !max-w-full" />
+          <div className="grid min-w-0 gap-2 rounded-panel border border-rule bg-sheet p-3">
+            <p className="text-xs text-[var(--ink-3)]">Regional context is optional and loaded only when requested for the current camera center.</p>
+            <button type="button" className={cn(workspaceAction, "w-full sm:w-auto sm:justify-self-start")} disabled={alertLoading} aria-busy={alertLoading} onClick={() => void fetchRegionalAlertForCoords(mapCenter.lat, mapCenter.lon, true)}>{alertLoading ? "Loading regional context…" : "Load regional context"}</button>
+            {alertError && <p role="alert" className="text-sm text-[var(--amber-ink)]">{alertError}</p>}
+            {regionalAlert && <RegionalAlertOverlay alert={regionalAlert} loading={alertLoading} dismissed={alertDismissed} onDismiss={() => setAlertDismissed(true)} onRefreshRegion={() => void fetchRegionalAlertForCoords(mapCenter.lat, mapCenter.lon, true)} />}
+          </div>
+          {timeBounds ? <TemporalScrubber reports={loadedReports} visibleCount={visibleReports.length} scrubberPct={scrubberPct} onChangePct={setScrubberPct} timeBounds={timeBounds} cutoffTimestamp={scrubberPct >= 100 ? timeBounds.max : cutoffTimestamp} /> : <p className="rounded-panel border border-rule bg-sheet p-4 text-sm text-[var(--ink-2)]">Reported-time timeline unavailable: no valid upload timestamps are loaded.</p>}
+          {viewMode !== "split" && panelReport && <IncidentPanel report={panelReport} canReview={canReview} onClose={() => setSelected(null)} />}
+        </section>
         {/* Right Situational Rail (Shown in Split View) */}
         {viewMode === "split" && (
           <aside
-            className="w-full max-h-[calc(100vh-210px)] overflow-y-auto pr-1 flex flex-col gap-4 no-scrollbar"
+            className="grid min-w-0 gap-4"
             aria-label="Incident analytics and triage list"
           >
+            {panelReport && <IncidentPanel report={panelReport} canReview={canReview} onClose={() => setSelected(null)} />}
             {/* Card 0: Hazard Summary Sidebar with D3 Bar Chart */}
             <HazardSummaryChart
-              reports={liveReports}
+              reports={loadedReports}
               selectedHazards={selectedHazards}
               onToggleHazard={handleToggleHazard}
               onResetHazards={() => setSelectedHazards([])}
@@ -1186,10 +1010,10 @@ export function IncidentMap({
               )}
             </Card>
 
-            {/* Card 2: Pinned Reports Pipeline */}
+            {/* Card 2: Priority reports in view Pipeline */}
             <Card className="bg-slate-950/95 dark:bg-[#0B141A]/95 border-slate-800 text-slate-100 rounded-2xl shadow-xl p-4 sm:p-5 flex flex-col gap-3">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-bold text-white tracking-tight">Pinned Reports</h3>
+                <h3 className="text-sm font-bold text-white tracking-tight">Priority reports in view</h3>
                 <Badge variant="outline" className="text-xs font-mono text-teal-400 border-slate-800 bg-slate-900">
                   {sortedVisible.length} shown
                 </Badge>
@@ -1208,7 +1032,7 @@ export function IncidentMap({
                     const label = item.incidentType
                       ? INCIDENT_LABEL[item.incidentType] ?? item.incidentType
                       : item.title || `Report ${item.id.slice(0, 6)}`;
-                    const isSelected = selected?.id === item.id;
+                    const isSelected = selectedReport?.id === item.id;
 
                     return (
                       <button
@@ -1286,14 +1110,14 @@ export function IncidentMap({
                   type="button"
                   variant="outline"
                   onClick={handleDownloadMapSnapshot}
-                  disabled={snapshotStatus === "rendering"}
+                  disabled={snapshotStatus === "rendering" || mapStatus !== "ready"}
                   data-testid="download-map-snapshot"
                   className="w-full text-xs font-semibold h-8 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
                 >
-                  {snapshotStatus === "saved" ? (
+                  {snapshotStatus === "requested" ? (
                     <>
                       <Check className="size-3.5 mr-1.5 text-emerald-400" />
-                      <span>Snapshot Saved (PNG)</span>
+                      <span>PNG download requested</span>
                     </>
                   ) : (
                     <>
@@ -1306,6 +1130,7 @@ export function IncidentMap({
                     </>
                   )}
                 </Button>
+                {snapshotStatus === "failed" && <p role="alert" className="text-xs text-[var(--amber-ink)]">The map snapshot could not be exported. Try again after the basemap finishes loading.</p>}
 
                 <div className="grid grid-cols-2 gap-2">
                   <Button

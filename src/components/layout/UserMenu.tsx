@@ -1,114 +1,42 @@
-// src/components/layout/UserMenu.tsx
-//
-// Avatar + email popover with links to /profile and sign-out.
-// Uses the native popover CSS surface (.ui-tr-popover). Sign-out
-// calls the existing `signOutAction` server action.
-
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { useFormStatus } from "react-dom";
+import Link from "next/link";
 import { ChevronDown, LogOut, User as UserIcon } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { signOutAction } from "@/lib/auth/actions";
 import type { UserProfile } from "@/lib/auth/profile";
 
-const ROLE_LABEL: Record<string, string> = {
-  reporter: "Reporter",
-  reviewer: "Reviewer",
-  admin: "Admin",
-};
+const ROLE_LABEL: Record<string, string> = { reporter: "Reporter", reviewer: "Reviewer", admin: "Admin" };
+export interface UserMenuProps { user: UserProfile }
 
-export interface UserMenuProps {
-  user: UserProfile;
+function SignOutButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" disabled={pending} aria-busy={pending}
+      className="flex min-h-11 w-full items-center gap-2 rounded-ctl px-2 text-left text-sm font-semibold text-ink transition-colors hover:bg-[var(--tide-wash)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tide active:bg-[var(--sheet-sunk)] disabled:cursor-wait disabled:opacity-50 motion-reduce:transition-none">
+      <LogOut size={16} aria-hidden="true" /><span aria-live="polite">{pending ? "Signing out…" : "Sign out"}</span>
+    </button>
+  );
 }
 
+/** Portaled popup keeps the account menu clear of header overflow and restores focus on close. */
 export function UserMenu({ user }: UserMenuProps) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    function closeOnOutside(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    }
-    window.addEventListener("pointerdown", closeOnOutside);
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      window.removeEventListener("pointerdown", closeOnOutside);
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [open]);
-  const initials = (user.name || user.email).slice(0, 1).toUpperCase();
-  return (
-    <div className="ui-tr-popover" ref={rootRef}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="ui-tr-popover__trigger"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label={`Account: ${user.email}`}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span
-          aria-hidden="true"
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: "var(--r-pill)",
-            background: "var(--tide)",
-            color: "#fff",
-            display: "grid",
-            placeItems: "center",
-            fontSize: 13,
-            fontWeight: 700,
-          }}
-        >
-          {initials}
-        </span>
-        <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {user.name || user.email}
-        </span>
-        <ChevronDown size={14} aria-hidden="true" />
+  const displayName = user.name?.trim() || user.email.trim() || "Your account";
+  const initials = Array.from(displayName)[0].toUpperCase();
+  return <Popover open={open} onOpenChange={setOpen}>
+    <PopoverTrigger asChild>
+      <button type="button" className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-ctl border border-rule bg-sheet p-1.5 text-ink transition-colors hover:bg-[var(--tide-wash)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tide active:bg-[var(--sheet-sunk)] data-[state=open]:border-tide data-[state=open]:bg-[var(--tide-wash)] motion-reduce:transition-none" aria-label={`Account: ${user.email}`}>
+        <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-tide text-sm font-bold text-[var(--on-tide)]">{initials}</span>
+        <span className="hidden max-w-32 truncate text-sm min-[1700px]:inline">{displayName}</span><ChevronDown className="hidden size-3.5 min-[1700px]:block" aria-hidden="true" />
       </button>
-      {open && (
-        <div
-          className="ui-tr-popover__body ui-tr-popover__body--bottom-right"
-          role="dialog"
-          aria-modal="false"
-          aria-label="Account menu"
-        >
-          <div style={{ padding: "8px 10px 6px", display: "grid", gap: 2 }}>
-            <span style={{ fontWeight: 700 }}>{user.name || "User"}</span>
-            <span className="t-meta" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-              {user.email}
-            </span>
-            <span className="t-meta">Role · {ROLE_LABEL[user.role] ?? user.role}</span>
-          </div>
-          <div className="ui-tr-popover__sep" />
-          <a className="ui-tr-popover__item" href="/profile" onClick={() => setOpen(false)}>
-            <UserIcon size={14} aria-hidden="true" />
-            <span>Profile</span>
-          </a>
-          <button
-            type="button"
-            className="ui-tr-popover__item"
-            onClick={() => {
-              setOpen(false);
-              void signOutAction();
-            }}
-          >
-            <LogOut size={14} aria-hidden="true" />
-            <span>Sign out</span>
-          </button>
-        </div>
-      )}
-    </div>
-  );
+    </PopoverTrigger>
+    <PopoverContent align="end" sideOffset={8} collisionPadding={12} aria-label="Account menu" className="grid max-h-[var(--radix-popover-content-available-height)] w-72 max-w-[calc(100vw-24px)] gap-2 overflow-y-auto overscroll-contain border-rule bg-sheet p-3 text-ink motion-reduce:animate-none">
+      <div className="grid min-w-0 gap-1 border-b border-rule p-2 pb-3"><strong className="break-words text-sm [overflow-wrap:anywhere]">{user.name || "Your account"}</strong><span className="break-all text-xs text-[var(--ink-3)]">{user.email}</span><span className="text-xs text-[var(--ink-2)]">Role · {ROLE_LABEL[user.role] ?? user.role}</span></div>
+      <Link className="flex min-h-11 items-center gap-2 rounded-ctl px-2 text-sm font-semibold text-ink transition-colors hover:bg-[var(--tide-wash)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tide active:bg-[var(--sheet-sunk)] motion-reduce:transition-none" href="/profile" onClick={() => setOpen(false)}><UserIcon size={16} aria-hidden="true" />Profile</Link>
+      <form action={signOutAction}><SignOutButton /></form>
+    </PopoverContent>
+  </Popover>;
 }
