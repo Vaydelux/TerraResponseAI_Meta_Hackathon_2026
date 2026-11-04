@@ -52,7 +52,7 @@ export function hasMapLocation(report: WorkspaceReport): boolean {
     Math.abs(report.latitude) <= 90 && Math.abs(report.longitude) <= 180;
 }
 
-export function reportTitle(report: WorkspaceReport): string {
+export function reportTitle(report: Pick<WorkspaceReport, "id" | "title">): string {
   return report.title?.trim() || `Report ${report.id.slice(0, 8)}`;
 }
 
