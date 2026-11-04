@@ -179,7 +179,8 @@ export async function getDailyUsageSummary(
     .select("estimated_cost_usd, outcome")
     .eq("utc_day", utcDay);
   if (error || !data) {
-    return { totalCostUsd: 0, totalRequests: 0, byOutcome: {} };
+    // Never make an unavailable billing query look like zero usage.
+    throw new Error("AI_USAGE_UNAVAILABLE");
   }
   let totalCost = 0;
   const byOutcome: Record<string, number> = {};
