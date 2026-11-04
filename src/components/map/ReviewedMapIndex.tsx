@@ -60,6 +60,7 @@ export function ReviewedMapIndex({ reports }: { reports: readonly IncidentMapRep
         <p className="m-0 rounded-ctl border border-dashed border-rule p-3 text-sm text-[var(--ink-2)]">
           No located report has been confirmed by an authorized human reviewer in this loaded snapshot.
           Pending AI observations are not counted as confirmed.
+          <Link href="/#incident-map-preview" className="mt-2 inline-flex min-h-11 items-center rounded-ctl px-2 font-semibold text-tide underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tide active:bg-[var(--tide-wash)]">Open a clearly labeled fictional map preview</Link>
         </p>
       )}
       {reviewed.length > 9 && (
