@@ -37,6 +37,10 @@ export interface ReviewActionBarProps {
   reportId: string;
   /** True if the current user is the contributor → ReviewerGuard. */
   isOwnReport: boolean;
+  /** UI authorization is derived from the server-provided event roles. */
+  canReview?: boolean;
+  restrictionReason?: string | null;
+  onReviewCommitted?: (result: { status: string; reviewOutcome: string | null }) => void;
   /** True if this is the last item in the queue (controls the toast). */
   isLastInQueue: boolean;
   /** Queue position (1-indexed) for the toast template. */
@@ -59,6 +63,9 @@ type ReviewAction = "confirm" | "correct" | "flag" | "reject";
 export function ReviewActionBar({
   reportId,
   isOwnReport,
+  canReview = true,
+  restrictionReason = null,
+  onReviewCommitted,
   isLastInQueue,
   queuePosition,
   status,
@@ -73,12 +80,16 @@ export function ReviewActionBar({
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [completed, setCompleted] = useState(false);
   const rejectAbortRef = useRef<AbortController | null>(null);
   const submittingRef = useRef(false);
   const completedRef = useRef(false);
   const requestIdRef = useRef<{ action: ReviewAction; reason?: string; id: string } | null>(null);
   useEffect(() => {
     completedRef.current = false;
+    // Changing reports resets the operation; reloads get the fresh server state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCompleted(false);
     submittingRef.current = false;
     requestIdRef.current = null;
   }, [reportId]);
@@ -89,7 +100,8 @@ export function ReviewActionBar({
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement;
       if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable || t.closest("button, [role='dialog']")) return;
-      if (isOwnReport || busy || submittingRef.current || completedRef.current || e.repeat) return;
+      if (!canReview || isOwnReport || busy || completed || submittingRef.current || completedRef.current || e.repeat) return;
+      if (typeof window.matchMedia === "function" && !window.matchMedia("(min-width: 1024px)").matches) return;
       if (drawerOpen || rejectOpen) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "c" || e.key === "C") { e.preventDefault(); void submitAction("confirm"); }
@@ -101,10 +113,10 @@ export function ReviewActionBar({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [drawerOpen, rejectOpen, nextHref, status, reviewOutcome, isOwnReport, busy]);
+  }, [drawerOpen, rejectOpen, nextHref, status, reviewOutcome, canReview, isOwnReport, busy, completed]);
 
   async function submitAction(action: ReviewAction, reason?: string) {
-    if (busy || submittingRef.current || completedRef.current || isOwnReport) return;
+    if (!canReview || busy || submittingRef.current || completedRef.current || isOwnReport) return;
     submittingRef.current = true;
     const requestId = requestIdRef.current?.action === action && requestIdRef.current?.reason === reason
       ? requestIdRef.current.id : crypto.randomUUID();
@@ -127,7 +139,10 @@ export function ReviewActionBar({
       const body = await res.json();
       if (res.ok && body?.ok) {
         completedRef.current = true;
+        setCompleted(true);
         requestIdRef.current = null;
+        onReviewCommitted?.({ status: typeof body.newStatus === "string" ? body.newStatus : "reviewed",
+          reviewOutcome: typeof body.reviewOutcome === "string" ? body.reviewOutcome : null });
         // Success — show the toast, then navigate to the next item.
         const nextN = Math.min(queuePosition.current + 1, queuePosition.total);
         toast.success(
@@ -145,12 +160,20 @@ export function ReviewActionBar({
           if (nextHref) router.replace(nextHref);
           else router.refresh();
         }, 640);
-      } else if (!body?.ok) {
+      } else {
         onResolvingChange?.(false);
-        toast.error(body?.error?.message ?? `${action} failed.`, {
-          label: "Retry",
-          onClick: () => void submitAction(action, reason),
-        });
+        const message = body?.error?.message ?? `${action} failed.`;
+        if (res.status === 409) {
+          toast.error(`${message} Refresh the report before choosing another action.`, {
+            label: "Reload report", onClick: () => window.location.reload(),
+          });
+        } else if (res.status >= 500) {
+          toast.error(message, { label: "Retry safely", onClick: () => void submitAction(action, reason) });
+        } else {
+          // Role, input and state failures are not corrected by repeating the same call.
+          requestIdRef.current = null;
+          toast.error(message);
+        }
       }
     } catch (err: unknown) {
       onResolvingChange?.(false);
@@ -175,11 +198,11 @@ export function ReviewActionBar({
     setRejectReason("");
   }
 
-  if (isOwnReport) {
+  if (!canReview || isOwnReport) {
     return (
       <div className={cn("actions", className)}>
         <div className="actions__locked" role="alert">
-          {COPY.reviewerGuardSelf}
+          {restrictionReason ?? (isOwnReport ? COPY.reviewerGuardSelf : "You are not assigned to review this report.")}
         </div>
       </div>
     );
@@ -188,20 +211,22 @@ export function ReviewActionBar({
   return (
     <>
       <div className={cn("actions", className)}>
+        {completed && <p role="status" className="m-0 text-sm text-[var(--tide)]">Review saved successfully. Continue to the next report or reload to see the latest state.</p>}
         <Button
           variant="primary"
           block
           className="actions__confirm"
           onClick={() => void submitAction("confirm")}
           busy={busy}
+          disabled={completed}
           kbd="C"
         >
           Confirm
         </Button>
         <div className="actions__row">
-          <Button variant="default" onClick={() => setDrawerOpen(true)} disabled={busy} kbd="E">Correct</Button>
-          <Button variant="default" onClick={() => void submitAction("flag")} disabled={busy} kbd="F">Flag</Button>
-          <Button variant="danger" onClick={() => setRejectOpen(true)} disabled={busy} kbd="R">Reject</Button>
+          <Button variant="default" onClick={() => setDrawerOpen(true)} disabled={busy || completed} kbd="E">Correct</Button>
+          <Button variant="default" onClick={() => void submitAction("flag")} disabled={busy || completed} kbd="F">Flag</Button>
+          <Button variant="danger" onClick={() => setRejectOpen(true)} disabled={busy || completed} kbd="R">Reject</Button>
         </div>
       </div>
 
@@ -212,6 +237,9 @@ export function ReviewActionBar({
         reportId={reportId}
         observation={observation}
         onSubmitted={() => {
+          completedRef.current = true;
+          setCompleted(true);
+          onReviewCommitted?.({ status: "reviewed", reviewOutcome: "confirmed" });
           onResolvingChange?.(true);
           setTimeout(() => {
             if (nextHref) router.replace(nextHref);
