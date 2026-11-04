@@ -8,6 +8,8 @@ export interface OfflineUpload {
   fileName: string;
   metadata: string;
   createdAt: number;
+  /** Authenticated owner at creation; older unscoped drafts are never auto-submitted. */
+  ownerId: string;
 }
 
 function openQueue(): Promise<IDBDatabase> {
@@ -54,10 +56,12 @@ export async function removeOfflineUpload(id: string): Promise<void> {
 }
 
 /** Flushes only successful uploads; failed items remain queued for retry. */
-export async function flushOfflineUploads(send: (item: OfflineUpload) => Promise<boolean>): Promise<number> {
+export async function flushOfflineUploads(send: (item: OfflineUpload) => Promise<boolean>, ownerId: string): Promise<number> {
+  if (!ownerId) return 0;
   const items = await listOfflineUploads();
   let flushed = 0;
   for (const item of items) {
+    if (!item.ownerId || item.ownerId !== ownerId) continue;
     if (await send(item)) {
       await removeOfflineUpload(item.id);
       flushed += 1;
