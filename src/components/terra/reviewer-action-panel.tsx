@@ -74,7 +74,22 @@ interface ReviewerActionPanelProps {
   isReviewer: boolean;
 }
 
-export function ReviewerActionPanel({
+// The editable corrections belong to a particular observation, not a
+// different report or the previous version of an AI analysis. Keying the form
+// resets its inputs without synchronous useEffect state synchronization.
+export function ReviewerActionPanel(props: ReviewerActionPanelProps) {
+  const { reportId, observation } = props;
+  const observationVersion = JSON.stringify([
+    reportId,
+    observation?.incident_type,
+    observation?.preliminary_severity,
+    observation?.summary_en,
+    observation?.summary_tl,
+  ]);
+  return <ReviewerActionPanelBody key={observationVersion} {...props} />;
+}
+
+function ReviewerActionPanelBody({
   reportId,
   reportStatus,
   observation,
@@ -85,40 +100,34 @@ export function ReviewerActionPanel({
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [history, setHistory] = useState<ReviewAction[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(isSupabaseConfigured());
 
   // Correction fields
-  const [correctedIncidentType, setCorrectedIncidentType] = useState("");
-  const [correctedSeverity, setCorrectedSeverity] = useState<string>("");
-  const [correctedSummary, setCorrectedSummary] = useState("");
-  const [correctedSummaryTl, setCorrectedSummaryTl] = useState("");
+  const [correctedIncidentType, setCorrectedIncidentType] = useState(observation?.incident_type ?? "");
+  const [correctedSeverity, setCorrectedSeverity] = useState<string>(observation?.preliminary_severity?.toString() ?? "");
+  const [correctedSummary, setCorrectedSummary] = useState(observation?.summary_en ?? "");
+  const [correctedSummaryTl, setCorrectedSummaryTl] = useState(observation?.summary_tl ?? "");
 
   const configured = isSupabaseConfigured();
   const isReviewed = reportStatus === "reviewed";
 
-  // Fetch review action history.
+  // Abort stale history reads when the report/observation changes.
   useEffect(() => {
     if (!configured) return;
-    fetch(`/api/reports/${reportId}/review`)
-      .then((r) => r.json())
+    const controller = new AbortController();
+    fetch(`/api/reports/${reportId}/review`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
       .then((body) => {
-        if (body?.ok && Array.isArray(body.actions)) {
+        if (!controller.signal.aborted && body?.ok && Array.isArray(body.actions)) {
           setHistory(body.actions);
         }
       })
-      .catch(() => {})
-      .finally(() => setHistoryLoading(false));
+      .catch(() => { /* History is optional; review stays usable offline. */ })
+      .finally(() => {
+        if (!controller.signal.aborted) setHistoryLoading(false);
+      });
+    return () => controller.abort();
   }, [configured, reportId]);
-
-  // Initialize correction fields from the observation.
-  useEffect(() => {
-    if (observation) {
-      setCorrectedIncidentType(observation.incident_type);
-      setCorrectedSeverity(observation.preliminary_severity?.toString() ?? "");
-      setCorrectedSummary(observation.summary_en);
-      setCorrectedSummaryTl(observation.summary_tl);
-    }
-  }, [observation]);
 
   async function handleSubmit() {
     if (!action) return;
