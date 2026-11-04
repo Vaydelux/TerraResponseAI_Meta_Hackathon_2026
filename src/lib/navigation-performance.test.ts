@@ -46,12 +46,14 @@ describe("fast authenticated navigation", () => {
     expect(context).toContain("cachedContextByUserId(resolvedUser.id)");
   });
 
-  it("does not serialize independent dashboard reads", () => {
+  it("uses one bounded RLS-scoped snapshot instead of serial dashboard reads", () => {
     const dashboard = source("src/app/(app)/dashboard/page.tsx");
-    expect(dashboard).toContain("countsPromise");
-    expect(dashboard).toContain("recentPromise");
-    expect(dashboard).toContain("auditPromise");
-    expect(dashboard).toContain("await Promise.all([countsPromise, recentPromise, auditPromise])");
+    const loader = source("src/lib/workspace/load-snapshot.ts");
+    expect(dashboard).toContain("await loadIncidentWorkspaceSnapshot(ctx)");
+    expect(loader).toContain("const REPORT_LIMIT = 200");
+    expect(loader).toContain('.eq("event_id", event.event_id)');
+    expect(loader).toContain('.eq("retention_state", "active")');
+    expect(loader).toContain('state: "unavailable"');
   });
 
   it("does not eagerly bundle MapLibre into the server map page", () => {
