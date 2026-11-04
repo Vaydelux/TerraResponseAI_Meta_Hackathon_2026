@@ -26,5 +26,5 @@ export default async function UploadPageRoute() {
       /></div>;
     }
   }
-  return <UploadFlow />;
+  return <UploadFlow ownerId={user.id} />;
 }

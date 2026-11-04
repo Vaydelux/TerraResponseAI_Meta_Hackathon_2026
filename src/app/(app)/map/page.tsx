@@ -6,6 +6,7 @@ import { loadIncidentWorkspaceSnapshot } from "@/lib/workspace/load-snapshot";
 import { hasMapLocation } from "@/lib/workspace/incidents";
 import { workspaceAction } from "@/lib/workspace/presentation";
 import { DeferredIncidentMap } from "@/components/map/DeferredIncidentMap";
+import { ReviewedMapIndex } from "@/components/map/ReviewedMapIndex";
 import type { IncidentMapReport } from "@/components/map/IncidentMap";
 
 export default async function MapPageRoute() {
@@ -27,6 +28,7 @@ export default async function MapPageRoute() {
     </header>
     {snapshot.state !== "ready" && <div role="alert" className="grid gap-2 rounded-panel border border-[var(--amber)] bg-[var(--amber-wash)] p-4 text-sm text-[var(--amber-ink)]"><strong>{snapshot.state === "unavailable" ? "Incident data unavailable" : "Some incident data is unavailable"}</strong><p>{snapshot.message}</p><a href="/map" className={`${workspaceAction} w-full sm:w-fit`}>Reload map page</a></div>}
     {snapshot.eventId && snapshot.state !== "unavailable" && <DeferredIncidentMap key={snapshot.eventId} eventId={snapshot.eventId} eventName={snapshot.eventName} reports={reports} canReview={ctx.user.role === "reviewer" || ctx.user.role === "admin"} />}
+    <ReviewedMapIndex reports={reports} />
     {snapshot.reports.length > reports.length && <p className="text-sm text-[var(--ink-2)]">{snapshot.reports.length - reports.length} reports have no valid map location. They remain available in the command workspace.</p>}
   </div>;
 }

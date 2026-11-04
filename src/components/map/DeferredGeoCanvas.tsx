@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { Component, type ReactNode } from "react";
 import type { GeoCanvasProps } from "./GeoCanvas";
 import { workspaceMapHeight } from "@/lib/workspace/presentation";
@@ -18,7 +19,7 @@ class MapBoundary extends Component<{ children: ReactNode }, { failed: boolean }
       <div className="grid gap-3 rounded-panel border border-rule bg-[var(--sheet-sunk)] p-6" role="alert">
         <h3>Map unavailable</h3>
         <p className="text-sm text-[var(--ink-2)]">Continue with the incident queue, timeline, and details. No report data has been changed.</p>
-        <button type="button" className="min-h-11 rounded-ctl border border-rule bg-sheet px-4 font-semibold hover:bg-[var(--tide-wash)] focus-visible:outline-2 focus-visible:outline-tide active:bg-[var(--sheet-sunk)]" onClick={() => this.setState({ failed: false })}>Retry loading map</button>
+        <div className="flex flex-col gap-2 sm:flex-row"><button type="button" className="min-h-11 rounded-ctl border border-rule bg-sheet px-4 font-semibold hover:bg-[var(--tide-wash)] focus-visible:outline-2 focus-visible:outline-tide active:bg-[var(--sheet-sunk)]" onClick={() => this.setState({ failed: false })}>Retry loading map</button><Link href="/#incident-map-preview" className="inline-flex min-h-11 items-center justify-center rounded-ctl border border-rule bg-sheet px-4 text-sm font-semibold text-tide hover:bg-[var(--tide-wash)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tide active:bg-[var(--sheet-sunk)]">Explore a fictional sample · not live data</Link></div>
       </div>
     );
     return this.props.children;
