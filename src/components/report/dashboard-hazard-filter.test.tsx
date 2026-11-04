@@ -67,6 +67,25 @@ describe("linked command workspace", () => {
     expect(map().getByRole("button", { name: "Map pin: Flood on Taft Avenue" }).getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("announces selected incidents and can clear selection without changing filters", () => {
+    render(<DashboardCommandWorkspace snapshot={snapshot()} canReview />);
+    fireEvent.click(queue().getByRole("button", { name: "Select Transformer fire" }));
+    expect(screen.getByRole("status", { name: "" }).textContent).toContain("Selected incident");
+    expect(details().getByRole("heading", { name: "Transformer fire" })).toBeDefined();
+    fireEvent.click(details().getByRole("button", { name: "Clear selected incident" }));
+    expect(details().queryByRole("heading", { name: "Transformer fire" })).toBeNull();
+    expect(screen.getByRole("button", { name: /^All hazards/ }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("does not present pending uploads or manual-only review as completed AI inference", () => {
+    render(<DashboardCommandWorkspace snapshot={snapshot({
+      reports: [reports[2], { ...reports[0], status: "needs_manual_review", model_id: null }],
+      totalCount: 2,
+    })} canReview />);
+    expect(queue().getByText("Awaiting AI analysis")).toBeDefined();
+    expect(queue().getByText("Human review pending · no AI finding")).toBeDefined();
+  });
+
   it("keeps unlocated reports in the queue without creating a map pin or coordinates", () => {
     render(<DashboardCommandWorkspace snapshot={snapshot()} canReview={false} />);
     expect(map().queryByRole("button", { name: /Unlocated/ })).toBeNull();
