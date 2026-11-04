@@ -45,6 +45,10 @@ export interface ObservationData {
   modelId?: string;
   /** True if this is a demo mock observation. */
   isDemo?: boolean;
+  /** True only for a successfully processed or separately recorded human-corrected observation. */
+  analysisAvailable?: boolean;
+  /** Human correction exists while original model analysis was unavailable. */
+  humanOnlyAssessment?: boolean;
 }
 
 export interface ObservationPanelProps {
@@ -94,10 +98,12 @@ export function ObservationPanel({
   className,
 }: ObservationPanelProps) {
   const state: VerificationState = stateOverride ?? stateFromReport({ status, reviewOutcome: reviewOutcome });
-  const severity = toSeverityLevel(observation.severity);
-  const incidentLabel = observation.incidentType
-    ? INCIDENT_LABEL[observation.incidentType] ?? observation.incidentType
-    : "Unclear";
+  const severity = observation.analysisAvailable && observation.severity != null
+    ? toSeverityLevel(observation.severity) : null;
+  const incidentLabel = !observation.analysisAvailable ? "Awaiting human assessment"
+    : observation.incidentType
+      ? INCIDENT_LABEL[observation.incidentType] ?? observation.incidentType
+      : "Unclassified";
 
   return (
     <div className={cn("obs panel", className)} data-state={state}>
@@ -110,26 +116,36 @@ export function ObservationPanel({
           modelName={observation.modelId}
           isDemo={observation.isDemo}
         />
+        {observation.humanOnlyAssessment && <p className="m-0 mt-2 text-xs font-semibold text-[var(--ink-2)]">Human-recorded assessment; original AI processing was unsuccessful.</p>}
         <h2 className="obs__type">{incidentLabel}</h2>
         <p className="obs__summary">
-          {observation.summary ?? "The model produced no summary for this photo."}
+          {!observation.analysisAvailable
+            ? "No validated AI observation is available. Inspect the saved photograph and supporting information before deciding."
+            : observation.summary ?? "The validated observation did not include a summary."}
         </p>
       </HatchSurface>
       <div className="obs__section">
         <div className="obs__section-title">Severity</div>
-        <SeverityMeter level={severity} state={state} />
+        {severity === null
+          ? <p role="status" className="m-0 text-sm text-[var(--ink-2)]">Not assessed — no validated AI severity. A human reviewer must determine the significance of the photograph.</p>
+          : <SeverityMeter level={severity} state={state} />}
       </div>
       <div className="obs__section">
-        <div className="obs__section-title">What the model saw</div>
-        <EvidenceList items={observation.visibleEvidence} />
+        <div className="obs__section-title">{observation.humanOnlyAssessment ? "What the reviewer recorded" : "What the model saw"}</div>
+        {observation.analysisAvailable
+          ? <EvidenceList items={observation.visibleEvidence} />
+          : <p className="m-0 text-sm text-[var(--ink-2)]">No validated model evidence. Review the original photo directly.</p>}
       </div>
       <div className="obs__section">
-        <div className="obs__section-title">What the model could not determine</div>
-        <UncertaintyList items={observation.uncertainties} />
+        <div className="obs__section-title">{observation.humanOnlyAssessment ? "Reviewer-recorded uncertainties" : "What the model could not determine"}</div>
+        {observation.analysisAvailable
+          ? <UncertaintyList items={observation.uncertainties} />
+          : <p className="m-0 text-sm text-[var(--ink-2)]">AI uncertainty was not assessed because analysis failed.</p>}
       </div>
       <div className="obs__section">
         <div className="obs__section-title">Priority</div>
         <PriorityBreakdown score={priorityScore} factors={priorityFactors} />
+        {!observation.analysisAvailable && <p className="mt-2 text-xs text-[var(--ink-2)]">This is a provisional rule-based queue score, not an AI severity estimate or human-confirmed incident priority.</p>}
       </div>
       {actionBar}
     </div>

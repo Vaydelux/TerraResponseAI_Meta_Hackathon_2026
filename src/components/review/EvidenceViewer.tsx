@@ -22,6 +22,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MaskControl, type SamOverlay } from "./MaskControl";
+import { RealSamMaskCanvas } from "./RealSamMaskCanvas";
 import { SealBadge } from "@/components/seal/SealBadge";
 import { stateFromReport } from "@/lib/design/status";
 import { formatCoords } from "@/lib/design/format";
@@ -41,6 +42,8 @@ export interface EvidenceViewerProps {
   reviewOutcome: string | null;
   analysisTarget?: string | null;
   samAvailable?: boolean;
+  canRequestSegmentation?: boolean;
+  segmentationUnavailableReason?: string | null;
   initialOverlay?: SamOverlay | null;
   className?: string;
 }
@@ -60,6 +63,8 @@ export function EvidenceViewer({
   reviewOutcome,
   analysisTarget = null,
   samAvailable = false,
+  canRequestSegmentation = false,
+  segmentationUnavailableReason = null,
   initialOverlay = null,
   className,
 }: EvidenceViewerProps) {
@@ -70,6 +75,9 @@ export function EvidenceViewer({
   const [dragging, setDragging] = useState<null | { x: number; y: number; ox: number; oy: number }>(null);
   const [maskOpacity, setMaskOpacity] = useState(0.45);
   const [maskVisible, setMaskVisible] = useState(true);
+  const [receivedOverlay, setReceivedOverlay] = useState<{ reportId: string; value: SamOverlay } | null>(null);
+  const displayedOverlay = receivedOverlay?.reportId === reportId
+    ? receivedOverlay.value : initialOverlay;
   const viewerRef = useRef<HTMLDivElement>(null);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestAbortRef = useRef<AbortController | null>(null);
@@ -241,30 +249,12 @@ export function EvidenceViewer({
               {urlError ? <span>{urlError}</span> : <span>Loading photo…</span>}
             </div>
           )}
-          {initialOverlay && maskVisible && (
-            <div className="viewer__mask" style={{ "--mask-opacity": maskOpacity } as React.CSSProperties}>
-              {/* The mask is rendered as an SVG overlay. The RLE would
-                  be decoded here; for now, a translucent flood-colored
-                  block indicates the mask region (per the CSS color
-                  spec, flood blue = SAM mask only). */}
-              <svg
-                width="100%"
-                height="100%"
-                viewBox={`0 0 ${initialOverlay.image_width || 100} ${initialOverlay.image_height || 100}`}
-                preserveAspectRatio="xMidYMid meet"
-                style={{ position: "absolute", inset: 0 }}
-                aria-hidden="true"
-              >
-                <rect
-                  x="20%"
-                  y="20%"
-                  width="60%"
-                  height="60%"
-                  fill="var(--flood)"
-                  opacity={maskOpacity}
-                />
-              </svg>
-            </div>
+          {displayedOverlay && signedUrl && (
+            <RealSamMaskCanvas
+              overlay={displayedOverlay}
+              opacity={maskOpacity}
+              visible={maskVisible}
+            />
           )}
         </div>
         <div className="viewer__chrome viewer__chrome--tl">
@@ -316,7 +306,14 @@ export function EvidenceViewer({
             reportId={reportId}
         analysisTarget={analysisTarget}
         samAvailable={samAvailable}
-        initialOverlay={initialOverlay}
+        status={status}
+        canRequest={canRequestSegmentation}
+        unavailableReason={segmentationUnavailableReason}
+        initialOverlay={displayedOverlay}
+        onMask={(next) => {
+          if (next) setReceivedOverlay({ reportId, value: next });
+          else setReceivedOverlay(null);
+        }}
         onOpacity={(o) => setMaskOpacity(o)}
         onToggle={(v) => setMaskVisible(v)}
       />

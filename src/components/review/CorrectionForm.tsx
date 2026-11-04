@@ -54,7 +54,7 @@ export function CorrectionForm({
   onSubmitted,
 }: CorrectionFormProps) {
   const [incidentType, setIncidentType] = useState(observation.incidentType ?? "unclear");
-  const [severity, setSeverity] = useState<number>(observation.severity ?? 3);
+  const [severity, setSeverity] = useState<number | null>(observation.severity);
   const [summary, setSummary] = useState(observation.summary ?? "");
   const [evidence, setEvidence] = useState<string[]>(observation.visibleEvidence);
   const [uncertainties, setUncertainties] = useState<string[]>(observation.uncertainties);
@@ -68,6 +68,10 @@ export function CorrectionForm({
     if (submitting || inFlightRef.current) return;
     if (!reason.trim()) {
       toast.error("An audit reason is required for a correction.");
+      return;
+    }
+    if (!observation.analysisAvailable && (summary.trim().length < 10 || severity === null)) {
+      toast.error("When AI analysis is unavailable, enter a factual summary (at least 10 characters) and explicitly choose severity.");
       return;
     }
     inFlightRef.current = true;
@@ -86,7 +90,7 @@ export function CorrectionForm({
           requestId,
           reason: reason.trim(),
           correctedIncidentType: incidentType,
-          correctedSeverity: severity,
+          correctedSeverity: severity ?? undefined,
           correctedSummary: summary,
           correctedVisibleEvidence: evidence,
           correctedUncertainties: uncertainties,
@@ -105,11 +109,16 @@ export function CorrectionForm({
           uncertainties,
         });
         onClose();
-      } else if (!body?.ok) {
-        toast.error(body?.error?.message ?? "Correction failed.", {
-          label: "Retry",
-          onClick: () => void handleSubmit(),
-        });
+      } else {
+        const message = body?.error?.message ?? "Correction failed.";
+        if (res.status === 409) {
+          toast.error(message, { label: "Reload report", onClick: () => window.location.reload() });
+        } else if (res.status >= 500) {
+          toast.error(message, { label: "Retry safely", onClick: () => void handleSubmit() });
+        } else {
+          requestIdRef.current = null;
+          toast.error(message);
+        }
       }
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === "AbortError") return;
@@ -147,19 +156,21 @@ export function CorrectionForm({
       className="drawer"
     >
       <header style={{ display: "grid", gap: 4, marginBottom: "var(--s-4)" }}>
-        <h2 style={{ fontSize: "var(--step-2)" }}>Correct the observation</h2>
+        <h2 style={{ fontSize: "var(--step-2)" }}>{observation.analysisAvailable ? "Correct the observation" : "Record your manual assessment"}</h2>
         <p className="t-meta">
-          Your edits overwrite the AI's values. The original is preserved in the audit trail.
+          {observation.analysisAvailable
+            ? "Your corrections are recorded separately from the original model output, with an audit trail."
+            : "No validated AI assessment exists for this report. Record a factual human assessment and severity; it is not an AI result."}
         </p>
       </header>
 
       <div style={{ display: "grid", gap: "var(--s-4)" }}>
         {renderDiff("Incident type", observation.incidentType ?? "unclear", incidentType)}
-        {renderDiff("Severity", observation.severity ?? 3, severity)}
+        {renderDiff("Severity", observation.severity ?? "Not assessed", severity ?? "Not assessed")}
         {renderDiff("Summary", observation.summary ?? "", summary)}
 
         <Field label="Incident type" htmlFor="cf-incident">
-          <Select id="cf-incident" value={incidentType} onChange={(e) => setIncidentType(e.target.value)}>
+          <Select id="cf-incident" value={incidentType} onChange={(e) => { setIncidentType(e.target.value); requestIdRef.current = null; }}>
             {INCIDENT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
@@ -171,8 +182,8 @@ export function CorrectionForm({
             aria-label="Corrected severity"
             block
             options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))}
-            value={String(severity)}
-            onChange={(v) => setSeverity(Number(v))}
+            value={severity === null ? "" : String(severity)}
+            onChange={(v) => { setSeverity(Number(v)); requestIdRef.current = null; }}
           />
         </Field>
 
@@ -180,7 +191,7 @@ export function CorrectionForm({
           <Textarea
             id="cf-summary"
             value={summary}
-            onChange={(e) => setSummary(e.target.value)}
+            onChange={(e) => { setSummary(e.target.value); requestIdRef.current = null; }}
             rows={4}
           />
         </Field>
@@ -207,7 +218,7 @@ export function CorrectionForm({
           <Input
             id="cf-reason"
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={(e) => { setReason(e.target.value); requestIdRef.current = null; }}
             placeholder="e.g. Image shows deeper water than the AI inferred"
             required
           />
@@ -216,7 +227,8 @@ export function CorrectionForm({
 
       <DialogActions>
         <Button variant="quiet" onClick={onClose} disabled={submitting}>Cancel</Button>
-        <Button variant="primary" onClick={() => void handleSubmit()} busy={submitting} disabled={!reason}>
+        <Button variant="primary" onClick={() => void handleSubmit()} busy={submitting}
+          disabled={!reason.trim() || (!observation.analysisAvailable && (summary.trim().length < 10 || severity === null))}>
           Submit correction
         </Button>
       </DialogActions>

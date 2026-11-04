@@ -12,7 +12,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Field, Input, Textarea, Button, toast } from "@/components/ui-tr";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,7 @@ export function PriorityOverride({
   const [score, setScore] = useState<string>(currentOverride ? String(currentOverride.new_score) : String(computedScore));
   const [reason, setReason] = useState<string>(currentOverride?.reason ?? "");
   const [busy, setBusy] = useState(false);
+  const requestIdRef = useRef<string | null>(null);
 
   async function handleSubmit() {
     if (busy) return;
@@ -45,26 +46,34 @@ export function PriorityOverride({
       toast.error("Score must be an integer 0–100.");
       return;
     }
-    if (!reason.trim()) {
-      toast.error("A reason is required for the audit trail.");
+    if (reason.trim().length < 3) {
+      toast.error("Enter a reason of at least three characters for the audit trail.");
       return;
     }
     setBusy(true);
+    const requestId = requestIdRef.current ?? crypto.randomUUID();
+    requestIdRef.current = requestId;
     try {
       const res = await fetch(`/api/reports/${reportId}/priority`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newScore: n, reason: reason.trim() }),
+        body: JSON.stringify({ newScore: n, reason: reason.trim(), requestId }),
       });
       const body = await res.json();
-      if (body?.ok) {
+      if (res.ok && body?.ok) {
+        requestIdRef.current = null;
         toast.success("Priority overridden. The computed score is preserved in the audit trail.");
         onOverridden?.(n, reason.trim());
-      } else if (!body?.ok) {
-        toast.error(body?.error?.message ?? "Override failed.", {
-          label: "Retry",
-          onClick: () => void handleSubmit(),
-        });
+      } else {
+        const message = body?.error?.message ?? "Override failed.";
+        if (res.status >= 500) {
+          toast.error(message, { label: "Retry safely", onClick: () => void handleSubmit() });
+        } else if (res.status === 409) {
+          toast.error(message, { label: "Reload report", onClick: () => window.location.reload() });
+        } else {
+          requestIdRef.current = null;
+          toast.error(message);
+        }
       }
     } catch {
       toast.error("Network error during override.", {
@@ -80,7 +89,7 @@ export function PriorityOverride({
     <div className={cn("panel", className)}>
       <h3 style={{ fontSize: "var(--step-1)", marginBottom: "var(--s-3)" }}>Override priority</h3>
       <p className="t-meta" style={{ marginBottom: "var(--s-3)" }}>
-        The original computed score is preserved alongside this override in the audit trail.
+        Only coordinators and administrators can override a report priority. Each change requires an audit reason; the database commits the override and new queue score together.
       </p>
       <div style={{ display: "grid", gap: "var(--s-3)" }}>
         <Field label={`New score (computed: ${computedScore})`} htmlFor="po-score">
@@ -90,7 +99,7 @@ export function PriorityOverride({
             min={0}
             max={100}
             value={score}
-            onChange={(e) => setScore(e.target.value)}
+            onChange={(e) => { setScore(e.target.value); requestIdRef.current = null; }}
           />
         </Field>
         <Field label="Reason (required)" htmlFor="po-reason">
@@ -98,13 +107,13 @@ export function PriorityOverride({
             id="po-reason"
             rows={3}
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={(e) => { setReason(e.target.value); requestIdRef.current = null; }}
             placeholder="e.g. Field team reports this incident is contained"
             required
           />
         </Field>
         <div className="tr-cluster" style={{ justifyContent: "flex-end" }}>
-          <Button variant="primary" onClick={() => void handleSubmit()} busy={busy} disabled={!reason.trim()}>
+          <Button variant="primary" onClick={() => void handleSubmit()} busy={busy} disabled={reason.trim().length < 3}>
             Submit override
           </Button>
         </div>

@@ -64,11 +64,15 @@ export async function GET(
   // Fetch the analysis (for visual severity + access disruption).
   const { data: analysis } = await supabase
     .from("report_analyses")
-    .select("structured_observation, severity_score")
+    .select("structured_observation, severity_score, processing_status, raw_usage_metadata")
     .eq("report_id", id)
     .single();
 
-  const observation = (analysis?.structured_observation as Record<string, unknown>) ?? {};
+  // Failed or incomplete AI analyses are NOT validated visual evidence.
+  const humanCorrected = Boolean((analysis?.raw_usage_metadata as
+    Record<string, unknown> | null)?._corrected_by);
+  const observation = analysis?.processing_status === "succeeded" || humanCorrected
+    ? (analysis?.structured_observation as Record<string, unknown> ?? {}) : {};
   const visualSeverity = observation.preliminary_severity as number | null ?? null;
 
   // Check if the report's incident_type indicates access disruption.
@@ -150,7 +154,8 @@ export async function GET(
 
 const overrideSchema = z.object({
   newScore: z.number().int().min(0).max(100),
-  reason: z.string().min(1).max(2000),
+  reason: z.string().trim().min(3).max(2000),
+  requestId: z.string().uuid(),
 });
 
 export async function POST(
@@ -223,61 +228,34 @@ export async function POST(
   }
 
   const supabase = await createSupabaseServerClient();
-
-  // Fetch the current computed score (to preserve it as previous_score).
-  const { data: report } = await supabase
-    .from("reports")
-    .select("priority_score")
-    .eq("id", id)
-    .single();
-
-  if (!report) {
-    return NextResponse.json(
-      { error: { code: "NOT_FOUND", message: "Report not found." } },
-      { status: 404 },
-    );
-  }
-
-  const previousScore = report.priority_score ?? 0;
-
-  // Insert the override (append-only — preserves history).
-  const { error: insertErr } = await supabase
-    .from("priority_overrides")
-    .insert({
-      report_id: id,
-      overridden_by: user.id,
-      previous_score: previousScore,
-      new_score: body.newScore,
-      reason: body.reason,
-    });
-
-  if (insertErr) {
-    return NextResponse.json(
-      { error: { code: "INSERT_FAILED", message: insertErr.message } },
-      { status: 500 },
-    );
-  }
-
-  // Update the report's priority_score to the overridden value.
-  const { error: updateErr } = await supabase
-    .from("reports")
-    .update({ priority_score: body.newScore })
-    .eq("id", id);
-
-  if (updateErr) {
-    return NextResponse.json(
-      { error: { code: "UPDATE_FAILED", message: updateErr.message } },
-      { status: 500 },
-    );
-  }
-
-  return NextResponse.json({
-    ok: true,
-    reportId: id,
-    computedScore: previousScore,
-    overriddenScore: body.newScore,
-    reason: body.reason,
-    overriddenBy: user.id,
-    overriddenAt: new Date().toISOString(),
+  // One database transaction validates the actor/event and locks the report.
+  // Direct INSERT followed by UPDATE previously left partial overrides when
+  // the second statement failed.
+  const { data, error } = await supabase.rpc("submit_priority_override_atomic", {
+    p_report_id: id,
+    p_request_id: body.requestId,
+    p_new_score: body.newScore,
+    p_reason: body.reason,
   });
+
+  if (error) {
+    const status = error.code === "42501" ? 403
+      : error.code === "22023" ? 400
+      : error.code === "P0002" ? 404
+      : error.code === "P0001" ? 409 : 503;
+    return NextResponse.json({ error: {
+      code: status === 403 ? "FORBIDDEN" : status === 409 ? "CONFLICT" : "OVERRIDE_UNAVAILABLE",
+      message: status === 403 ? "Only the assigned event coordinator or administrator can override this priority."
+        : status === 409 ? "This report or request changed. Refresh before trying again."
+        : status === 503 ? "The atomic priority-override service is unavailable. Confirm that the staging migration is installed."
+        : "The priority override was not accepted.",
+    } }, { status });
+  }
+  if (!data || typeof data !== "object" ||
+    (data as { ok?: unknown }).ok !== true) {
+    return NextResponse.json({ error: {
+      code: "OVERRIDE_UNAVAILABLE", message: "The override transaction could not be confirmed.",
+    } }, { status: 503 });
+  }
+  return NextResponse.json(data);
 }

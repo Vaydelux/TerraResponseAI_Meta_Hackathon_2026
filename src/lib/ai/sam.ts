@@ -30,6 +30,8 @@
 // text contains no mask data (the model didn't find a match), we
 // return a no_match result.
 
+import { parseSamImageResponse, type SamStoredMask } from "@/lib/ai/sam-protocol";
+
 const DEFAULT_TIMEOUT_MS = 45_000; // segmentation can be slower than vision
 const MIN_SCORE_THRESHOLD = 0.3; // below this = no match
 
@@ -55,17 +57,12 @@ export interface MaskBox {
 
 export interface SegmentSuccess {
   ok: true;
-  /** The raw segmentation text from the Responses API (contains
-   *  the special-token mask data). Stored as-is for the overlay
-   *  renderer to parse. */
-  rle: string;
-  /** Confidence score [0, 1]. */
-  score: number;
-  /** Bounding box (normalized). */
-  box: MaskBox | null;
-  /** The image width/height the mask aligns to. */
+  /** Only decoded-and-validated model objects can be persisted/rendered. */
+  masks: SamStoredMask[];
   imageWidth: number;
   imageHeight: number;
+  /** Missing confidence means none was supplied by the provider. */
+  score: number | null;
   modelId: string;
   prompt: string;
   usageMetadata: Record<string, unknown>;
@@ -161,6 +158,7 @@ export async function segmentImage(
       },
     ],
     stream: true,
+    metadata: { mask_encoding: "one_bit", include_confidence: "true" },
   };
 
   const controller = new AbortController();
@@ -177,17 +175,15 @@ export async function segmentImage(
       signal: controller.signal,
     });
 
-    clearTimeout(timeoutId);
-
     if (!response.ok) {
       const statusCode = response.status;
-      const errorText = await response.text().catch(() => "unknown error");
+      // Provider response bodies can contain request context; never surface them to reviewers.
       const kind: "transient" | "permanent" =
         statusCode === 429 || statusCode >= 500 ? "transient" : "permanent";
       return {
         ok: false,
         kind,
-        error: `SAM API returned ${statusCode}: ${errorText.slice(0, 500)}`,
+        error: `SAM API returned HTTP ${statusCode}; no overlay was generated.`,
         statusCode,
       };
     }
@@ -195,9 +191,20 @@ export async function segmentImage(
     // Parse the streaming response. The Meta Responses API streams
     // text/event-stream with events of type "response.output_text.delta".
     // The stream terminates with "[DONE]".
-    return parseStreamResponse(response, args.prompt, model);
+    const parsed = await parseSamImageResponse(response);
+    if (parsed.status === "no_match") {
+      return { ok: false, kind: "no_match",
+        error: "SAM found no matching object for the requested target." };
+    }
+    return {
+      ok: true, masks: parsed.masks, imageWidth: parsed.width,
+      imageHeight: parsed.height,
+      score: parsed.masks.length > 0 &&
+        parsed.masks.every((item) => typeof item.confidence === "number")
+        ? Math.max(...parsed.masks.map((item) => item.confidence ?? 0)) : null,
+      modelId: model, prompt, usageMetadata: parsed.usage,
+    };
   } catch (err) {
-    clearTimeout(timeoutId);
     if (err instanceof Error && err.name === "AbortError") {
       return {
         ok: false,
@@ -208,129 +215,13 @@ export async function segmentImage(
     return {
       ok: false,
       kind: "transient",
-      error: err instanceof Error ? err.message : "Unknown fetch error",
+      error: err instanceof Error && err.message.startsWith("SAM_")
+        ? "SAM output was incomplete, invalid or exceeded safety bounds; no mask was saved."
+        : "SAM provider or network request failed. The report remains usable.",
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
-}
-
-/**
- * Parse the text/event-stream response from the Responses API.
- *
- * The stream consists of SSE events. Each event has a `data:` field
- * containing a JSON object. We accumulate the text deltas from
- * `response.output_text.delta` events. The final text contains the
- * segmentation output (bounding boxes + pixel-accurate masks in
- * special-token format).
- *
- * We also capture `response.completed` events for usage metadata
- * and `response.output_image` events if the API returns image
- * content blocks.
- *
- * If the accumulated text is empty or contains no mask data, we
- * return a no_match result (the rest of the report remains usable).
- */
-async function parseStreamResponse(
-  response: Response,
-  prompt: string,
-  model: string,
-): Promise<SegmentResult> {
-  const reader = response.body?.getReader();
-  if (!reader) {
-    return {
-      ok: false,
-      kind: "permanent",
-      error: "SAM stream response has no body reader.",
-    };
-  }
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let fullText = "";
-  let usage: Record<string, unknown> = {};
-
-  // Read the SSE stream.
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    // Split on double newlines (SSE event boundaries).
-    const events = buffer.split("\n\n");
-    buffer = events.pop() ?? ""; // keep the incomplete event
-
-    for (const event of events) {
-      const lines = event.split("\n");
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const data = line.slice(6).trim();
-        if (data === "[DONE]") continue;
-
-        try {
-          const parsed = JSON.parse(data);
-
-          // Accumulate text deltas.
-          if (parsed.type === "response.output_text.delta" && parsed.delta) {
-            fullText += parsed.delta;
-          }
-
-          // Capture usage metadata from the completed event.
-          if (parsed.type === "response.completed" && parsed.response?.usage) {
-            usage = parsed.response.usage;
-          }
-        } catch {
-          // Skip malformed SSE data.
-        }
-      }
-    }
-  }
-
-  // Process the accumulated text. If it's empty, the model found no
-  // match for the prompt.
-  if (!fullText || fullText.trim().length === 0) {
-    return {
-      ok: false,
-      kind: "no_match",
-      error: "SAM stream produced no output text (no match for the prompt).",
-    };
-  }
-
-  // The official docs say the output contains "one box and one mask
-  // per match" in special-token text. The exact format of the
-  // special tokens is documented at:
-  // https://dev.meta.ai/docs/media-segmentation#reading-segmentation-output
-  //
-  // We store the raw text as the `rle` field. The overlay renderer
-  // (segmentation-overlay.tsx) parses the special-token text to
-  // extract the mask geometry. The score is derived from the
-  // model's confidence (if present in the text); otherwise we
-  // default to 1.0 (the model returned a match).
-  //
-  // If the text doesn't contain mask data (e.g., the model said
-  // "no match" in plain text), we return a no_match result.
-  const hasMaskData = fullText.includes("<mask>") ||
-    fullText.includes("<box>") ||
-    fullText.includes("rle") ||
-    fullText.includes("segmentation");
-
-  if (!hasMaskData) {
-    return {
-      ok: false,
-      kind: "no_match",
-      error: "SAM output text contains no mask data (the model may not have found a match).",
-    };
-  }
-
-  return {
-    ok: true,
-    rle: fullText,
-    score: 1.0, // default; the overlay renderer can extract the actual score
-    box: null, // the overlay renderer extracts the box from the text
-    imageWidth: 0, // the overlay renderer extracts the dimensions
-    imageHeight: 0,
-    modelId: model,
-    prompt,
-    usageMetadata: usage,
-  };
 }
 
 /** Check if SAM is configured (has a key). */
