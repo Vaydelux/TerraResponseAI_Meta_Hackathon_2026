@@ -371,3 +371,39 @@ Use the existing `src/app/styles/tokens.css` semantic colors, spacing and typogr
 ## 5. Changes and next step
 
 **Plan documentation only** on branch `plan/production-public-assets-20261105`. Request explicit owner approval of this plan before beginning app edits. No implementation, merge, Vercel redeploy, or Supabase mutation performed.
+
+
+---
+
+# Approved extension — collapsible workspace sidebar (2026-11-05)
+
+**Owner request:** “Please proceed. also can you implement a mixed of sidebar for navigation. collapsible instead of a horizontal nav bar.” Prior public-asset plan is approved for implementation. This addition extends the approved work to the authenticated shell only; public landing and login retain their compact top navigation.
+
+## Findings (source review)
+- \`TopBar.tsx\` contains long horizontal navigation at desktop >=1440px and a stacked mobile drawer. It competes for width and doesn't provide a compact desktop layout.
+- \`AppShell.tsx\` composes header, banner, page and footer but has no persistent sidebar column.
+- Existing \`isNavHrefActive\`, role and flag visibility, pending-review count, \`ThemeToggle\`, \`UserMenu\`, \`Wordmark\`, and \`NavPendingIndicator\` must be preserved.
+- Existing dashboard has its own >=1440px 65/35 map-queue split; adding a 264px sidebar consumes viewport width. Preserve existing proportions within available content width; don't introduce horizontal overflow.
+- Existing responsive smoke only covers a public landing, not authenticated sidebar interactions.
+
+## Priorities 1 → 5
+1. **ENHANCE:** Move authenticated navigation into a persistent, elegant desktop sidebar; add expanded text/icon and collapsed icon-only modes. Mobile/tablet use a slide-in modal drawer opened by a header menu button; no desktop horizontal nav.
+2. **REFINE:** Split shell into small components: \`AppShell\` server, \`WorkspaceFrame\` client state, \`TopBar\` compact header, \`WorkspaceSidebar\` shared role-aware link registry. Do not duplicate route authorization; every route remains server enforced.
+3. **POLISH:** Desktop >=1024: sidebar width 264px expanded, 76px collapsed, fluid main. Tablet 768–1023: drawer triggered from header, existing map height 400px. Mobile 320–480: drawer width min(304px, 90vw), 44px menu/toggle/links, scrollable navigation, no body overflow. Sidebar groups, Lucide iconography, active state, pending count badge, semantic tokens, softened borders, accessible hover/focus/active, reduced-motion behavior, brand wordmark; content remains readable at 320px.
+4. **SOLIDIFY:** Close drawer on route click, Escape, overlay click and when browser navigation changes route. Trap keyboard focus in drawer, restore opener focus on closing, lock background scroll, \`aria-expanded\`, \`aria-current\`, \`aria-label\`. Keep role/triage flag gating, status indicator, account and theme controls. No changes to database, Supabase auth, inference or API logic.
+5. **TEST LAST:** After implementation, run lint/typecheck/test/build and an authenticated/fixture sidebar component test plus Playwright where possible. Regression check at 320/768/1440 for zero horizontal overflow, keyboard and reduced motion, route-active links and no unauthorized visible link; verify public asset URLs anonymously with configured middleware and 200+image MIME responses.
+
+## Target component tree
+\`\`\`
+AppShell [server]
+  WorkspaceFrame [client: desktop collapsed and mobile drawer state]
+    TopBar [brand, mobile menu, theme, profile]
+    Desktop WorkspaceSidebar [grouped links / collapse button]
+    Responsive Main [DemoBanner, route children, footer]
+    Mobile WorkspaceSidebar [modal drawer, same link data, close control]
+Dashboard route [unchanged: map + timeline / queue]
+\`\`\`
+
+**Risks:** Preview deployment may differ from production. Explicit public asset allowlist must not exempt evidence or any API route. No protected routes should become anonymously accessible. A narrower dashboard content column may change layout at some in-between widths. Authenticated end-to-end staging demo remains unverified independently of frontend tests.
+
+**Implementation authority:** Owner's “Please proceed” approves the previous asset plan. The sidebar work is newly requested in the same message; retain this plan in the PR and implement that scope without unrelated feature growth. Merge only if code checks are green and the branch is current.
