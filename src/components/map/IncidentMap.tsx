@@ -29,7 +29,17 @@ import {
   Compass,
   Download,
   Check,
+  Plus,
+  Minus,
+  LocateFixed,
+  Layers,
+  ShieldAlert,
+  Flame,
+  Waves,
 } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { MapLegend } from "./MapLegend";
 import { IncidentPanel, type IncidentPanelData } from "./IncidentPanel";
 import { PIN_HAZARD_SHORT_LABEL } from "./IncidentPin";
@@ -205,6 +215,21 @@ export function IncidentMap({
     lon: reports[0]?.longitude ?? 121.0,
   });
   const [snapshotStatus, setSnapshotStatus] = useState<"idle" | "rendering" | "saved">("idle");
+  const [viewMode, setViewMode] = useState<"map" | "split">("split");
+
+  function handleZoomIn() {
+    mapRef.current?.zoomIn({ duration: 300 });
+  }
+  function handleZoomOut() {
+    mapRef.current?.zoomOut({ duration: 300 });
+  }
+  function handleRecenter() {
+    if (reports[0] && Number.isFinite(reports[0].latitude)) {
+      mapRef.current?.flyTo({ center: [reports[0].longitude, reports[0].latitude], zoom: 12, duration: 600 });
+    } else {
+      mapRef.current?.flyTo({ center: [121.0, 14.6], zoom: 11, duration: 600 });
+    }
+  }
 
   // Localized weather/seismic alert state fetched from Google Search Grounding on region pan
   const [regionalAlert, setRegionalAlert] = useState<RegionalHazardAlert | null>(null);
@@ -905,8 +930,8 @@ export function IncidentMap({
     searchQuery.trim() !== "";
 
   return (
-    <div className="tactical-map-shell">
-      {/* Persistent Top Filter Bar: Search + Hazard Category + Severity Level + Heatmap + Verification Mode */}
+    <div className="tactical-map-shell flex flex-col gap-3 sm:gap-4 w-full">
+      {/* Top Filter Bar: Search + Hazard Category + Severity Level + Heatmap + View Mode */}
       <MapFilterBar
         reports={liveReports}
         visibleCount={visibleReports.length}
@@ -928,13 +953,23 @@ export function IncidentMap({
           handleResetAllFilters();
           setShowHeatmap(false);
         }}
+        viewMode={viewMode}
+        onChangeViewMode={setViewMode}
       />
 
-      {/* Main Responsive Grid: Map Canvas Stage + Right Situational Rail */}
-      <div className="tactical-map-grid">
-        <div className="tactical-map-stage">
+      {/* Main Command Center Grid */}
+      <div
+        className={cn(
+          "w-full grid gap-4 items-start",
+          viewMode === "split"
+            ? "grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_410px]"
+            : "grid-cols-1",
+        )}
+      >
+        {/* Map Stage Container */}
+        <div className="relative w-full h-[calc(100vh-210px)] min-h-[580px] rounded-2xl overflow-hidden border border-slate-800 bg-[#0B141A] shadow-2xl">
           <div
-            className={cn("map", className)}
+            className={cn("w-full h-full relative", className)}
             ref={containerRef}
             data-zoomed-labels={mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD ? "true" : "false"}
           >
@@ -946,7 +981,7 @@ export function IncidentMap({
               style={{ opacity: showHeatmap ? 1 : 0 }}
             />
 
-            {/* Top-left Coordinate & Pin Count Readout */}
+            {/* Top-left GPS Pill Readout */}
             <div className="tactical-gps-pill num">
               <Compass
                 size={13}
@@ -962,7 +997,7 @@ export function IncidentMap({
               {showHeatmap ? " · Heatmap On" : ""}
             </div>
 
-            {/* Dismissible Regional Weather & Seismic Alert Overlay (Google Search Grounding) */}
+            {/* Non-intrusive Dismissible Regional Weather & Seismic Alert */}
             <RegionalAlertOverlay
               alert={regionalAlert}
               loading={alertLoading}
@@ -973,9 +1008,63 @@ export function IncidentMap({
               }
             />
 
+            {/* Floating Tactical Map Controls on Right Edge */}
+            <div className="absolute top-4 right-4 z-20 flex flex-col gap-1.5 shadow-xl">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setShowHeatmap((prev) => !prev)}
+                title={showHeatmap ? "Disable Heatmap" : "Enable Heatmap"}
+                className={cn(
+                  "size-9 rounded-xl border-slate-800 backdrop-blur-md transition-all shadow-md",
+                  showHeatmap
+                    ? "bg-amber-600 text-white border-amber-500 hover:bg-amber-500"
+                    : "bg-slate-950/90 text-slate-300 hover:bg-slate-800 hover:text-white",
+                )}
+              >
+                <Layers className="size-4" />
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleRecenter}
+                title="Re-center map"
+                className="size-9 rounded-xl bg-slate-950/90 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white backdrop-blur-md shadow-md"
+              >
+                <LocateFixed className="size-4 text-teal-400" />
+              </Button>
+
+              <div className="flex flex-col bg-slate-950/90 border border-slate-800 rounded-xl overflow-hidden backdrop-blur-md shadow-md mt-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleZoomIn}
+                  title="Zoom In"
+                  className="size-9 text-slate-300 hover:bg-slate-800 hover:text-white rounded-none"
+                >
+                  <Plus className="size-4" />
+                </Button>
+                <div className="h-px bg-slate-800" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleZoomOut}
+                  title="Zoom Out"
+                  className="size-9 text-slate-300 hover:bg-slate-800 hover:text-white rounded-none"
+                >
+                  <Minus className="size-4" />
+                </Button>
+              </div>
+            </div>
+
             <MapLegend showPending={pendingMode === "all"} />
 
-            {/* Selected Incident Floating Panel */}
+            {/* Selected Incident Inspector Panel (elevated above bottom scrubber) */}
             {panelReport && (
               <IncidentPanel
                 report={panelReport}
@@ -984,7 +1073,7 @@ export function IncidentMap({
               />
             )}
 
-            {/* Bottom Temporal Scrubber filtering pins by `uploaded_at` */}
+            {/* Bottom Temporal Progression Scrubber */}
             <TemporalScrubber
               reports={liveReports}
               visibleCount={visibleReports.length}
@@ -996,232 +1085,255 @@ export function IncidentMap({
           </div>
         </div>
 
-        {/* Right Situational Rail */}
-        <aside className="tactical-rail" aria-label="Incident details and list">
-          {/* Card 0: Hazard Summary Sidebar with D3 Bar Chart & Pending Count */}
-          <HazardSummaryChart
-            reports={liveReports}
-            selectedHazards={selectedHazards}
-            onToggleHazard={handleToggleHazard}
-            onResetHazards={() => setSelectedHazards([])}
-          />
+        {/* Right Situational Rail (Shown in Split View) */}
+        {viewMode === "split" && (
+          <aside
+            className="w-full max-h-[calc(100vh-210px)] overflow-y-auto pr-1 flex flex-col gap-4 no-scrollbar"
+            aria-label="Incident analytics and triage list"
+          >
+            {/* Card 0: Hazard Summary Sidebar with D3 Bar Chart */}
+            <HazardSummaryChart
+              reports={liveReports}
+              selectedHazards={selectedHazards}
+              onToggleHazard={handleToggleHazard}
+              onResetHazards={() => setSelectedHazards([])}
+            />
 
-          {/* Card 1: Highest Priority Incident Highlight */}
-          <div className="panel" style={{ display: "grid", gap: "var(--s-3)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--s-2)" }}>
-              <span className="t-label" style={{ color: "var(--tide)", fontSize: "var(--step--1)" }}>
-                Top Priority in View
-              </span>
-              <span
-                className="t-meta num"
-                style={{
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                  background: topAdvisory ? "var(--amber-wash)" : "var(--sheet-sunk)",
-                  color: topAdvisory ? "var(--amber-ink)" : "var(--ink-3)",
-                  fontWeight: 700,
-                }}
-              >
-                {topAdvisory ? `Priority ${topAdvisory.priority_score ?? "—"}` : "No Pins"}
-              </span>
-            </div>
+            {/* Card 1: Top Priority Incident Highlight */}
+            <Card className="bg-slate-950/95 dark:bg-[#0B141A]/95 border-slate-800 text-slate-100 rounded-2xl shadow-xl p-4 sm:p-5 flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-teal-400 uppercase tracking-wider">
+                  Top Priority in View
+                </span>
+                <Badge
+                  variant={topAdvisory ? "default" : "secondary"}
+                  className={cn(
+                    "font-mono font-bold text-[11px] px-2.5 py-0.5 border-0",
+                    topAdvisory
+                      ? "bg-amber-500/90 text-slate-950 hover:bg-amber-500"
+                      : "bg-slate-800 text-slate-400",
+                  )}
+                >
+                  {topAdvisory ? `Priority ${topAdvisory.priority_score ?? "—"}` : "No Pins"}
+                </Badge>
+              </div>
 
-            {topAdvisory ? (
-              <>
-                <h3 style={{ fontSize: "var(--step-1)", margin: 0 }}>
-                  {topAdvisory.incidentType
-                    ? INCIDENT_LABEL[topAdvisory.incidentType] ?? topAdvisory.incidentType
-                    : topAdvisory.title || `Report #TR-${topAdvisory.id.slice(0, 6)}`}
-                </h3>
-                <p className="t-meta">
-                  {topAdvisory.summary ||
-                    topAdvisory.description ||
-                    "Click Center on Map to highlight this location or open the report for full details."}
-                </p>
-                <div className="t-meta num">
-                  {topAdvisory.location_label || `${topAdvisory.latitude.toFixed(4)}° N, ${topAdvisory.longitude.toFixed(4)}° E`}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--s-2)" }}>
-                  <button
-                    type="button"
-                    className="btn btn--primary"
-                    style={{ flex: 1 }}
-                    onClick={() => focusReportOnMap(topAdvisory)}
-                  >
-                    <Navigation size={14} aria-hidden="true" />
-                    Center on Map
-                  </button>
-                  <Link
-                    href={
-                      canReview && topAdvisory.status !== "reviewed"
-                        ? `/review/${topAdvisory.id}`
-                        : `/reports/${topAdvisory.id}`
-                    }
-                    className="btn"
-                    style={{ flex: 1 }}
-                  >
-                    Open Report
-                    <ArrowUpRight size={14} aria-hidden="true" />
-                  </Link>
-                  <ShareReportButton
-                    reportId={topAdvisory.id}
-                    title={
-                      topAdvisory.incidentType
+              {topAdvisory ? (
+                <>
+                  <div>
+                    <h3 className="text-base font-bold text-white tracking-tight leading-snug">
+                      {topAdvisory.incidentType
                         ? INCIDENT_LABEL[topAdvisory.incidentType] ?? topAdvisory.incidentType
-                        : topAdvisory.title
-                    }
-                    variant="quiet"
-                    size="md"
+                        : topAdvisory.title || `Report #TR-${topAdvisory.id.slice(0, 6)}`}
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                      {topAdvisory.summary ||
+                        topAdvisory.description ||
+                        "Click Center on Map to highlight this location or open the report for full details."}
+                    </p>
+                    <div className="text-[11px] text-teal-300 font-mono mt-1.5 flex items-center gap-1">
+                      <Navigation className="size-3 text-teal-400" />
+                      <span>
+                        {topAdvisory.location_label ||
+                          `${topAdvisory.latitude.toFixed(4)}° N, ${topAdvisory.longitude.toFixed(4)}° E`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1 flex-wrap">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="flex-1 bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs border-0"
+                      onClick={() => focusReportOnMap(topAdvisory)}
+                    >
+                      <Navigation className="size-3.5 mr-1.5" />
+                      Center on Map
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white text-xs"
+                    >
+                      <Link
+                        href={
+                          canReview && topAdvisory.status !== "reviewed"
+                            ? `/review/${topAdvisory.id}`
+                            : `/reports/${topAdvisory.id}`
+                        }
+                      >
+                        Open Report
+                        <ArrowUpRight className="size-3.5 ml-1" />
+                      </Link>
+                    </Button>
+                    <ShareReportButton
+                      reportId={topAdvisory.id}
+                      title={
+                        topAdvisory.incidentType
+                          ? INCIDENT_LABEL[topAdvisory.incidentType] ?? topAdvisory.incidentType
+                          : topAdvisory.title
+                      }
+                      variant="quiet"
+                      size="md"
+                    />
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-slate-400">
+                  No geo-tagged incidents match the current filter. Try clicking &ldquo;Reset all filters&rdquo; above.
+                </p>
+              )}
+            </Card>
+
+            {/* Card 2: Pinned Reports Pipeline */}
+            <Card className="bg-slate-950/95 dark:bg-[#0B141A]/95 border-slate-800 text-slate-100 rounded-2xl shadow-xl p-4 sm:p-5 flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-white tracking-tight">Pinned Reports</h3>
+                <Badge variant="outline" className="text-xs font-mono text-teal-400 border-slate-800 bg-slate-900">
+                  {sortedVisible.length} shown
+                </Badge>
+              </div>
+
+              {sortedVisible.length === 0 ? (
+                <p className="text-xs text-slate-400">No pinned reports in the current filter.</p>
+              ) : (
+                <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-1">
+                  {sortedVisible.slice(0, 8).map((item) => {
+                    const sev = toSeverityLevel(item.severity);
+                    const state = stateFromReport({
+                      status: item.status,
+                      reviewOutcome: item.review_outcome,
+                    });
+                    const label = item.incidentType
+                      ? INCIDENT_LABEL[item.incidentType] ?? item.incidentType
+                      : item.title || `Report ${item.id.slice(0, 6)}`;
+                    const isSelected = selected?.id === item.id;
+
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => focusReportOnMap(item)}
+                        className={cn(
+                          "w-full text-left p-2.5 rounded-xl border text-xs flex flex-col gap-1 transition-all",
+                          isSelected
+                            ? "border-teal-500 bg-teal-950/40 text-white"
+                            : "border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700 hover:bg-slate-850",
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono font-bold text-[11px] text-teal-400">
+                            #TR-{item.id.slice(0, 6).toUpperCase()}
+                          </span>
+                          <span
+                            className={cn(
+                              "text-[10px] font-bold px-1.5 py-0.5 rounded-sm font-mono",
+                              sev >= 4
+                                ? "bg-red-500/20 text-red-400"
+                                : "bg-slate-800 text-slate-300",
+                            )}
+                          >
+                            Sev {sev} · {state}
+                          </span>
+                        </div>
+                        <div className="font-semibold text-slate-100 truncate">{label}</div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                          <span className="truncate max-w-[180px]">
+                            {item.location_label || `${item.latitude.toFixed(3)}, ${item.longitude.toFixed(3)}`}
+                          </span>
+                          <span className="shrink-0">
+                            {item.uploaded_at ? formatRelativeTime(item.uploaded_at) : ""}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {/* Card 3: Verification Summary & Snapshot Export */}
+            <Card className="bg-slate-950/95 dark:bg-[#0B141A]/95 border-slate-800 text-slate-100 rounded-2xl shadow-xl p-4 sm:p-5 flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-white tracking-tight">Verification Summary</h3>
+                <span className="text-xs text-slate-400 truncate max-w-[140px] font-medium">
+                  {eventName || "Active Event"}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-xs text-slate-300 font-mono">
+                  <span>Confirmed by Reviewer</span>
+                  <strong className="text-teal-400">
+                    {confirmedCount} of {visibleReports.length} ({confirmedPct}%)
+                  </strong>
+                </div>
+                <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-teal-500 rounded-full transition-all duration-300"
+                    style={{ width: `${confirmedPct}%` }}
                   />
                 </div>
-              </>
-            ) : (
-              <p className="t-meta">
-                No geo-tagged incidents match the current filter. Try clicking &ldquo;Reset all filters&rdquo; above.
-              </p>
-            )}
-          </div>
-
-          {/* Card 2: Pinned Reports List */}
-          <div className="panel" style={{ display: "grid", gap: "var(--s-3)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--s-2)" }}>
-              <h3 style={{ fontSize: "var(--step-0)", margin: 0 }}>Pinned Reports</h3>
-              <span className="t-meta num" style={{ fontWeight: 700, color: "var(--tide)" }}>
-                {sortedVisible.length} shown
-              </span>
-            </div>
-
-            {sortedVisible.length === 0 ? (
-              <p className="t-meta">No pinned reports in the current filter.</p>
-            ) : (
-              <div style={{ display: "grid", gap: "var(--s-2)", maxHeight: 280, overflowY: "auto" }}>
-                {sortedVisible.slice(0, 6).map((item) => {
-                  const sev = toSeverityLevel(item.severity);
-                  const state = stateFromReport({
-                    status: item.status,
-                    reviewOutcome: item.review_outcome,
-                  });
-                  const label = item.incidentType
-                    ? INCIDENT_LABEL[item.incidentType] ?? item.incidentType
-                    : item.title || `Report ${item.id.slice(0, 6)}`;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className="pipeline-item"
-                      aria-current={selected?.id === item.id ? "true" : undefined}
-                      onClick={() => focusReportOnMap(item)}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                        <span className="t-meta num" style={{ fontWeight: 700 }}>
-                          #TR-{item.id.slice(0, 6).toUpperCase()}
-                        </span>
-                        <span
-                          className="t-meta num"
-                          style={{
-                            padding: "1px 6px",
-                            borderRadius: 4,
-                            fontWeight: 700,
-                            background: sev >= 4 ? "var(--brick-wash)" : "var(--sheet)",
-                            color: sev >= 4 ? "var(--brick-ink)" : "var(--ink-2)",
-                          }}
-                        >
-                          Severity {sev} · {state}
-                        </span>
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: "var(--step--1)" }}>{label}</div>
-                      <div className="t-meta num" style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {item.location_label || `${item.latitude.toFixed(3)}, ${item.longitude.toFixed(3)}`}
-                        </span>
-                        <span style={{ flexShrink: 0 }}>
-                          {item.uploaded_at ? formatRelativeTime(item.uploaded_at) : ""}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
+                <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                  <span>Pending (Hatched): {pendingCount}</span>
+                  <span>Active EOC Filter</span>
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Card 3: Verification Summary + Map Snapshot Export & Quick Actions */}
-          <div className="panel" style={{ display: "grid", gap: "var(--s-3)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-              <h3 style={{ fontSize: "var(--step-0)", margin: 0 }}>Verification Summary</h3>
-              <span className="t-meta">{eventName || "Active Event"}</span>
-            </div>
+              <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDownloadMapSnapshot}
+                  disabled={snapshotStatus === "rendering"}
+                  data-testid="download-map-snapshot"
+                  className="w-full text-xs font-semibold h-8 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
+                >
+                  {snapshotStatus === "saved" ? (
+                    <>
+                      <Check className="size-3.5 mr-1.5 text-emerald-400" />
+                      <span>Snapshot Saved (PNG)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="size-3.5 mr-1.5" />
+                      <span>
+                        {snapshotStatus === "rendering"
+                          ? "Rendering High-Res PNG…"
+                          : "Download Map Snapshot"}
+                      </span>
+                    </>
+                  )}
+                </Button>
 
-            <div style={{ display: "grid", gap: 6 }}>
-              <div className="t-meta num" style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Confirmed by Reviewer</span>
-                <strong>
-                  {confirmedCount} of {visibleReports.length} ({confirmedPct}%)
-                </strong>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-8 border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
+                  >
+                    <Link href="/reports/new">
+                      <Upload className="size-3 mr-1" />
+                      Upload Photo
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    size="sm"
+                    className="text-xs h-8 bg-teal-600 hover:bg-teal-500 text-white font-semibold border-0"
+                  >
+                    <Link href={canReview ? "/review" : "/reports"}>
+                      {canReview ? <CheckSquare className="size-3 mr-1" /> : <FileText className="size-3 mr-1" />}
+                      {canReview ? "Review Queue" : "All Reports"}
+                    </Link>
+                  </Button>
+                </div>
               </div>
-              <div className="kpi-bar" aria-hidden="true">
-                <div
-                  className="kpi-bar__fill"
-                  style={{ width: `${confirmedPct}%` }}
-                />
-              </div>
-              <div className="t-meta num" style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Pending Review (Hatched): {pendingCount}</span>
-                <span>Equal Pin Size</span>
-              </div>
-            </div>
-
-            <div
-              style={{
-                paddingTop: "var(--s-3)",
-                borderTop: "1px solid var(--rule)",
-                display: "grid",
-                gap: "var(--s-2)",
-              }}
-            >
-              <button
-                type="button"
-                className="btn btn--block"
-                onClick={handleDownloadMapSnapshot}
-                disabled={snapshotStatus === "rendering"}
-                data-testid="download-map-snapshot"
-              >
-                {snapshotStatus === "saved" ? (
-                  <>
-                    <Check size={15} aria-hidden="true" style={{ color: "var(--green)" }} />
-                    <span>Snapshot Saved (PNG)</span>
-                  </>
-                ) : (
-                  <>
-                    <Download size={15} aria-hidden="true" />
-                    <span>
-                      {snapshotStatus === "rendering"
-                        ? "Rendering High-Res PNG…"
-                        : "Download Map Snapshot"}
-                    </span>
-                  </>
-                )}
-              </button>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "var(--s-2)",
-                }}
-              >
-                <Link href="/reports/new" className="btn">
-                  <Upload size={14} aria-hidden="true" />
-                  Upload Photo
-                </Link>
-                <Link href={canReview ? "/review" : "/reports"} className="btn btn--primary">
-                  {canReview ? <CheckSquare size={14} aria-hidden="true" /> : <FileText size={14} aria-hidden="true" />}
-                  {canReview ? "Review Queue" : "All Reports"}
-                </Link>
-              </div>
-            </div>
-          </div>
-        </aside>
+            </Card>
+          </aside>
+        )}
       </div>
     </div>
   );

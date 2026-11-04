@@ -106,21 +106,28 @@ export default async function MapPageRoute() {
   const canReview = ctx.user.role === "reviewer" || ctx.user.role === "admin";
 
   return (
-    <div className="tr-page" style={{ display: "grid", gap: "var(--s-4)" }}>
-      <PageHeader
-        title={`Incident Map · ${activeEvent?.event_name ?? "Active Sector"}`}
-        subtitle="Confirmed incidents appear as solid pins. Pending AI observations appear hatched. Filter by hazard vector or scrub temporally below."
-        actions={
-          <>
-            <Button href="/reports/new">Upload evidence</Button>
-            {canReview && (
-              <Button variant="primary" href="/review">
-                Open review queue
-              </Button>
-            )}
-          </>
-        }
-      />
+    <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 py-3 sm:py-4 flex flex-col gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-800">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[11px] font-mono text-emerald-400 font-semibold uppercase tracking-wider">
+              Live Telemetry Synced · {activeEvent?.event_name ?? "Active Sector"}
+            </span>
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5">
+            Tactical Incident Map
+          </h1>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button href="/reports/new">Upload Evidence</Button>
+          {canReview && (
+            <Button variant="primary" href="/review">
+              Open Review Queue
+            </Button>
+          )}
+        </div>
+      </div>
       <DeferredIncidentMap
         eventId={activeEventId}
         eventName={activeEvent?.event_name}

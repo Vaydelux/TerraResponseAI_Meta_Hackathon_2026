@@ -218,9 +218,21 @@
   .wordmark__mark { width: 28px; height: 28px; border-radius: 7px; flex: none; }
   .wordmark__name { letter-spacing: -.025em; }
   .wordmark__ai { color: var(--tide); letter-spacing: -.01em; }
+  @media (max-width: 640px) {
+    .topbar {
+      gap: 8px;
+      padding-inline: 12px;
+    }
+    .topbar .segmented__btn span:not([aria-hidden="true"]):last-child {
+      display: none;
+    }
+    .topbar .segmented__btn {
+      padding: 4px 7px;
+    }
+  }
   @media (max-width: 460px) {
-    .wordmark { gap: 7px; font-size: 1.05rem; }
-    .wordmark__mark { width: 24px; height: 24px; }
+    .wordmark { gap: 6px; font-size: 0.98rem; }
+    .wordmark__mark { width: 22px; height: 22px; }
   }
   /* Square survey-corner glyph: ink stroke, one amber hatch quadrant.
    * Built as inline SVG in the component; the CSS reserves space. */

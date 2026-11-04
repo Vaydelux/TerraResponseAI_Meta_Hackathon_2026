@@ -1,11 +1,11 @@
-"use client";
-
 // src/components/map/TemporalScrubber.tsx
 //
 // Temporal Scrubber component docked at the bottom of the Incident Map.
 // Filters visible incident pins based on their `uploaded_at` timestamp,
 // allowing responders to replay and visualize incident progression over
 // time with Play/Pause automation, step controls, and time presets.
+
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -16,6 +16,9 @@ import {
   SkipForward,
   RotateCcw,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { IncidentMapReport } from "./IncidentMap";
 
 export interface TemporalScrubberProps {
@@ -25,6 +28,7 @@ export interface TemporalScrubberProps {
   onChangePct: (nextPct: number) => void;
   timeBounds: { min: number; max: number };
   cutoffTimestamp: number;
+  className?: string;
 }
 
 function formatScrubberTime(ms: number): string {
@@ -45,6 +49,7 @@ export function TemporalScrubber({
   onChangePct,
   timeBounds,
   cutoffTimestamp,
+  className,
 }: TemporalScrubberProps) {
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -98,167 +103,149 @@ export function TemporalScrubber({
 
   return (
     <div
-      className="tactical-scrubber"
+      className={cn(
+        "tactical-scrubber absolute z-20 inset-x-3 bottom-3 sm:inset-x-4 sm:bottom-3",
+        "bg-slate-950/95 dark:bg-[#0B141A]/95 backdrop-blur-xl",
+        "border border-slate-800 rounded-2xl shadow-xl",
+        "p-3 sm:px-4 sm:py-3 text-slate-100 flex flex-col gap-2",
+        className,
+      )}
       role="region"
       aria-label="Temporal incident progression scrubber"
       data-testid="temporal-scrubber"
     >
-      <div className="tactical-scrubber__head">
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--s-2)", flexWrap: "wrap" }}>
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontWeight: 700,
-              color: "var(--ink)",
-            }}
-          >
-            <Clock size={15} aria-hidden="true" style={{ color: "var(--tide)" }} />
-            Temporal Incident Progression
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        {/* Title + Controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 font-bold text-white text-xs">
+            <Clock className="size-3.5 text-teal-400" />
+            <span className="hidden sm:inline">Temporal Incident Progression</span>
+            <span className="sm:hidden">Timeline</span>
           </span>
 
           {/* Playback Controls */}
-          <div className="tactical-scrubber__controls" role="group" aria-label="Timeline playback controls">
-            <button
+          <div className="flex items-center gap-1">
+            <Button
               type="button"
-              className="tactical-scrubber__ctl-btn"
+              variant="outline"
+              size="sm"
               onClick={handlePlayToggle}
-              aria-label={isPlaying ? "Pause timeline progression" : "Play timeline progression"}
-              title={isPlaying ? "Pause replay" : "Replay incident progression over time"}
+              className="h-7 px-2.5 rounded-lg text-xs bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800 hover:text-white"
+              title={isPlaying ? "Pause replay" : "Replay progression over time"}
             >
-              {isPlaying ? <Pause size={13} aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}
+              {isPlaying ? <Pause className="size-3 mr-1 text-amber-400" /> : <Play className="size-3 mr-1 text-teal-400" />}
               <span>{isPlaying ? "Pause" : "Replay"}</span>
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="button"
-              className="tactical-scrubber__ctl-btn"
+              variant="ghost"
+              size="icon"
               onClick={() => {
                 setIsPlaying(false);
                 onChangePct(Math.max(0, scrubberPct - 10));
               }}
               disabled={scrubberPct <= 0}
-              aria-label="Step backward in time"
-              title="Step backward (-10%)"
+              className="size-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              title="Step back 10%"
             >
-              <SkipBack size={13} aria-hidden="true" />
-            </button>
+              <SkipBack className="size-3.5" />
+            </Button>
 
-            <button
+            <Button
               type="button"
-              className="tactical-scrubber__ctl-btn"
+              variant="ghost"
+              size="icon"
               onClick={() => {
                 setIsPlaying(false);
                 onChangePct(Math.min(100, scrubberPct + 10));
               }}
               disabled={scrubberPct >= 100}
-              aria-label="Step forward in time"
-              title="Step forward (+10%)"
+              className="size-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              title="Step forward 10%"
             >
-              <SkipForward size={13} aria-hidden="true" />
-            </button>
+              <SkipForward className="size-3.5" />
+            </Button>
           </div>
         </div>
 
-        {/* Cutoff Timestamp & Visible Pin Count Readout */}
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--s-2)", flexWrap: "wrap" }}>
-          <span
-            className="num tactical-scrubber__cutoff-pill"
-            data-testid="temporal-scrubber-readout"
-          >
+        {/* Current Cutoff Readout Badge */}
+        <div className="flex items-center gap-2">
+          <Badge className="bg-teal-600 hover:bg-teal-500 text-white font-mono text-[11px] px-2.5 py-0.5 border-0 shadow-sm">
             {scrubberPct >= 100
-              ? `LIVE · All ${visibleCount} pins (${formatScrubberTime(timeBounds.max)})`
-              : `Uploaded ≤ ${formatScrubberTime(cutoffTimestamp)} · ${visibleCount} of ${reports.length} pins`}
-          </span>
-
-          {scrubberPct < 100 && (
-            <button
-              type="button"
-              className="btn"
-              onClick={() => {
-                setIsPlaying(false);
-                onChangePct(100);
-              }}
-              style={{ minHeight: 28, padding: "0 10px", fontSize: "0.75rem" }}
-            >
-              <RotateCcw size={12} aria-hidden="true" />
-              Reset to Live
-            </button>
-          )}
+              ? `LIVE · All ${visibleCount} pins`
+              : `${formatScrubberTime(cutoffTimestamp)} (${visibleCount} pins)`}
+          </Badge>
         </div>
       </div>
 
-      {/* Upload Activity Histogram + Range Scrubber */}
-      <div className="tactical-scrubber__track-wrap">
-        <div className="tactical-scrubber__histogram" aria-hidden="true">
-          {histogramBuckets.map((b) => {
-            const active = b.thresholdPct <= scrubberPct;
+      {/* Track + Histogram Slider */}
+      <div className="flex flex-col gap-1">
+        {/* Histogram Bars */}
+        <div className="grid grid-cols-12 gap-1 h-3 px-1 items-end">
+          {histogramBuckets.map((bucket) => {
+            const isActive = scrubberPct >= bucket.thresholdPct;
             return (
               <div
-                key={b.index}
-                className="tactical-scrubber__bar"
-                data-active={active ? "true" : "false"}
-                style={{ height: `${b.heightPct}%` }}
-                title={`${b.count} report(s) uploaded in interval`}
+                key={bucket.index}
+                className={cn(
+                  "rounded-xs transition-colors duration-200",
+                  isActive ? "bg-teal-500/80" : "bg-slate-800/80",
+                )}
+                style={{ height: `${bucket.heightPct}%` }}
+                title={`${bucket.count} incidents uploaded`}
               />
             );
           })}
         </div>
 
+        {/* Slider Input */}
         <input
           type="range"
           min={0}
           max={100}
-          step={5}
+          step={1}
           value={scrubberPct}
           onChange={(e) => {
             setIsPlaying(false);
             onChangePct(Number(e.target.value));
           }}
-          aria-label="Filter visible incident pins by uploaded_at timestamp"
-          className="tactical-scrubber__range"
+          aria-label="Filter incidents by upload time"
+          className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-teal-400"
         />
-      </div>
 
-      {/* Bottom Time Bounds & Quick Jump Presets */}
-      <div
-        className="t-meta num"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "var(--s-2)",
-          fontSize: "0.75rem",
-        }}
-      >
-        <span>Earliest upload: {formatScrubberTime(timeBounds.min)}</span>
+        {/* Bottom Time Range + Jump Buttons */}
+        <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-0.5">
+          <span className="truncate max-w-[130px] sm:max-w-none">
+            {formatScrubberTime(timeBounds.min)}
+          </span>
 
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span>Jump:</span>
-          {[
-            { label: "25%", pct: 25 },
-            { label: "50%", pct: 50 },
-            { label: "75%", pct: 75 },
-            { label: "Live (100%)", pct: 100 },
-          ].map((preset) => (
-            <button
-              key={preset.pct}
-              type="button"
-              onClick={() => {
-                setIsPlaying(false);
-                onChangePct(preset.pct);
-              }}
-              className="tactical-scrubber__jump-btn"
-              aria-pressed={scrubberPct === preset.pct}
-            >
-              {preset.label}
-            </button>
-          ))}
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-slate-500 mr-1 hidden sm:inline">Jump:</span>
+            {[25, 50, 75, 100].map((pct) => (
+              <button
+                key={pct}
+                type="button"
+                onClick={() => {
+                  setIsPlaying(false);
+                  onChangePct(pct);
+                }}
+                className={cn(
+                  "px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all",
+                  scrubberPct === pct
+                    ? "bg-teal-600 text-white font-bold"
+                    : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800",
+                )}
+              >
+                {pct === 100 ? "Live" : `${pct}%`}
+              </button>
+            ))}
+          </div>
+
+          <span className="truncate max-w-[130px] sm:max-w-none text-right">
+            {formatScrubberTime(timeBounds.max)}
+          </span>
         </div>
-
-        <span>Latest upload: {formatScrubberTime(timeBounds.max)}</span>
       </div>
     </div>
   );

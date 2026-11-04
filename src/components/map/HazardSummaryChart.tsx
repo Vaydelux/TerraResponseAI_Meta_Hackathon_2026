@@ -1,25 +1,29 @@
-"use client";
-
 // src/components/map/HazardSummaryChart.tsx
 //
-// Summary sidebar card for the Incident Map page. Shows:
+// Summary sidebar card for the Incident Map page using shadcn & Lucide:
 //   1. Total incidents, Pending review count, and Confirmed count.
-//   2. A D3 bar chart (`import * as d3 from "d3"`) of Total Incidents
-//      by Hazard Category (Flood, Fire, Medical, Structural, Blocked
-//      Road, Debris, Other/Unclear) with interactive bar click filtering.
+//   2. A D3 bar chart of Total Incidents by Hazard Category with interactive
+//      click-to-filter toggles and high-contrast accessibility.
+
+"use client";
 
 import { useMemo } from "react";
 import * as d3 from "d3";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, RotateCcw } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { stateFromReport } from "@/lib/design/status";
 import { resolveHazardCategory, type HazardCategoryId } from "./MapFilterBar";
 import type { IncidentMapReport } from "./IncidentMap";
+import { cn } from "@/lib/utils";
 
 export interface HazardSummaryChartProps {
   reports: IncidentMapReport[];
   selectedHazards?: HazardCategoryId[];
   onToggleHazard?: (hazard: HazardCategoryId) => void;
   onResetHazards?: () => void;
+  className?: string;
 }
 
 interface CategoryDatum {
@@ -50,6 +54,7 @@ export function HazardSummaryChart({
   selectedHazards = [],
   onToggleHazard,
   onResetHazards,
+  className,
 }: HazardSummaryChartProps) {
   const { data, totalCount, pendingCount, confirmedCount } = useMemo(() => {
     let pending = 0;
@@ -98,11 +103,11 @@ export function HazardSummaryChart({
   }, [reports]);
 
   // Compute D3 scales for the horizontal bar chart
-  const chartWidth = 310;
-  const labelWidth = 98;
-  const valueWidth = 44;
+  const chartWidth = 320;
+  const labelWidth = 100;
+  const valueWidth = 46;
   const barMaxWidth = chartWidth - labelWidth - valueWidth;
-  const rowHeight = 25;
+  const rowHeight = 26;
   const chartHeight = data.length * rowHeight + 8;
 
   const yScale = useMemo(
@@ -111,7 +116,7 @@ export function HazardSummaryChart({
         .scaleBand<string>()
         .domain(data.map((d) => d.key))
         .range([4, chartHeight - 4])
-        .paddingInner(0.26),
+        .paddingInner(0.24),
     [data, chartHeight],
   );
 
@@ -123,28 +128,28 @@ export function HazardSummaryChart({
   );
 
   return (
-    <section className="panel" aria-labelledby="hazard-summary-heading" style={{ display: "grid", gap: "var(--s-3)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <BarChart3 size={16} aria-hidden="true" style={{ color: "var(--tide)" }} />
-          <h3 id="hazard-summary-heading" style={{ fontSize: "var(--step-0)", margin: 0 }}>
+    <Card
+      className={cn(
+        "bg-slate-950/95 dark:bg-[#0B141A]/95 border-slate-800 text-slate-100 rounded-2xl shadow-xl p-4 sm:p-5 flex flex-col gap-3.5",
+        className,
+      )}
+      aria-labelledby="hazard-summary-heading"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="size-4 text-teal-400" />
+          <h3
+            id="hazard-summary-heading"
+            className="text-sm font-bold text-white tracking-tight"
+          >
             Incidents by Hazard Category
           </h3>
         </div>
         {selectedHazards.length > 0 && onResetHazards && (
           <button
             type="button"
-            className="t-meta"
             onClick={onResetHazards}
-            style={{
-              background: "transparent",
-              border: 0,
-              color: "var(--tide)",
-              fontWeight: 600,
-              cursor: "pointer",
-              textDecoration: "underline",
-              padding: 0,
-            }}
+            className="text-xs text-teal-400 hover:text-teal-300 font-semibold underline"
           >
             Show all
           </button>
@@ -152,95 +157,56 @@ export function HazardSummaryChart({
       </div>
 
       {/* Summary KPI Strip: Total, Pending Review, Confirmed */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "var(--s-2)",
-        }}
-      >
-        <div
-          style={{
-            padding: "8px 10px",
-            borderRadius: "var(--r-ctl)",
-            background: "var(--sheet-sunk)",
-            border: "1px solid var(--rule)",
-          }}
-        >
-          <div className="t-meta" style={{ fontSize: "0.72rem" }}>Total</div>
-          <div className="num" style={{ fontFamily: "var(--font-display)", fontWeight: 750, fontSize: "var(--step-1)" }}>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-center">
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            Total
+          </div>
+          <div className="text-lg font-extrabold text-white font-mono mt-0.5">
             {totalCount}
           </div>
         </div>
 
-        <div
-          style={{
-            padding: "8px 10px",
-            borderRadius: "var(--r-ctl)",
-            background: "var(--amber-wash)",
-            border: "1px dashed var(--amber)",
-          }}
-        >
-          <div className="t-meta" style={{ fontSize: "0.72rem", color: "var(--amber-ink)", fontWeight: 600 }}>
+        <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-600/50 text-center">
+          <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
             Pending
           </div>
           <div
-            className="num"
+            className="text-lg font-extrabold text-amber-400 font-mono mt-0.5"
             data-testid="map-pending-count"
-            style={{
-              fontFamily: "var(--font-display)",
-              fontWeight: 750,
-              fontSize: "var(--step-1)",
-              color: "var(--amber-ink)",
-            }}
           >
             {pendingCount}
           </div>
         </div>
 
-        <div
-          style={{
-            padding: "8px 10px",
-            borderRadius: "var(--r-ctl)",
-            background: "var(--green-wash)",
-            border: "1px solid var(--green)",
-          }}
-        >
-          <div className="t-meta" style={{ fontSize: "0.72rem", color: "var(--green-ink)", fontWeight: 600 }}>
+        <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-600/50 text-center">
+          <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
             Confirmed
           </div>
-          <div
-            className="num"
-            style={{
-              fontFamily: "var(--font-display)",
-              fontWeight: 750,
-              fontSize: "var(--step-1)",
-              color: "var(--green-ink)",
-            }}
-          >
+          <div className="text-lg font-extrabold text-emerald-400 font-mono mt-0.5">
             {confirmedCount}
           </div>
         </div>
       </div>
 
       {/* D3 SVG Bar Chart */}
-      <div style={{ width: "100%", overflowX: "auto" }}>
+      <div className="w-full overflow-x-auto">
         <svg
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
           width="100%"
           height={chartHeight}
           role="img"
           aria-label="Bar chart of incidents by hazard category showing confirmed and pending counts"
-          style={{ display: "block", overflow: "visible" }}
+          className="block overflow-visible"
         >
           <defs>
             <linearGradient id="d3-grad-confirmed" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="var(--tide)" />
-              <stop offset="100%" stopColor="var(--tide)" />
+              <stop offset="0%" stopColor="#0d9488" />
+              <stop offset="100%" stopColor="#14b8a6" />
             </linearGradient>
             <linearGradient id="d3-grad-pending" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="var(--amber)" />
-              <stop offset="100%" stopColor="var(--amber)" />
+              <stop offset="0%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#fbbf24" />
             </linearGradient>
           </defs>
           {data.map((d) => {
@@ -259,17 +225,21 @@ export function HazardSummaryChart({
                     onToggleHazard(d.key);
                   }
                 }}
-                style={{ cursor: d.selectable && onToggleHazard ? "pointer" : "default" }}
+                className={cn(
+                  d.selectable && onToggleHazard
+                    ? "cursor-pointer hover:opacity-85 transition-opacity"
+                    : "cursor-default",
+                )}
               >
                 {/* Category Label */}
                 <text
                   x={0}
                   y={bw / 2}
                   dy="0.35em"
-                  fill={isSelected ? "var(--tide)" : "var(--ink-2)"}
+                  fill={isSelected ? "#2dd4bf" : "#94a3b8"}
                   fontSize={11.5}
-                  fontWeight={isSelected ? 700 : 600}
-                  fontFamily="var(--font-ui)"
+                  fontWeight={isSelected ? 700 : 500}
+                  fontFamily="inherit"
                 >
                   {d.label}
                 </text>
@@ -281,7 +251,7 @@ export function HazardSummaryChart({
                   width={barMaxWidth}
                   height={bw}
                   rx={4}
-                  fill="var(--sheet-sunk)"
+                  fill="#1e293b"
                 />
 
                 {/* Confirmed Bar Segment */}
@@ -298,7 +268,7 @@ export function HazardSummaryChart({
                   </rect>
                 )}
 
-                {/* Pending Bar Segment (Stacked after confirmed) */}
+                {/* Pending Bar Segment */}
                 {pendingW > 0 && (
                   <rect
                     x={labelWidth + confirmedW}
@@ -318,11 +288,11 @@ export function HazardSummaryChart({
                   y={bw / 2}
                   dy="0.35em"
                   textAnchor="end"
-                  fill="var(--ink)"
+                  fill="#f1f5f9"
                   fontSize={11.5}
                   fontWeight={700}
-                  fontFamily="var(--font-ui)"
-                  style={{ fontVariantNumeric: "tabular-nums" }}
+                  fontFamily="inherit"
+                  className="font-mono"
                 >
                   {d.total}
                   {d.pending > 0 ? ` (${d.pending}p)` : ""}
@@ -333,32 +303,20 @@ export function HazardSummaryChart({
         </svg>
       </div>
 
-      {/* Legend for the D3 stacked bars */}
-      <div
-        className="t-meta"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 8,
-          fontSize: "0.75rem",
-          paddingTop: 4,
-          borderTop: "1px solid var(--rule)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--grad-primary)", display: "inline-block" }} />
+      {/* Legend */}
+      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="size-2 rounded-xs bg-teal-500 inline-block" />
             Confirmed
           </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--grad-amber)", display: "inline-block" }} />
+          <span className="inline-flex items-center gap-1.5">
+            <span className="size-2 rounded-xs bg-amber-500 inline-block" />
             Pending (p)
           </span>
         </div>
-        <span>Click a bar to toggle filter</span>
+        <span className="text-[10px] text-slate-400">Click a bar to toggle filter</span>
       </div>
-    </section>
+    </Card>
   );
 }
