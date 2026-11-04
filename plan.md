@@ -11,7 +11,7 @@
 
 The owner authorized proceeding with PR #70 and expanded the scope to reviewer Confirm, Correct, Flag, Reject, priority override, functionality and roles. Source changes implemented: role-aware review workbench, no failed-AI severity fabrication, human-correction provenance, permanent-error retry guards, SAM on manual-review with a reviewer-supplied target and no automatic inference, official Meta mask parser with genuine image-aligned canvas, atomic idempotent coordinator/admin priority transaction, tests and documentation.
 
-**Staging DB gate:** `20261105001000_atomic_priority_override.sql` was applied to the staging project. Authenticated function execution is granted, anon execution rejected. No staging review or override records were modified as part of this migration. The production DB migration is intentionally **not** applied, so the code must NOT be marked production-ready without deploying it in production first.
+**Database gate:** `20261105001000_atomic_priority_override.sql` was applied to **staging and production** with a zero-report production preflight. Both databases grant the RPC to authenticated users and deny anonymous execution; no report, review or priority override records were altered by the schema migration. Live role-specific transaction acceptance is still required before full readiness.
 
 **Known limitations:** no real paid SAM or authenticated review transaction was executed here; end-to-end user-account acceptance remains open; prior Vercel 402 quota may block production deployment. See `docs/REVIEW_ROLE_AND_SAM_QA_20261105.md` for exact role matrix, test scope and demo fallback.
 
