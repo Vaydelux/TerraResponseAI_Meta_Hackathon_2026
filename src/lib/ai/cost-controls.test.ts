@@ -45,9 +45,9 @@ describe("cost-controls: readCostControlConfig", () => {
     expect(c.modelCallTimeoutMs).toBe(30_000);
     expect(c.maxRetries).toBe(4);
     expect(c.maxOutputTokens).toBe(900);
-    expect(c.costPer1mInputTokensUsd).toBe(0.3);
-    expect(c.costPer1mOutputTokensUsd).toBe(0.6);
-    expect(c.costPerCallFlatUsd).toBe(0.001);
+    expect(c.costPer1mInputTokensUsd).toBe(1.25);
+    expect(c.costPer1mOutputTokensUsd).toBe(4.25);
+    expect(c.costPerCallFlatUsd).toBe(0.01);
   });
 
   it("reads overrides from env", () => {
