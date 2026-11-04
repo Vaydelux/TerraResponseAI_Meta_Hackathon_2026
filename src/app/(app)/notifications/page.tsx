@@ -46,7 +46,7 @@ export default async function NotificationsPage() {
     status: string;
   }> = [];
 
-  if (error || !(data ?? []).length) {
+  if (!error && !(data ?? []).length) {
     const eventIds = ctx.events.map((e) => e.event_id);
     if (eventIds.length > 0) {
       const { data: recentReports } = await db
@@ -72,31 +72,28 @@ export default async function NotificationsPage() {
           title:
             row.title || `Report #TR-${row.id.slice(0, 6).toUpperCase()} status update`,
           body: isConfirmed
-            ? `Human reviewer confirmed this report (${row.location_label || "Sector corridor"}).`
+            ? `Human reviewer confirmed this report (${row.location_label || "location not supplied"}).`
             : `Report queued in pipeline (${row.status.replaceAll("_", " ")}).`,
           createdAt: row.uploaded_at,
-          status: isConfirmed ? "VERIFIED" : "PIPELINE UPDATE",
+          status: isConfirmed ? "HUMAN-REVIEWED REPORT" : "REPORT ACTIVITY",
         };
       });
     }
   }
 
+  // Only persisted notification rows contribute to inbox metrics.
+  // Read-only report activity is a separate view and has no unread flag.
   const hasRealNotifications = !error && (data ?? []).length > 0;
-  const totalNotifications = hasRealNotifications
-    ? (data ?? []).length
-    : derivedUpdates.length;
-  const unreadCount = hasRealNotifications
-    ? (data ?? []).filter((n) => !n.read_at).length
-    : derivedUpdates.length;
-  const verifiedUpdatesCount = hasRealNotifications
-    ? (data ?? []).filter((n) => String(n.kind).includes("confirm") || String(n.kind).includes("review")).length
-    : derivedUpdates.filter((u) => u.status === "VERIFIED").length;
+  const totalNotifications: number | null = error ? null : (data ?? []).length;
+  const unreadCount: number | null = error ? null : (data ?? []).filter((n) => !n.read_at).length;
+  const reviewedNotificationCount: number | null = error ? null :
+    (data ?? []).filter((n) => String(n.kind).includes("confirm") || String(n.kind).includes("review")).length;
 
   return (
     <section className="tr-page" style={{ display: "grid", gap: "var(--s-4)" }}>
       <PageHeader
-        title="Notifications & Activity Inbox"
-        subtitle="Audit-linked incident and moderation activity visible to your account."
+        title="Notifications & Report Activity"
+        subtitle="Persisted notification inbox, plus separately labeled activity from reports you are authorized to view."
         actions={
           !error &&
           (data ?? []).some((n) => !n.read_at) && (
@@ -113,31 +110,32 @@ export default async function NotificationsPage() {
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-card__head">
-            <span className="kpi-card__label">Total Activity Alerts</span>
+            <span className="kpi-card__label">Persisted inbox items</span>
           </div>
-          <div className="kpi-card__value num">{totalNotifications}</div>
-          <div className="kpi-card__sub">RLS-scoped moderation &amp; cluster notifications</div>
+          <div className="kpi-card__value num">{totalNotifications ?? "—"}</div>
+          <div className="kpi-card__sub">Only actual notification records (loaded window)</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-card__head">
             <span className="kpi-card__label">Unread Inbox</span>
           </div>
           <div className="kpi-card__value num" style={{ color: "var(--amber-ink)" }}>
-            {unreadCount}
+            {unreadCount ?? "—"}
           </div>
-          <div className="kpi-card__sub">New pipeline &amp; thread updates</div>
+          <div className="kpi-card__sub">Only notification rows without read_at</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-card__head">
-            <span className="kpi-card__label">Verified Outcomes</span>
+            <span className="kpi-card__label">Review-related messages</span>
           </div>
           <div className="kpi-card__value num" style={{ color: "var(--tide)" }}>
-            {verifiedUpdatesCount}
+            {reviewedNotificationCount ?? "—"}
           </div>
-          <div className="kpi-card__sub">Human-reviewed status transitions</div>
+          <div className="kpi-card__sub">Notification kind only; not a count of verified disasters</div>
         </div>
       </div>
 
+      {error && <div role="alert" className="rounded-ctl border border-[var(--amber)] bg-[var(--amber-wash)] p-4 text-sm">The persisted notifications inbox is unavailable. Counts are intentionally withheld; no unread messages have been inferred.</div>}
       {!error && (data ?? []).length > 0 ? (
         <div className="tr-stack">
           {(data ?? []).map((n) => (
@@ -209,8 +207,13 @@ export default async function NotificationsPage() {
             </article>
           ))}
         </div>
-      ) : derivedUpdates.length > 0 ? (
-        <div className="tr-stack">
+      ) : error ? null : derivedUpdates.length > 0 ? (
+        <section className="grid min-w-0 gap-3" aria-labelledby="report-activity-heading">
+          <div className="grid gap-1">
+            <h2 id="report-activity-heading" className="m-0 text-lg font-semibold">Recent report activity · not notifications</h2>
+            <p className="m-0 text-sm text-[var(--ink-2)]">Read-only entries derived from authorized stored reports. They have no unread status and do not appear in inbox counts.</p>
+          </div>
+          <div className="tr-stack">
           {derivedUpdates.map((item) => (
             <article
               key={item.id}
@@ -245,7 +248,8 @@ export default async function NotificationsPage() {
               </Link>
             </article>
           ))}
-        </div>
+          </div>
+        </section>
       ) : (
         <div className="panel" style={{ display: "grid", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -253,8 +257,7 @@ export default async function NotificationsPage() {
             <h2 style={{ fontSize: "var(--step-1)", margin: 0 }}>No notifications yet</h2>
           </div>
           <p className="t-meta" style={{ margin: 0 }}>
-            When your submitted reports are analyzed by Meta AI Vision or verified by a human
-            reviewer, updates will appear here.
+            Persisted notifications will appear here when the server records one. Report activity is listed separately when available.
           </p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Link href="/reports/new" className="btn btn--primary btn--sm">

@@ -70,9 +70,10 @@ export default async function IncidentThreadsPage() {
     }
   }
 
-  // If the optional `incident_threads` table is not yet migrated or empty,
-  // synthesize live hazard clusters from the user's visible `reports` rows
-  // so the Incident Threads view remains operational and navigable.
+  // Read-only fallback: display actual stored reports individually.
+  // Without measured distance, recency and a persisted incident membership,
+  // we must NEVER invent an incident cluster or a hazard classification.
+  let reportHistoryUnavailable = false;
   let derivedClusters: Array<{
     id: string;
     title: string;
@@ -84,94 +85,63 @@ export default async function IncidentThreadsPage() {
     leadReportId: string;
     locationLabel: string;
   }> = [];
-
   if (error || !incidents?.length) {
-    const { data: reportRows } = await db
+    const { data: reportRows, error: reportsError } = await db
       .from("reports")
-      .select(
-        "id, event_id, title, status, review_outcome, location_label, latitude, longitude, uploaded_at, report_analyses(structured_observation)",
-      )
+      .select("id,event_id,title,status,review_outcome,location_label,latitude,longitude,uploaded_at,report_analyses(structured_observation)")
       .in("event_id", ids)
       .order("uploaded_at", { ascending: false })
       .limit(50);
-
-    const grouped = new Map<
-      string,
-      {
-        id: string;
-        title: string;
-        incident_type: string;
-        status: string;
-        event_id: string;
-        last_observed_at: string;
-        reportCount: number;
-        leadReportId: string;
-        locationLabel: string;
-      }
-    >();
-
-    for (const r of reportRows ?? []) {
-      const row = r as unknown as {
-        id: string;
-        event_id: string;
-        title: string | null;
-        status: string;
-        review_outcome: string | null;
-        location_label: string | null;
-        latitude: number | null;
-        longitude: number | null;
-        uploaded_at: string;
-        report_analyses?: Array<{
-          structured_observation?: { incident_type?: string };
-        }>;
-      };
-      const incType =
-        ((Array.isArray(row.report_analyses) ? row.report_analyses[0] : row.report_analyses) as { structured_observation?: { incident_type?: string } } | undefined)?.structured_observation?.incident_type ?? "flooding";
-      const key = `${row.event_id}:${incType}`;
-      const existing = grouped.get(key);
-      if (existing) {
-        existing.reportCount += 1;
-      } else {
-        grouped.set(key, {
-          id: `cluster-${incType}-${row.id.slice(0, 6)}`,
-          title:
-            row.title ||
-            `${readableType(incType).replace(/\b\w/g, (c) => c.toUpperCase())} Corridor Cluster`,
-          incident_type: incType,
-          status: row.review_outcome === "confirmed" ? "verified_active" : "monitoring",
-          event_id: row.event_id,
-          last_observed_at: row.uploaded_at,
+    reportHistoryUnavailable = Boolean(reportsError);
+    if (!reportsError) {
+      derivedClusters = (reportRows ?? []).map((item) => {
+        const r = item as unknown as {
+          id: string; event_id: string; title: string | null; status: string;
+          review_outcome: string | null; location_label: string | null;
+          latitude: number | null; longitude: number | null; uploaded_at: string;
+          report_analyses?: Array<{ structured_observation?: { incident_type?: string } }>;
+        };
+        const analysis = Array.isArray(r.report_analyses) ? r.report_analyses[0] : r.report_analyses;
+        const rawCategory = analysis?.structured_observation?.incident_type;
+        const category = typeof rawCategory === "string" && rawCategory.trim() ? rawCategory : "unclassified";
+        const hasCoordinates = typeof r.latitude === "number" && Number.isFinite(r.latitude) &&
+          typeof r.longitude === "number" && Number.isFinite(r.longitude) &&
+          Math.abs(r.latitude) <= 90 && Math.abs(r.longitude) <= 180;
+        return {
+          id: r.id,
+          title: r.title?.trim() || "Report awaiting classification",
+          incident_type: category,
+          status: r.status === "reviewed" && r.review_outcome === "confirmed" ? "reviewed" : "unverified",
+          event_id: r.event_id,
+          last_observed_at: r.uploaded_at,
           reportCount: 1,
-          leadReportId: row.id,
-          locationLabel:
-            row.location_label ||
-            (typeof row.latitude === "number" && typeof row.longitude === "number"
-              ? `${row.latitude.toFixed(4)}° N, ${row.longitude.toFixed(4)}° E`
-              : "Sector Corridor"),
-        });
-      }
+          leadReportId: r.id,
+          locationLabel: r.location_label?.trim() ||
+            (hasCoordinates ? `${r.latitude!.toFixed(4)}, ${r.longitude!.toFixed(4)} (submitted)` : "Location not supplied"),
+        };
+      });
     }
-    derivedClusters = Array.from(grouped.values());
   }
 
+  const usingStoredThreads = !error && Boolean(incidents?.length);
   const totalThreads =
-    !error && incidents && incidents.length > 0
-      ? incidents.length
-      : derivedClusters.length;
+    usingStoredThreads
+      ? incidents!.length
+      : reportHistoryUnavailable ? 0 : derivedClusters.length;
   const totalLinkedReports =
-    !error && incidents && incidents.length > 0
+    usingStoredThreads
       ? Array.from(visibleCounts.values()).reduce((sum, n) => sum + n, 0)
-      : derivedClusters.reduce((sum, c) => sum + c.reportCount, 0);
+      : reportHistoryUnavailable ? 0 : derivedClusters.reduce((sum, c) => sum + c.reportCount, 0);
   const verifiedThreads =
-    !error && incidents && incidents.length > 0
-      ? incidents.filter((i) => String(i.status).includes("verified") || String(i.status).includes("confirmed")).length
-      : derivedClusters.filter((c) => c.status === "verified_active").length;
+    usingStoredThreads
+      ? (incidents ?? []).filter((i) => String(i.status).includes("verified") || String(i.status).includes("confirmed")).length
+      : reportHistoryUnavailable ? 0 : derivedClusters.filter((c) => c.status === "reviewed").length;
 
   return (
     <section className="tr-page" style={{ display: "grid", gap: "var(--s-4)" }}>
       <PageHeader
         title="Incident Threads & Hazard Clusters"
-        subtitle="Related field evidence grouped by hazard type, proximity, and recency. A suggested match is not independent disaster confirmation."
+        subtitle="Persisted incident threads when available, otherwise individual stored reports. A suggested match is not independent disaster confirmation."
         actions={
           <Link href="/reports/new" className="btn btn--primary">
             <PlusCircle size={16} aria-hidden="true" />
@@ -184,41 +154,43 @@ export default async function IncidentThreadsPage() {
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-card__head">
-            <span className="kpi-card__label">Active Hazard Clusters</span>
+            <span className="kpi-card__label">{usingStoredThreads ? "Persisted incident threads" : "Recent stored reports"}</span>
           </div>
-          <div className="kpi-card__value num">{totalThreads}</div>
-          <div className="kpi-card__sub">Grouped by spatial &amp; temporal proximity</div>
+          <div className="kpi-card__value num">{reportHistoryUnavailable && !usingStoredThreads ? "—" : totalThreads}</div>
+          <div className="kpi-card__sub">{usingStoredThreads ? "Server-stored incident groups" : "No spatial correlation inferred"}</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-card__head">
-            <span className="kpi-card__label">Linked Field Reports</span>
+            <span className="kpi-card__label">{usingStoredThreads ? "Linked Field Reports" : "Report history entries"}</span>
           </div>
           <div className="kpi-card__value num" style={{ color: "var(--tide)" }}>
-            {totalLinkedReports}
+            {reportHistoryUnavailable && !usingStoredThreads ? "—" : totalLinkedReports}
           </div>
-          <div className="kpi-card__sub">Corroborating photo submissions</div>
+          <div className="kpi-card__sub">{usingStoredThreads ? "Authorized linked submissions" : "Each entry is one stored report"}</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-card__head">
-            <span className="kpi-card__label">Verified Corridors</span>
+            <span className="kpi-card__label">{usingStoredThreads ? "Stored reviewed threads" : "Human-reviewed reports"}</span>
           </div>
           <div className="kpi-card__value num" style={{ color: "var(--green-ink)" }}>
-            {verifiedThreads}
+            {reportHistoryUnavailable && !usingStoredThreads ? "—" : verifiedThreads}
           </div>
-          <div className="kpi-card__sub">Clusters with human-confirmed lead report</div>
+          <div className="kpi-card__sub">{usingStoredThreads ? "Recorded thread status" : "Recorded report review outcome"}</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-card__head">
-            <span className="kpi-card__label">Correlation Window</span>
+            <span className="kpi-card__label">Grouping method</span>
           </div>
           <div className="kpi-card__value num" style={{ fontSize: "var(--step-2)" }}>
-            1.5 km · 6h
+            {usingStoredThreads ? "Server-managed" : "Not applied"}
           </div>
-          <div className="kpi-card__sub">Automated Meta AI spatial-temporal threshold</div>
+          <div className="kpi-card__sub">{usingStoredThreads ? "No threshold claimed by this UI" : "No proximity or recency inference"}</div>
         </div>
       </div>
 
-      {!error && incidents && incidents.length > 0 ? (
+      {error && <p role="alert" className="rounded-ctl border border-[var(--amber)] bg-[var(--amber-wash)] p-3 text-sm">Persisted incident threads are unavailable. Showing separate stored reports only when their read succeeds; no grouping is inferred.</p>}
+      {reportHistoryUnavailable && <p role="alert" className="rounded-ctl border border-[var(--amber)] bg-[var(--amber-wash)] p-3 text-sm">Recent report history is unavailable; no zero-report claim can be made.</p>}
+      {usingStoredThreads ? (
         <div className="tr-stack">
           {countError && (
             <p role="status" className="t-meta">
@@ -266,7 +238,7 @@ export default async function IncidentThreadsPage() {
           ))}
         </div>
       ) : derivedClusters.length > 0 ? (
-        <div className="triage-grid">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           {derivedClusters.map((c) => (
             <article key={c.id} className="panel" style={{ display: "grid", gap: 12 }}>
               <div
@@ -288,7 +260,7 @@ export default async function IncidentThreadsPage() {
                   }}
                 >
                   <Layers size={14} aria-hidden="true" />
-                  {readableType(c.incident_type).toUpperCase()} CLUSTER
+                  {readableType(c.incident_type).toUpperCase()} · STORED REPORT
                 </span>
                 <span className="t-meta num">
                   {c.reportCount} {c.reportCount === 1 ? "report" : "reports"}
@@ -305,7 +277,7 @@ export default async function IncidentThreadsPage() {
               <p className="t-meta" style={{ margin: 0 }}>
                 Workspace:{" "}
                 {ctx.events.find((e) => e.event_id === c.event_id)?.event_name ??
-                  "Metro Manila Sector"}{" "}
+                  "Authorized event"}{" "}
                 · Updated {formatRelativeTime(c.last_observed_at)}
               </p>
               <div
@@ -323,7 +295,7 @@ export default async function IncidentThreadsPage() {
                   style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
                 >
                   <ShieldCheck size={14} aria-hidden="true" style={{ color: "var(--green)" }} />
-                  Meta AI Grouped
+                  Stored report · not a proximity match
                 </span>
                 <Link href={`/reports/${c.leadReportId}`} className="btn btn--sm">
                   <span>Inspect Lead Report</span>
@@ -336,11 +308,10 @@ export default async function IncidentThreadsPage() {
       ) : (
         <div className="panel" style={{ display: "grid", gap: 12 }}>
           <h2 style={{ fontSize: "var(--step-1)", margin: 0 }}>
-            No active incident threads yet
+            No stored incident threads or report entries yet
           </h2>
           <p className="t-meta" style={{ margin: 0 }}>
-            When field photos are uploaded, Meta AI Vision automatically groups proximate
-            submissions into shared incident threads for faster verification.
+            Incident grouping requires actual spatial-temporal matching. Recent authorized reports appear individually until a persisted thread is available.
           </p>
           <div>
             <Link href="/reports/new" className="btn btn--primary">

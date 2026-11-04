@@ -359,13 +359,14 @@ export function LocationConfirm({
 
         {choice === "manual" && (
           <div style={{ display: "grid", gap: "var(--s-3)" }}>
-            {/* Interactive Sector Map Pin Pad */}
+            <p className="m-0 text-sm leading-relaxed text-[var(--ink-2)]">Schematic coordinate pad — not a geographic map or GPS measurement. Confirm the latitude and longitude against a reliable source before submitting.</p>
+            {/* Interactive Schematic Coordinate Pad */}
             <button
               type="button"
               className="location-map-preview"
               onClick={handleInteractivePadClick}
               onKeyDown={handleInteractivePadKeyDown}
-              aria-label="Interactive sector pin placement pad — click anywhere to place pin"
+              aria-label="Illustrative coordinate pad, not a live geographic map; click to propose manually checked coordinates"
               style={{
                 position: "relative",
                 height: 250,
@@ -403,7 +404,7 @@ export function LocationConfirm({
                 }}
               >
                 <Compass size={13} aria-hidden="true" style={{ color: "var(--tide)" }} />
-                <span>Click map grid to position pin · Metro Manila Sector</span>
+                <span>Schematic only · verify coordinates manually</span>
               </div>
 
               <div
@@ -431,7 +432,7 @@ export function LocationConfirm({
                   }}
                 >
                   {manualValid && latValue !== null && lonValue !== null
-                    ? `${latValue.toFixed(4)}° N, ${lonValue.toFixed(4)}° E`
+                    ? `${latValue.toFixed(4)}, ${lonValue.toFixed(4)}`
                     : "Click to place pin"}
                 </span>
                 <MapPin size={24} style={{ color: "var(--tide)", fill: "var(--tide-wash)" }} />
@@ -441,14 +442,14 @@ export function LocationConfirm({
             {/* Quick Sector Presets */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <span className="t-meta" style={{ fontWeight: 600 }}>
-                Quick sector pins:
+                Sample coordinates (not GPS):
               </span>
               {SECTOR_PRESETS.map((preset) => (
                 <button
                   key={preset.label}
                   type="button"
                   className="btn btn--sm"
-                  style={{ minHeight: 28, padding: "0 10px", fontSize: "0.75rem" }}
+                  style={{ minHeight: 44, padding: "0 12px", fontSize: "0.875rem" }}
                   onClick={() => {
                     setChoice("manual");
                     updateManualCoords(String(preset.lat), String(preset.lon));

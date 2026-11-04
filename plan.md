@@ -1,3 +1,110 @@
+# ACTIVE PLAN — TerraResponse AI full-app trust, UX, map, report and AI cost hardening
+
+**Date:** 2026-11-05 Asia/Manila. **Status:** APPROVED and IMPLEMENTED on PR #67 branch; final CI and separate authenticated staging acceptance are required before full sign-off.
+**Baseline:** main a12d68dcaf8977d24045f0cddb0927d7b572bad8 (PR #66 merged), Vercel READY on matching SHA.
+**Product:** A human-reviewed disaster-photo triage prototype for reporters, reviewers and coordinators; not emergency dispatch.
+**Demo:** In 2–3 minutes, reporter uploads a labeled test image and location; real Meta Muse Spark provides provisional observations; independent reviewer decides; authorized, human-reviewed map evidence appears with an audit record. A separate fictional sample tour is available if live dependencies fail.
+**Stack:** Next.js App Router, React/TS, Tailwind + existing semantic CSS tokens, Supabase/Postgres/PostGIS/Auth/RLS/private storage, Muse Spark 1.3 Standard, optional SAM 3.1 and sourced contextual intelligence, Vercel.
+
+## Implementation checkpoint (approval received)
+
+The user authorized implementation of this plan. Code changes committed on this PR: truth-first incident/read-notification handling, official Standard-mode Muse prices, non-billable cache/preflight accounting, real global spend display and explicit unavailable state, mobile review cards, keyboard-accessible admin tabs, 44px filter/location touch targets, schematic-location disclosures and empty-map hardening. Regression tests and route-level audit added. Exact final-head CI must pass before merge; live staging E2E is still not observed and is not represented as passing. For detailed route-by-route assessment and known limits see docs/ROUTE_QUALITY_REVIEW_20261105.md.
+
+## 1. Findings — source-audited defects, not speculative screenshots
+
+**Critical: source truth and cost**
+1. src/lib/ai/cost-controls.ts defaults to USD 0.30/million input tokens and 0.60/million output tokens; Meta's official Muse Spark Standard schedule is 1.25 and 4.25. Unless overridden, default estimated spend can understate actual rate-based cost by ~4.2x on input and ~7.1x on output. The provider bill remains authoritative.
+2. src/components/admin/SpendCeilings.tsx displays the SAME global estimated usage as per-user and per-event, capped to those limits. This is not genuine scoped spending. Its fallback ceilings and default zeros mask API outages as measured data.
+3. src/app/(app)/incidents/page.tsx derives fallback incident groups from real reports, but missing AI classification defaults to flooding and grouping uses event + hazard (not measured distance or recency). It can imply unproven hazard, location and incident grouping.
+4. src/app/(app)/notifications/page.tsx fabricates an unread-inbox count from derived report activity when notifications query fails or returns empty. Derived read-only activity is not a persisted notification or unread event; present it separately or show failure.
+5. src/app/(app)/audit/page.tsx sometimes discards Supabase audit read errors. src/app/api/reports/[id]/analyze/route.ts uses a constant severity uncertainty (0.3), not a calibrated model-measured uncertainty; it must never be advertised as exact confidence.
+6. The landing fictional map is intentionally static and already marked fictional; static navigation labels, safety thresholds, model prompts and category definitions are legitimate constants. They must not be confused with invented incident evidence. Production data currently has no reports, analyses or reviews; staging has 1 report, 1 successful Muse analysis and zero reviewer actions.
+
+**High: mobile and interaction**
+7. ReviewQueueTable has seven columns and uses native Table without a mobile stacked-card representation. The table CSS uses width:100% and overflow:hidden, which does not prove no overflow or readable touch targets at 320px. Audit admin, audit-log and event tables too.
+8. FilterRail reset control is 26px high; LocationConfirm quick-sector presets and edit control are 28px high, below requested 44px touch targets. Some legacy control CSS differs from recent Tailwind additions.
+9. The 264px/76px desktop sidebar reduces usable width before the dashboard 65/35 split. Verify nested breakpoints 1024/1280/1440 and expanded/collapsed states, not just public viewport width.
+10. The dashboard's command map and dedicated incident map are two implementations; preserve consistent verified/pending status, event scope and tile failure behavior. Review CPU/markers/heatmap/reduced motion. The synthetic sector placement grid is a manually selected approximate location control, NOT independently verified GPS.
+11. Audit AdminTabs uses a pressed-button segmented group rather than proper tablist/panel semantics. Events content is read-only, so all edit/create affordances must accurately reflect that. Verify each tab actually shows meaningful results and clear unavailable/empty states.
+12. Ordinary PR #66 CI passed, including 9 public-browser responsive tests, but the complete authenticated role-specific desktop/mobile paths and two live staging demos were NOT observed passing. Global mobile→desktop readiness cannot yet be certified.
+
+**Existing foundations worth keeping**
+- Real RLS-gated snapshots; authentic saved Meta observations remain provisional; separate human-review action; original photo authenticity not guaranteed.
+- SHA256 duplicate caching, bounded Muse requests/output, rate/spend ceilings, Zod schema validation, timeout and retry caps, controlled offline uploads, private evidence, protected review RPC.
+- Isolated fictional landing MapPreview clearly says samples are fictional; new human-confirmed map index stays available when WebGL fails.
+- Role-aware collapsible sidebar and mobile drawer with focus handling; no need to redesign navigation wholesale.
+
+## 2. Ordered priorities — IMPLEMENT ONLY AFTER OWNER REVIEW
+
+### 1 ENHANCE — high impact truthful demo
+- [ ] Fix false flooding fallback and mark unpersisted report clusters as PROVISIONAL DERIVED GROUPS, never persisted incidents. A real 5–10 km/recency claim must be based on measured geodesic distance, time and source records; unknown classification stays unknown.
+- [ ] Separate persisted Notifications inbox/unread count from read-only report activity; failure does not become an invented empty state or unread alert.
+- [ ] On report submission and review success, show one clear next action; on model failure preserve the saved report and allow authorized human review with truthful provenance. Keep all synthetic demo data clearly marked, never merge into live data.
+- [ ] Make all interactive tabs and visible actions truthful; remove dead or misleading controls before adding features.
+
+### 2 REFINE — precise low-cost AI and shared design
+- [ ] Update Muse Spark Standard price defaults, cite provider schedule and date; allow explicit env overrides. Show estimated token rates and token usage only as estimates; use real scoped SQL/API per-user/per-event numbers where authorized, otherwise Unavailable.
+- [ ] Keep Muse Spark 1.3 Standard mode for private photos, not Contributor without explicit opt-in/privacy review. No Muse Wonder or generated imagery for ordinary triage.
+- [ ] Reuse one bounded schema-constrained Muse vision call per persisted image, SHA/prompt/schema cache, EXIF-stripped derivative, retry caps and rate limits. Compare 900 vs 700 vs 600 output tokens against real representative fixture quality before changing defaults; no silent accuracy regression.
+- [ ] SAM only when an authorized reviewer explicitly requests a concrete segmentation region and cost allows; optional contextual weather only with timestamp, location, genuine external citations and explicit stale/unavailable fallback. Never invent weather advisories.
+- [ ] Extract shared status/provenance, mobile data cards, error/empty/loading and navigation tokens only where duplication is measurable.
+
+### 3 POLISH — page-by-page visual and interaction checklist
+- [ ] Public landing: readable hero and scrim, media poster fallback, fictional sample label, working CTAs.
+- [ ] Login, signup, forgot/reset password, account unavailable: readable forms, accessible validation, realistic authentication/verification states, no broken branding.
+- [ ] Dashboard: true metric source scope, 65/35 inside usable desktop width, map/timeline/queue/pinned list, responsive overflow and sidebar collapse.
+- [ ] Map: actual map vs split tabs, hazard pills, severity filters, heatmap derived density labeling, marker focus, confirmed index, WebGL/network fallback.
+- [ ] Reports list/grid: actual filters and counts, responsive cards, search, large text, private thumbnail fallback, pagination/loaded-window wording.
+- [ ] Upload: photo/location/submit, explicit manual coordinates, no invented GPS, >44px targets, offline draft and duplicate protection.
+- [ ] Report detail: audit and evidence clarity, private media recovery, uploaded/AI/review provenance, deletion safeguards and long text.
+- [ ] Review queue/workbench: table desktop + stacked mobile cards, readable statuses, Confirm/Correct/Flag/Reject, shortcut/keyboard behavior, optional SAM, no self-review.
+- [ ] Incident threads/detail: true sourced thread grouping, accurate status, valid linked report count, no invented hazard or location.
+- [ ] Notifications: real inbox vs derived activity, accurate unread and read actions, date/status with no fabricated data.
+- [ ] Profile: real role/permissions and own reports; disabled or unimplemented actions clearly indicated.
+- [ ] Audit tabs (log, events, spend): semantic tabs, focus/arrow-key support, audited events from RLS data, read-only events, correct scoped AI spend or unavailable.
+- [ ] Admin users: actual role grants, read-only/error states, responsive accounts and 44px controls.
+- [ ] Navigation: role visibility, active and collapsed state, focus trap, Escape, icon tooltips and stable mobile drawer.
+
+**Breakpoints:** 320–480: single column, swipeable cards and scrollable hazard pills within containers, stacked full-width buttons, >=44px tap targets, 16:9 object-cover previews, no document overflow. 768–1024: modal drawer, map 400px and stacked queue. >=1440: desktop rail collapsed/expanded, map/timeline 65%, queue/detail 35% of remaining content. Also test intermediate 1024/1280 and mobile keyboard state. Accessibility: AA contrast, keyboard, aria, reduced motion, empty/loading/error and long untrusted text.
+
+**Tokens:** Preserve --paper, --sheet, --sheet-sunk, --ink, --ink-2, --ink-3, --rule, --tide, --amber, --green, --brick, --s-*, --step-*, --r-ctl, --r-panel; remove arbitrary one-off colors where touched.
+
+## 3. Target component tree
+Authenticated AppShell
+  WorkspaceFrame → compact TopBar / grouped collapsible Sidebar / MobileDialog
+  DashboardCommandWorkspace → IncidentFilters + GeoCanvas/Timeline + Queue/Details
+  MapPage → IncidentMap + VerifiedMapIndex (same authorized snapshot)
+  Reports → ResponsiveReportList + ReportDetail + private ReportThumb
+  UploadFlow → saved report → Muse provisional analysis → reviewer queue
+  ReviewQueue → desktop Table / mobile Cards → ReviewWorkbench / ReviewActions / optional SAM
+  IncidentThreads → persisted thread OR explicitly labeled derived grouping
+  Notifications → persisted Inbox + separate sourced ReportActivityHistory
+  AuditTabs → AuditLog / ReadOnlyEvents / TrueScopedCostDashboard
+Landing → clearly fictional MapPreview, independent of live reports
+
+## 4. SOLIDIFY — security, data integrity and failures
+- [ ] Confirm all roles and route handlers obey RLS and ownership; authenticated does not imply authorized, private photos never publicly exposed and no service keys reach browser.
+- [ ] Reviewer approval refers to recorded decision, NOT guaranteed image authenticity or emergency dispatch; no AI-only confirmed pins. Unknown coordinates never placed on map.
+- [ ] Avoid duplicate paid model calls, preserve data on upload/network/model failures; report strict meaningful session expiry, status transitions and retryable errors.
+- [ ] Distinguish real persisted report, derived-from-report card, and fictional sample in UI. Audit event-scoped status and batch query errors fail closed.
+- [ ] Audit map clustering CPU/DOM size and tile failures; retained queue should work on 32-bit/low-memory mobile devices. Use measured data, not invented performance claims.
+- [ ] Keyboard, visible focus, reduced motion, route-active sidebar, meaningful labels, correct responsive table/card transformations and no body horizontal scroll.
+
+## 5. TEST LAST — execution/acceptance
+- [ ] After implementing priorities 1–4, lint, typecheck, unit+integration tests, Next production build and Playwright in 320/480/768/1024/1280/1440; check all role tabs and each visible control, overflow and contrast.
+- [ ] Validate role-specific reporter/reviewer/admin paths, account changes, persistence, database RLS and real-error injection.
+- [ ] Protected staging E2E must succeed twice in a row with real model calls, distinct reviewer, audit history and map status; verify visual map marker separately. No protected run has been observed yet.
+- [ ] One-paragraph 2–3 minute demo script + known limitations. Do not call fully tested/enterprise ready until all checks pass.
+- [ ] Open release issues #21 (email confirmation) and #30 (staging migration ledger) remain independent gates.
+
+## 6. Risks and next action
+Priority risks: (1) misleading hazard/unread/spend data, (2) private evidence and model costs, (3) authenticated 320px usability untested, (4) map CPU/tiles, (5) incomplete live review. PR #66 is already merged; this new PR contains ONLY a reviewed action plan.
+**Owner review gate:** Approve this plan before application code edits. First implementation PR: honest incident/notification/spend data + correct Muse Standard pricing. Then responsive review tables and map/report polish, then staged E2E and visual review.
+
+---
+
+# Earlier plans (archived verbatim)
+
 # ACTIVE PLAN — TerraResponse AI two-pass hackathon demo readiness
 
 **Date:** November 5, 2026 (Asia/Manila). **State:** AWAITING OWNER REVIEW — PLAN ONLY.

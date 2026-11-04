@@ -80,6 +80,8 @@ export interface UsageLogEntry {
   } | null;
   latencyMs?: number | null;
   outcome: UsageOutcome;
+  /** Explicitly mark successful cache re-use and preflight paths with no provider call. */
+  noProviderCall?: boolean;
   failureKind?: string | null;
   errorMessage?: string | null;
   config?: CostControlConfig;
@@ -117,7 +119,11 @@ export async function logUsage(entry: UsageLogEntry): Promise<void> {
         totalTokens: u.totalTokens ?? u.total_tokens ?? null,
       }
     : null;
-  const cost = estimateCost(usage, config);
+  const preflightSkip = entry.noProviderCall === true ||
+    entry.outcome === "budget_exhausted" || entry.outcome === "rate_limited" ||
+    entry.outcome === "download_failed";
+  // A cached response or preflight rejection did not invoke the paid model.
+  const cost = preflightSkip ? { usd: 0, basis: "flat" as const } : estimateCost(usage, config);
   const utcDay = new Date().toISOString().slice(0, 10);
 
   const row = {
@@ -179,7 +185,8 @@ export async function getDailyUsageSummary(
     .select("estimated_cost_usd, outcome")
     .eq("utc_day", utcDay);
   if (error || !data) {
-    return { totalCostUsd: 0, totalRequests: 0, byOutcome: {} };
+    // Never make an unavailable billing query look like zero usage.
+    throw new Error("AI_USAGE_UNAVAILABLE");
   }
   let totalCost = 0;
   const byOutcome: Record<string, number> = {};

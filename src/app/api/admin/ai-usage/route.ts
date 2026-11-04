@@ -71,7 +71,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const summary = await getDailyUsageSummary(day);
+  let summary;
+  try {
+    summary = await getDailyUsageSummary(day);
+  } catch {
+    return NextResponse.json(
+      { error: { code: "AI_USAGE_UNAVAILABLE", message: "Verified usage totals are temporarily unavailable. No zero-spend claim can be made." } },
+      { status: 503 },
+    );
+  }
   const config = readCostControlConfig();
   return NextResponse.json({
     ok: true,
@@ -88,7 +96,7 @@ export async function GET(request: NextRequest) {
       modelCallTimeoutMs: config.modelCallTimeoutMs,
     },
     caveat:
-      "Estimated cost is a rough upper-bound approximation from token counts (or a flat per-call rate when tokens are unavailable). " +
+      "Estimated spend is calculated from recorded model usage using configured pricing. Past records may use older rates; a missing token split yields only an approximation. " +
       "The provider's actual bill is the source of truth. " +
       "These numbers are for anomaly detection + budget enforcement only.",
   });

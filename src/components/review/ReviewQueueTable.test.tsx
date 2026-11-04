@@ -62,6 +62,21 @@ describe("review queue resilience and keyboard access", () => {
     expect(link.getAttribute("href")).toBe("/review/" + report.id);
   });
 
+  it("renders mobile stacked cards with a clear keyboard-accessible review action", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, reports: [report] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, reports: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ReviewQueueTable eventId="b2222222-2222-4222-8222-222222222222" />);
+    const card = await screen.findByTestId("mobile-review-" + report.id);
+    expect(card.textContent).toContain("Damaged bridge");
+    expect(card.textContent).toContain("AI triage · provisional");
+    const action = screen.getByRole("link", { name: "Review Damaged bridge" });
+    expect(action.getAttribute("href")).toBe("/review/" + report.id);
+    expect(action.className).toContain("min-h-11");
+    expect(screen.getByTestId("desktop-review-table")).toBeTruthy();
+  });
+
   it("does not show a successful empty queue for invalid API payloads", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: false, reports: [] }) });
     vi.stubGlobal("fetch", fetchMock);
