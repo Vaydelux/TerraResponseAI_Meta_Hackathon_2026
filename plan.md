@@ -1,12 +1,25 @@
 # ACTIVE PLAN — Fix empty Meta analysis response + replace schematic pin pad with real searchable map
 
 **Date:** 2026-11-05 (Asia/Manila).
-**Status:** PROPOSED; STOP FOR OWNER REVIEW BEFORE CODE, MODEL CALLS, DATABASE WRITES, OR DEPLOYMENT.
+**Status:** APPROVED AND IMPLEMENTED ON PR #69; awaiting exact-head CI and separate live staging acceptance.
 **Baseline:** \`main\` commit \`4042261727bde688616803738556eb946d7ed71c\`; PR #68 merged; Vercel production still on earlier commit \`3cf9f1d4\` due deployment API quota 402 at last verification.
 **Product:** TerraResponse AI, disaster-photo triage with provisional Muse Spark observations and independent human review.
 **Core 2–3-min demo:** Consented/synthetic photo → real geolocated pin → saved report → real provisional Muse analysis or truthful degraded state → independent reviewer → clearly labeled reviewed report on map.
 **Stack:** Next.js App Router, TypeScript, Tailwind v4 + semantic CSS tokens, Supabase private evidence/Postgres/PostGIS/RLS, MapLibre GL JS and current shared \`buildSurveyStyle\`, Meta Muse Spark 1.3 Standard, Vercel.
 **Devices:** 320–480px mobile, 768–1024px tablet, >=1440px desktop. Maintain 65/35 map/detail dashboard within available content width.
+
+## Approved implementation checkpoint
+
+Owner approved the plan and authorized merge/deploy after validation. Code implemented on this branch:
+- Server-backed empty Meta-output diagnostics (finish reason, reasoning-token count, completion-token count, number of choices), with no raw response or evidence logged; low reasoning effort to improve chance of a visible structured output within the bounded budget.
+- Explicit `MODEL_OUTPUT_LIMIT` retryable state for `finish_reason=length`; `MODEL_EMPTY_OUTPUT` goes to human review. No hidden automatic extra inference.
+- The report timeline now explicitly distinguishes failed analysis from validated analysis and retains the photo and human review.
+- Real MapLibre picker on upload with click/drag/keyboard pin, theme-aware real OSM tiles/attribution, independent numeric coordinates, EXIF GPS, browser permission GPS, and Unknown mode.
+- Local latitude/longitude search without a key, optional signed-in MapTiler place-name search via server-only `MAPTILER_API_KEY`, result validation, timeout/debounce and best-effort request throttling. No report evidence or private descriptions are sent to the geocoder.
+- Independent map-place search (a marker clearly labeled `not an incident`) alongside existing report search.
+- Added API/data/unit tests and responsive CI gates.
+
+**Operational limitations:** MapTiler search needs a MapTiler key in Vercel; coordinate lookup and manual map pinning do not. The static OSM basemap is a real map, but its tiles still require network and must comply with provider usage terms. The existing failed staging report was not re-analyzed and no new paid Meta calls were made; real cause of its empty response remains unknown without historic `finish_reason`. Protected two-pass staging acceptance is still unverified. Vercel account may be blocked by its deployment quota.
 
 ## 1. Audit findings (confirmed, do not treat hypotheses as facts)
 
