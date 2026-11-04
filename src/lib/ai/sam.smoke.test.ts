@@ -64,11 +64,9 @@ describe.skipIf(SKIP)("SAM 3.1 live smoke test", () => {
       throw new Error(`SAM live smoke failed (${result.kind}): ${result.error}`);
     }
 
-    // If the API succeeded, the mask must be a non-empty RLE string OR
-    // a clearly-empty result (the model may classify the red square as
-    // no_match if its threshold is conservative).
-    expect(result.rle.length).toBeGreaterThan(0);
-    console.log("[sam smoke] mask RLE length:", result.rle.length);
+    // Only real validated model masks qualify as successful output.
+    expect(result.masks.length).toBeGreaterThan(0);
+    console.log("[sam smoke] validated mask objects:", result.masks.length);
     console.log("[sam smoke] score:", result.score);
     console.log("[sam smoke] modelId:", result.modelId);
   }, 90_000);
