@@ -13,7 +13,7 @@ describe("fast authenticated navigation", () => {
   });
 
   it("keeps native Next.js links and provides a real pending state", () => {
-    const nav = source("src/components/layout/TopBar.tsx");
+    const nav = source("src/components/layout/WorkspaceSidebar.tsx");
     expect(nav).toContain('import Link from "next/link"');
     expect(nav).toContain("<NavPendingIndicator />");
     expect(nav).not.toContain('prefetch={false}');
