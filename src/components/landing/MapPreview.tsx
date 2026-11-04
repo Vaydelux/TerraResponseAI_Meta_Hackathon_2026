@@ -13,7 +13,7 @@ export function MapPreview({ signedIn = false }: { signedIn?: boolean }) {
   const selected = PREVIEW_INCIDENTS.find((incident) => incident.id === selectedId) ?? PREVIEW_INCIDENTS[0];
 
   return (
-    <section id="incident-map-preview" aria-labelledby="preview-heading" className="mt-12 grid min-w-0 scroll-mt-40 gap-4 sm:mt-16 sm:scroll-mt-24">
+    <section id="incident-map-preview" aria-labelledby="preview-heading" className="mt-12 grid min-w-0 gap-4 sm:mt-16">
       <div className="grid gap-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-[var(--tide)]">Explore the workspace</p>
         <h2 id="preview-heading" className="font-[family-name:var(--font-display)] text-[length:var(--step-3)] font-bold text-[var(--ink)]">One map. A clearer next step.</h2>
