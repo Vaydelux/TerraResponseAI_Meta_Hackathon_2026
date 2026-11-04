@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { TopBar } from "./TopBar";
+import { WorkspaceFrame } from "./WorkspaceFrame";
 import { DemoBanner } from "./DemoBanner";
 import type { AuthContext } from "@/lib/auth/profile";
 
@@ -22,11 +22,10 @@ export function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <div className="isolate grid min-h-dvh min-w-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] bg-paper">
-      <TopBar ctx={ctx} pendingReviewCount={pendingReviewCount}
-        showIncidentNotifications={showIncidentNotifications} showRoleManagement={showRoleManagement} />
+    <WorkspaceFrame ctx={ctx} pendingReviewCount={pendingReviewCount}
+      showIncidentNotifications={showIncidentNotifications} showRoleManagement={showRoleManagement}>
       <DemoBanner />
-      <main id="main-content" tabIndex={-1} className="relative z-0 min-w-0">
+      <main id="main-content" tabIndex={-1} className="relative z-0 min-w-0 flex-1">
         {children}
       </main>
       <footer className="flex min-w-0 flex-col gap-3 border-t border-rule bg-sheet px-3 py-4 text-xs sm:px-6 min-[1025px]:flex-row min-[1025px]:items-center min-[1025px]:justify-between">
@@ -40,6 +39,6 @@ export function AppShell({
           <Link href="/profile" className={FOOTER_LINK}>Profile</Link>
         </nav>
       </footer>
-    </div>
+    </WorkspaceFrame>
   );
 }

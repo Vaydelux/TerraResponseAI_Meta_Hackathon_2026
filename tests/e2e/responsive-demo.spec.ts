@@ -1,5 +1,28 @@
 import { test, expect } from "@playwright/test";
 
+test.describe("public asset availability", () => {
+  test("brand, editorial and hero assets return media rather than a login redirect", async ({ page, request }) => {
+    for (const [path, mime] of [
+      ["/logo.svg", "image/svg+xml"],
+      ["/icon.svg", "image/svg+xml"],
+      ["/demo/flood-aerial.png", "image/png"],
+      ["/brand/readme-banner.svg", "image/svg+xml"],
+      ["/hero/terraresponse-poster.jpg", "image/jpeg"],
+    ] as const) {
+      const response = await request.get(path, { maxRedirects: 0 });
+      expect(response.status(), path).toBe(200);
+      expect(response.headers()["content-type"], path).toContain(mime);
+      expect(response.headers()["location"], path).toBeUndefined();
+    }
+    await page.goto("/login");
+    const mark = page.locator('img[src="/logo.svg"]').first();
+    await expect(mark).toBeVisible();
+    await expect.poll(async () => mark.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+  });
+});
+
+
+
 // This is a public demo-surface smoke test, not proof of a real Supabase
 // upload, Meta inference, or human review. Playwright projects run it at
 // 320px mobile, 768px tablet and 1440px desktop.

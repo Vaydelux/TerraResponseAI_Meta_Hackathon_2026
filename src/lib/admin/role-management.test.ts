@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 const migration=readFileSync("supabase/migrations/20261103122000_admin_role_management.sql","utf8");
 const action=readFileSync("src/app/(app)/admin/users/actions.ts","utf8");
 const page=readFileSync("src/app/(app)/admin/users/page.tsx","utf8");
-const topbar=readFileSync("src/components/layout/TopBar.tsx","utf8");
+const sidebar=readFileSync("src/components/layout/WorkspaceSidebar.tsx","utf8");
 const helper=readFileSync("src/lib/admin/role-management.ts","utf8");
 
 describe("admin role governance",()=>{
@@ -37,6 +37,7 @@ describe("admin role governance",()=>{
   it("shows role management only to approved admins and uses server form actions",()=>{
     expect(page).toContain('ctx.user.role!=="admin"');
     expect(page).toContain('action={assignUserRole}');
-    expect(topbar).toContain('showRoleManagement && ctx.user.role === "admin"');
+    expect(sidebar).toContain('roles: ["admin"], requiresRoleManagement: true');
+    expect(sidebar).toContain('(!link.requiresRoleManagement || options.showRoleManagement)');
   });
 });

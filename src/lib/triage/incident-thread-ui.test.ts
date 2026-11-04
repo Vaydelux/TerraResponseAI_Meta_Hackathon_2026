@@ -5,7 +5,7 @@ const list = readFileSync("src/app/(app)/incidents/page.tsx", "utf8");
 const detail = readFileSync("src/app/(app)/incidents/[id]/page.tsx", "utf8");
 const inbox = readFileSync("src/app/(app)/notifications/page.tsx", "utf8");
 const actions = readFileSync("src/app/(app)/notifications/actions.ts", "utf8");
-const nav = readFileSync("src/components/layout/TopBar.tsx", "utf8");
+const nav = readFileSync("src/components/layout/WorkspaceSidebar.tsx", "utf8");
 
 describe("community incident threads and private notification inbox", () => {
   it("only uses verified sessions and RLS-scoped reads", () => {
@@ -51,7 +51,7 @@ describe("community incident threads and private notification inbox", () => {
   });
 
   it("only adds the incident navigation when triage is enabled", () => {
-    expect(nav).toContain('{ href: "/incidents", label: "Incident threads", triageOnly: true }');
-    expect(nav).toContain("(!link.triageOnly || showIncidentNotifications)");
+    expect(nav).toContain('{ href: "/incidents", label: "Incident threads", icon: Network, requiresTriage: true }');
+    expect(nav).toContain("(!link.requiresTriage || options.showIncidentNotifications)");
   });
 });

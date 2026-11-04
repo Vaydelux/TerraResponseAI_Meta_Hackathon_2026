@@ -10,7 +10,7 @@
 import { useState, useActionState, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ShieldCheck, Lock, Eye, EyeOff, ArrowRight, KeyRound, Mail, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, Lock, Eye, EyeOff, ArrowRight, KeyRound, Mail, CheckCircle2, ImageOff } from "lucide-react";
 import { Button, Field, Input } from "@/components/ui-tr";
 import { Wordmark } from "@/components/layout/Wordmark";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -22,6 +22,7 @@ export function LoginContent({ configured }: { configured: boolean }) {
   const params = useSearchParams();
 
   const [showPw, setShowPw] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
 
   const cbParam = params.get("callbackUrl");
   const callbackUrl = safeAuthPath(cbParam ?? "/dashboard");
@@ -90,11 +91,20 @@ export function LoginContent({ configured }: { configured: boolean }) {
               </p>
 
               <div className="auth-portal__media">
-                <img
-                  src="/demo/flood-aerial.png"
-                  alt="Aerial flood intelligence preview"
-                  referrerPolicy="no-referrer"
-                />
+                {previewFailed ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 bg-[var(--sheet-sunk)] px-5 text-center text-[var(--ink-2)]" role="status">
+                    <ImageOff size={28} aria-hidden="true" />
+                    <span className="text-sm font-semibold">Preview image unavailable</span>
+                    <span className="text-xs">You can still sign in and submit reports.</span>
+                  </div>
+                ) : (
+                  <img
+                    src="/demo/flood-aerial.png"
+                    alt="Aerial flood intelligence preview"
+                    referrerPolicy="no-referrer"
+                    onError={() => setPreviewFailed(true)}
+                  />
+                )}
                 <div className="auth-portal__media-bar">
                   <span>Flood Assessment Preview</span>
                   <span style={{ background: "var(--tide)", color: "#fff", padding: "2px 8px", borderRadius: 4 }}>

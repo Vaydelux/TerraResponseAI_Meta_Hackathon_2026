@@ -305,3 +305,105 @@ Reuse existing components and file locations where suitable. Extract narrowly sc
 ## 5. Next step
 
 **Implement the approved plan in priority order, then verify the demo.** Owner review was received before implementation. No push, deployment, auth changes, migrations, or closure of issue #21 are authorized by this approval. The full improvement goal remains unfinished until the final checks pass.
+
+
+---
+
+# Production public assets + login imagery plan — November 5, 2026
+
+**Status: AWAITING OWNER REVIEW — PLAN ONLY. No implementation/merge/production deployment.**
+
+**Baseline:** GitHub main `121f75e6c6f58bd4651827fc074eb1d66aac0dd1` (CI success), matching Vercel production READY deployment `dpl_4RiXh8ySApY4UUSmJZgVQX5x6475`. The supplied production login screenshot shows broken header + editorial `/logo.svg` images and `/demo/flood-aerial.png`.
+
+## 1. Findings
+
+- `middleware.ts` has a concrete source-level error: both `config.matcher` and `isStaticAsset` bypass `/_next/*`, `/favicon.ico` and `/robots.txt` but **not** `/logo.svg`, `/icon.svg`, or the files in `public/demo`, `public/brand`, `public/hero`, and `public/assets`. When Supabase is configured, signed-out requests to those files can be redirected to `/login`. Their presence in the repository rules out a simple missing-source-file explanation.
+- `Wordmark.tsx` loads `/logo.svg`; `LoginContent.tsx` loads `/demo/flood-aerial.png`. Both are affected by that routing rule.
+- CI's browser smoke runs without Supabase configuration; its bypass path masks this regression. `src/lib/login-middleware-redirect.test.ts` tests auth pages and protected routes but omits public asset requests.
+- Preview uses a different build/deployment. Its logo rendering does not rule out the production middleware defect; actual anonymous HTTP status/header comparisons remain unverified because direct HTTP access was unavailable.
+- Existing frontend structure is largely intentional; avoid speculative layout redesign. Issue #21 email confirmation cleanup is a separate production release gate.
+
+## 2. Ordered plan
+
+### Priority 1 — ENHANCE
+- [ ] Restore anonymous access to every intentional `public/` brand/demo/hero asset, including SVG, JPG, PNG and MP4.
+- [ ] Ensure the login preview degrades to a useful accessible fallback on media errors, without hiding failures.
+
+### Priority 2 — REFINE
+- [ ] Define one narrow, explicit public-asset allowlist (exact paths + known public asset prefixes) for `middleware.ts`; use it consistently in matcher/runtime bypass behavior.
+- [ ] Preserve private Supabase evidence restrictions, protected pages, API auth, and the single shared `Wordmark`. Do **not** implement a blanket extension-based auth bypass.
+
+### Priority 3 — POLISH
+- [ ] Preserve the current split login with brand and 16:9 scrimmed media at desktop >=1440px; validate tablet 768–1024px stack (including the existing 899px breakpoint), and mobile 320–480px form-first, full-width controls, 44px targets.
+- [ ] Check theme contrast, keyboard focus/hover/active states, long labels, image aspect ratios, reduced-motion behavior, and no horizontal scroll; reuse existing Tailwind classes and CSS tokens.
+
+### Priority 4 — SOLIDIFY
+- [ ] Add middleware regression tests in **configured, signed-out** mode: `/logo.svg`, `/icon.svg`, `/demo/flood-aerial.png`, `/brand/readme-banner.svg`, `/hero/terraresponse-bg.mp4`, representative `/assets/aistudio/*.png`. Assert no redirect and no session refresh.
+- [ ] Negative tests for `/dashboard`, `/review`, and other protected routes; preserve API route authorization.
+- [ ] Add browser assertions for anonymous asset response 200, proper content type, logo/preview natural image dimensions, and explicit missing-media fallback.
+- [ ] No database, secrets, auth policy, inference, or report workflow changes in this fix.
+
+### Priority 5 — TEST (only after 1–4)
+- [ ] Execute `bun install --frozen-lockfile`, `bun run lint`, `bun run typecheck`, `bun run test`, `bun run build`, relevant Playwright tests; report observed results.
+- [ ] Browser smoke at 320x800, 768x1024, 1440x900; assert zero broken images and overflow, good focus/reduced-motion behavior.
+- [ ] Compare anonymous production vs preview asset response status, redirect chain, content type, and caching. Rehearse the real authenticated reporter → Meta → reviewer → map staging path separately; do not claim it passes because public UI tests pass.
+- [ ] Submit a minimal PR for review **only after** all checks pass. Do not merge or deploy until explicit owner review; Issue #21 remains a separate release blocker.
+
+## 3. Target component tree
+
+```text
+Next Middleware
+  static Next internals / explicit public assets / public auth routes
+  protected application routes / individually authorized API routes
+RootLayout → brand metadata (favicon.ico, icon.svg)
+LoginContent
+  Topbar → Wordmark (/logo.svg)
+  AuthPortal
+    Aside → Wordmark (/logo.svg) + 16:9 FloodPreview (/demo/flood-aerial.png; graceful fallback)
+    Main  → existing Supabase sign-in action (unchanged)
+Dashboard → existing 65/35 desktop map + timeline / queue (unchanged)
+```
+
+## 4. Tokens, risks, and definition of done
+
+Use the existing `src/app/styles/tokens.css` semantic colors, spacing and typography; Tailwind flex/grid on touched layouts only. Main risks: overly broad auth bypass, a fix that merely hides image errors, preview/production environment drift, and CI that never exercises configured middleware. Done means authentic 200 asset responses, intact role protections, zero broken login imagery, no overflow at required widths, and green test gates. A true 2–3 minute end-to-end demo additionally needs separately verified real staging credentials, Meta inference and independent human review.
+
+## 5. Changes and next step
+
+**Plan documentation only** on branch `plan/production-public-assets-20261105`. Request explicit owner approval of this plan before beginning app edits. No implementation, merge, Vercel redeploy, or Supabase mutation performed.
+
+
+---
+
+# Approved extension — collapsible workspace sidebar (2026-11-05)
+
+**Owner request:** “Please proceed. also can you implement a mixed of sidebar for navigation. collapsible instead of a horizontal nav bar.” Prior public-asset plan is approved for implementation. This addition extends the approved work to the authenticated shell only; public landing and login retain their compact top navigation.
+
+## Findings (source review)
+- \`TopBar.tsx\` contains long horizontal navigation at desktop >=1440px and a stacked mobile drawer. It competes for width and doesn't provide a compact desktop layout.
+- \`AppShell.tsx\` composes header, banner, page and footer but has no persistent sidebar column.
+- Existing \`isNavHrefActive\`, role and flag visibility, pending-review count, \`ThemeToggle\`, \`UserMenu\`, \`Wordmark\`, and \`NavPendingIndicator\` must be preserved.
+- Existing dashboard has its own >=1440px 65/35 map-queue split; adding a 264px sidebar consumes viewport width. Preserve existing proportions within available content width; don't introduce horizontal overflow.
+- Existing responsive smoke only covers a public landing, not authenticated sidebar interactions.
+
+## Priorities 1 → 5
+1. **ENHANCE:** Move authenticated navigation into a persistent, elegant desktop sidebar; add expanded text/icon and collapsed icon-only modes. Mobile/tablet use a slide-in modal drawer opened by a header menu button; no desktop horizontal nav.
+2. **REFINE:** Split shell into small components: \`AppShell\` server, \`WorkspaceFrame\` client state, \`TopBar\` compact header, \`WorkspaceSidebar\` shared role-aware link registry. Do not duplicate route authorization; every route remains server enforced.
+3. **POLISH:** Desktop >=1024: sidebar width 264px expanded, 76px collapsed, fluid main. Tablet 768–1023: drawer triggered from header, existing map height 400px. Mobile 320–480: drawer width min(304px, 90vw), 44px menu/toggle/links, scrollable navigation, no body overflow. Sidebar groups, Lucide iconography, active state, pending count badge, semantic tokens, softened borders, accessible hover/focus/active, reduced-motion behavior, brand wordmark; content remains readable at 320px.
+4. **SOLIDIFY:** Close drawer on route click, Escape, overlay click and when browser navigation changes route. Trap keyboard focus in drawer, restore opener focus on closing, lock background scroll, \`aria-expanded\`, \`aria-current\`, \`aria-label\`. Keep role/triage flag gating, status indicator, account and theme controls. No changes to database, Supabase auth, inference or API logic.
+5. **TEST LAST:** After implementation, run lint/typecheck/test/build and an authenticated/fixture sidebar component test plus Playwright where possible. Regression check at 320/768/1440 for zero horizontal overflow, keyboard and reduced motion, route-active links and no unauthorized visible link; verify public asset URLs anonymously with configured middleware and 200+image MIME responses.
+
+## Target component tree
+\`\`\`
+AppShell [server]
+  WorkspaceFrame [client: desktop collapsed and mobile drawer state]
+    TopBar [brand, mobile menu, theme, profile]
+    Desktop WorkspaceSidebar [grouped links / collapse button]
+    Responsive Main [DemoBanner, route children, footer]
+    Mobile WorkspaceSidebar [modal drawer, same link data, close control]
+Dashboard route [unchanged: map + timeline / queue]
+\`\`\`
+
+**Risks:** Preview deployment may differ from production. Explicit public asset allowlist must not exempt evidence or any API route. No protected routes should become anonymously accessible. A narrower dashboard content column may change layout at some in-between widths. Authenticated end-to-end staging demo remains unverified independently of frontend tests.
+
+**Implementation authority:** Owner's “Please proceed” approves the previous asset plan. The sidebar work is newly requested in the same message; retain this plan in the PR and implement that scope without unrelated feature growth. Merge only if code checks are green and the branch is current.

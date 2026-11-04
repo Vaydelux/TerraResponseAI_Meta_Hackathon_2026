@@ -24,13 +24,18 @@ function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
 }
 
-// Static assets + Next internals — never guard.
+// Explicit public assets are always accessible, even when Supabase Auth is
+// configured. Do not bypass every path with a file extension: private evidence
+// remains protected by route handlers, Supabase Storage policies, and RLS.
+const PUBLIC_ASSET_PREFIXES = ["/assets/", "/brand/", "/demo/", "/hero/"] as const;
+const PUBLIC_ASSET_PATHS = new Set(["/logo.svg", "/icon.svg", "/favicon.ico", "/robots.txt"]);
+
 function isStaticAsset(pathname: string): boolean {
   return (
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/api/") ||
-    pathname === "/favicon.ico" ||
-    pathname === "/robots.txt"
+    PUBLIC_ASSET_PATHS.has(pathname) ||
+    PUBLIC_ASSET_PREFIXES.some((prefix) => pathname.startsWith(prefix))
   );
 }
 
@@ -77,6 +82,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Match every path except static assets and API routes (handled above).
+  // Public asset paths are exempted by isStaticAsset; retain the existing matcher
+  // to avoid accidentally exempting sensitive routes on extension alone.
   matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt).*)"],
 };
