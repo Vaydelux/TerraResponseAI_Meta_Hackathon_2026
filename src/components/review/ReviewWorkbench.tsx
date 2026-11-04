@@ -351,7 +351,7 @@ export function ReviewWorkbench({
                     setDetail((prev) => prev ? { ...prev, status, review_outcome: reviewOutcome } : prev);
                   }}
                   reportId={reportId}
-                  isOwnReport={isOwnReport}
+                  isOwnReport={isOwnReport && currentUserRole !== "admin"}
                   isLastInQueue={isLastInQueue}
                   queuePosition={queuePosition ?? { current: 1, total: 1 }}
                   status={detail.status}
