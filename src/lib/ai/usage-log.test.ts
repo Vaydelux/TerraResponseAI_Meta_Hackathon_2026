@@ -270,12 +270,10 @@ describe("getDailyUsageSummary", () => {
     expect(s.totalRequests).toBe(3); // count is row count, not sum
   });
 
-  it("returns 0/0 on a query error", async () => {
+  it("fails closed on a query error rather than presenting invented zero spend", async () => {
     mockFrom.mockReturnValue(makeSelectBuilder({
       data: null, error: { message: "DB down" },
     }));
-    const s = await getDailyUsageSummary("2024-09-15");
-    expect(s.totalCostUsd).toBe(0);
-    expect(s.totalRequests).toBe(0);
+    await expect(getDailyUsageSummary("2024-09-15")).rejects.toThrow("AI_USAGE_UNAVAILABLE");
   });
 });
