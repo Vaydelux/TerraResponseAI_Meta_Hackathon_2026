@@ -404,13 +404,14 @@ export function IncidentMap({
     renderHeatmapCanvas();
   }, [renderHeatmapCanvas, mapCenter, mapZoom]);
 
-  // A retry rebuilds the canvas; panning updates only the camera, never the snapshot.
-  useEffect(() => {
-    const container = containerRef.current;
+  // The imperative MapLibre instance belongs to the React ref lifecycle.
+  // Constructor errors are handled at attach time, rather than triggering
+  // synchronous React state updates from an effect.
+  const attachMap = useCallback((container: HTMLDivElement | null) => {
     if (!container || mapRef.current) return;
+    containerRef.current = container;
     let disposed = false;
     let map: maplibregl.Map;
-    setMapStatus("loading");
     const firstLocated = reports.find((report) => Number.isFinite(report.latitude) &&
       Number.isFinite(report.longitude) && Math.abs(report.latitude) <= 90 && Math.abs(report.longitude) <= 180);
     try {
@@ -478,7 +479,8 @@ export function IncidentMap({
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current = [];
       try { map.remove(); } catch { /* Keep teardown from replacing the usable report UI. */ }
-      mapRef.current = null;
+      if (mapRef.current === map) mapRef.current = null;
+      if (containerRef.current === container) containerRef.current = null;
     };
   }, [eventId, reports, mapAttempt]);
   // Render HTML markers (single pins + D3 cluster markers) with Framer Motion
@@ -883,12 +885,12 @@ export function IncidentMap({
       >
         <section className="grid min-w-0 gap-4" aria-label="Map and timeline">
           <div className="relative h-[320px] min-[481px]:h-[360px] md:h-[400px] min-[1025px]:h-[480px] min-[1440px]:h-[560px] min-w-0 overflow-hidden rounded-panel border border-rule bg-[var(--sheet-sunk)] [&_.maplibregl-ctrl-group_button]:size-11">
-            <div className={cn("relative h-full w-full", className)} ref={containerRef} data-zoomed-labels={mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD ? "true" : "false"} />
+            <div className={cn("relative h-full w-full", className)} ref={attachMap} data-zoomed-labels={mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD ? "true" : "false"} />
             <canvas ref={heatmapCanvasRef} className="map-heatmap-overlay" aria-hidden="true" style={{ opacity: showHeatmap ? 1 : 0 }} />
           </div>
           <div className="flex min-w-0 flex-col gap-2 rounded-panel border border-rule bg-sheet p-3 text-sm text-[var(--ink-2)] sm:flex-row sm:items-center sm:justify-between" role="status">
             <p>{mapStatus === "loading" ? "Preparing the map. The report list remains available." : mapStatus === "unavailable" ? "Interactive map unavailable. Use the report list, filters, and timeline." : mapStatus === "tiles-unavailable" ? "Basemap tiles are unavailable. Report data and pins are unchanged." : "Map ready. Report data is limited to the loaded snapshot."}</p>
-            {(mapStatus === "unavailable" || mapStatus === "tiles-unavailable") && <button type="button" className={workspaceAction} onClick={() => setMapAttempt((value) => value + 1)}>Retry map</button>}
+            {(mapStatus === "unavailable" || mapStatus === "tiles-unavailable") && <button type="button" className={workspaceAction} onClick={() => { setMapStatus("loading"); setMapAttempt((value) => value + 1); }}>Retry map</button>}
           </div>
           <div className="grid min-w-0 gap-2 rounded-panel border border-rule bg-sheet p-3 text-sm text-ink">
             <span className="break-words font-mono [overflow-wrap:anywhere]">Camera center: {formatCoords(mapCenter.lat, mapCenter.lon)} · {visibleReports.length} pins in this loaded window</span>
