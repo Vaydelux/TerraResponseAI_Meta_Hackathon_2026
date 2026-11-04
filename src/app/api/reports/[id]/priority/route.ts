@@ -64,13 +64,15 @@ export async function GET(
   // Fetch the analysis (for visual severity + access disruption).
   const { data: analysis } = await supabase
     .from("report_analyses")
-    .select("structured_observation, severity_score, processing_status")
+    .select("structured_observation, severity_score, processing_status, raw_usage_metadata")
     .eq("report_id", id)
     .single();
 
   // Failed or incomplete AI analyses are NOT validated visual evidence.
-  const observation = analysis?.processing_status === "succeeded"
-    ? (analysis.structured_observation as Record<string, unknown> ?? {}) : {};
+  const humanCorrected = Boolean((analysis?.raw_usage_metadata as
+    Record<string, unknown> | null)?._corrected_by);
+  const observation = analysis?.processing_status === "succeeded" || humanCorrected
+    ? (analysis?.structured_observation as Record<string, unknown> ?? {}) : {};
   const visualSeverity = observation.preliminary_severity as number | null ?? null;
 
   // Check if the report's incident_type indicates access disruption.
