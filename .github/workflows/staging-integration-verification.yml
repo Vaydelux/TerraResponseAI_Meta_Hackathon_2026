@@ -123,9 +123,9 @@ jobs:
   authenticated_staging_e2e:
     if: github.ref == 'refs/heads/main' && inputs.run_authenticated_e2e
     needs: database_read_only
-    name: Optional authenticated staging E2E loop (Reporter -> Muse -> Reviewer -> Map)
+    name: Two consecutive UI staging demos (Reporter -> Muse -> Reviewer -> Map)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     environment: staging
     env:
       STAGING_SUPABASE_PROJECT_REF: ${{ inputs.project_ref || vars.STAGING_SUPABASE_PROJECT_REF || secrets.STAGING_SUPABASE_PROJECT_REF }}
@@ -170,4 +170,7 @@ jobs:
             fi
             sleep 1
           done
-          PLAYWRIGHT_BASE_URL=http://localhost:3000 bunx playwright test tests/e2e/authenticated-flow.spec.ts --project=chromium-desktop
+          # Both attempts are independent, sequential, and must each pass.
+          # No retries, no silent skips, no overlapping live Meta calls.
+          PLAYWRIGHT_BASE_URL=http://localhost:3000 bunx playwright test tests/e2e/authenticated-flow.spec.ts --project=chromium-desktop --repeat-each=2 --workers=1 --retries=0
+          echo "Two independent reporter-to-reviewer UI acceptance passes completed successfully."
