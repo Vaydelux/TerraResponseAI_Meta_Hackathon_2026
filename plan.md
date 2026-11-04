@@ -1,11 +1,22 @@
 # ACTIVE PLAN — Calm global smooth scrolling (recording preparation)
 
-**Date:** November 5, 2026 (Asia/Manila). **Status:** AWAITING REVIEW — NO APPLICATION EDITS.
+**Date:** November 5, 2026 (Asia/Manila). **Status:** APPROVED, IMPLEMENTATION COMMITTED ON PR #68 — awaiting exact-commit CI and deployment.
 **Baseline:** main \`3cf9f1d4d1b81c041c3b7cc8e2ae35f7f6687c9d\`. Latest merge (#67) is deployed and green.
 **Product:** TerraResponse AI — photo-based community disaster reporting, provisional Meta observations and independently human-reviewed incident map.
 **Core demo:** 2–3 minute capture of landing → authorized reporter upload → saved AI analysis → separate reviewer decision → accurately labeled map result.
 **Stack:** Next.js App Router, React, TypeScript, Tailwind v4 with semantic CSS tokens, Supabase, Meta Muse Spark, MapLibre, Vercel.
 **Scope:** Native, accessible *smooth anchor/programmatic page scrolling* on every public/authenticated route. Do NOT confuse this with full-page route transition animation, wheel/trackpad physics, forced scrolling of map gestures, or Javascript scroll hijacking.
+
+## Approved enhancement — global “Back to top”
+
+The owner approved the plan and explicitly added a responsive theme-aware Back-to-top button for every public and authenticated page. Implemented on the review branch:
+- `src/components/layout/BackToTop.tsx` is mounted once in RootLayout. It appears only after meaningful document scrolling (not map/queue drag), uses a passive scroll listener with requestAnimationFrame throttling, and has no dependency on backend data or another animation library.
+- A 48px branded floating control uses existing `--sheet`, `--tide`, `--on-tide`, `--rule-strong` and shadow tokens for day/night themes. Mobile remains compact; desktop shows the full label.
+- Placement avoids bottom-right toast stacks by using the left edge on standard pages. The map/dashboard use a raised right-edge position to avoid map attribution; the review detail raises the control above the fixed mobile action bar. Backdrop overlay and drawer stay above the button.
+- Clicking the control focuses `#main-content` and scrolls to document top. Reduced-motion preference uses native instant scrolling.
+- `html` smooth anchor scrolling and sticky-header padding are centralized in `src/app/styles/base.css`; old duplicate landing `scroll-mt` offsets were removed.
+- Vitest and responsive Playwright tests cover the new button, focus, hidden state, theme-class tokens, motion preference, anchor offset, touch target, and document overflow.
+- Test/merge gate: run exact-head lint, typecheck, unit/integration, Next build, 320/768/1440 responsive browser smoke. Do not claim the protected authenticated two-pass staging E2E was performed by these tests.
 
 ## 1. Findings — concrete code audit
 
