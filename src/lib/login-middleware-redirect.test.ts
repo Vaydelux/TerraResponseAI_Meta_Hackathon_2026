@@ -63,6 +63,34 @@ describe("login callback and session redirect", () => {
     expect(mocks.refreshSupabaseSession).not.toHaveBeenCalled();
   });
 
+  it("serves only explicitly public brand and demo assets without requesting a session", async () => {
+    const assets = [
+      "/logo.svg",
+      "/icon.svg",
+      "/favicon.ico",
+      "/robots.txt",
+      "/demo/flood-aerial.png",
+      "/brand/readme-banner.svg",
+      "/hero/terraresponse-poster.jpg",
+      "/hero/terraresponse-bg.mp4",
+      "/assets/aistudio/image_25e22ba9.png",
+    ];
+    for (const path of assets) {
+      const result = await middleware(request(path));
+      expect(result.headers.get("location"), path).toBeNull();
+      expect(result.status, path).toBe(200);
+    }
+    expect(mocks.refreshSupabaseSession).not.toHaveBeenCalled();
+  });
+
+  it("does not blindly allow private routes merely because a path has a file extension", async () => {
+    for (const path of ["/dashboard/private.svg", "/reports/internal.png", "/review/data.json"]) {
+      const result = await middleware(request(path));
+      expect(result.headers.get("location"), path).toContain("/login?callbackUrl=");
+    }
+    expect(mocks.refreshSupabaseSession).toHaveBeenCalledTimes(3);
+  });
+
   it("redirects unauthenticated protected requests back to login and preserves refreshed cookies", async () => {
     mocks.refreshSupabaseSession.mockImplementation(async (req: NextRequest) => {
       const response = NextResponse.next({ request: req });
