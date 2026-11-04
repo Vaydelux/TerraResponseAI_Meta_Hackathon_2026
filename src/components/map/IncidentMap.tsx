@@ -177,10 +177,10 @@ export function IncidentMap({
   const [scrubberPct, setScrubberPct] = useState<number>(100);
   const [selected, setSelected] = useState<IncidentMapReport | null>(reports[0] ?? null);
   const loadedReports = reports;
-  const [mapZoom, setMapZoom] = useState<number>(11);
+  const [mapZoom, setMapZoom] = useState<number>(reports.length ? 11 : 2);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lon: number }>({
-    lat: reports[0]?.latitude ?? 14.6,
-    lon: reports[0]?.longitude ?? 121.0,
+    lat: reports[0]?.latitude ?? 0,
+    lon: reports[0]?.longitude ?? 0,
   });
   const [snapshotStatus, setSnapshotStatus] = useState<"idle" | "rendering" | "requested" | "failed">("idle");
   const [viewMode, setViewMode] = useState<"map" | "split">("split");
@@ -196,9 +196,8 @@ export function IncidentMap({
       Number.isFinite(report.longitude) && Math.abs(report.latitude) <= 90 && Math.abs(report.longitude) <= 180);
     if (firstLocated) {
       mapRef.current?.flyTo({ center: [firstLocated.longitude, firstLocated.latitude], zoom: 12, duration: reducedMotion ? 0 : 600 });
-    } else {
-      mapRef.current?.flyTo({ center: [121.0, 14.6], zoom: 11, duration: reducedMotion ? 0 : 600 });
     }
+    // No geolocated report: never imply an arbitrary city is the incident center.
   }
 
   // Optional regional context is fetched only after an explicit user request.
@@ -419,8 +418,8 @@ export function IncidentMap({
         container,
         style: buildSurveyStyle(resolveIsNight(readInitialTheme())),
         // Default camera position only; no report is assigned these coordinates.
-        center: firstLocated ? [firstLocated.longitude, firstLocated.latitude] : [121, 14.6],
-        zoom: 11,
+        center: firstLocated ? [firstLocated.longitude, firstLocated.latitude] : [0, 0],
+        zoom: firstLocated ? 11 : 2,
         attributionControl: {},
         canvasContextAttributes: { preserveDrawingBuffer: true },
       });
@@ -899,12 +898,12 @@ export function IncidentMap({
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button type="button" variant="outline" onClick={() => setShowHeatmap((value) => !value)} aria-pressed={showHeatmap} className="min-h-11 bg-sheet text-ink hover:bg-[var(--tide-wash)] active:bg-[var(--sheet-sunk)]"><Layers className="size-4" aria-hidden="true" />{showHeatmap ? "Hide density overlay" : "Show density overlay"}</Button>
-            <Button type="button" variant="outline" onClick={handleRecenter} className="min-h-11 bg-sheet text-ink hover:bg-[var(--tide-wash)] active:bg-[var(--sheet-sunk)]"><LocateFixed className="size-4" aria-hidden="true" />Recenter map</Button>
+            <Button type="button" variant="outline" onClick={handleRecenter} disabled={loadedReports.length === 0} className="min-h-11 bg-sheet text-ink hover:bg-[var(--tide-wash)] active:bg-[var(--sheet-sunk)]"><LocateFixed className="size-4" aria-hidden="true" />Recenter map</Button>
           </div>
           <MapLegend showPending={pendingMode === "all"} className="!static !max-w-full" />
           <div className="grid min-w-0 gap-2 rounded-panel border border-rule bg-sheet p-3">
-            <p className="text-xs text-[var(--ink-3)]">Regional context is optional and loaded only when requested for the current camera center.</p>
-            <button type="button" className={cn(workspaceAction, "w-full sm:w-auto sm:justify-self-start")} disabled={alertLoading} aria-busy={alertLoading} onClick={() => void fetchRegionalAlertForCoords(mapCenter.lat, mapCenter.lon, true)}>{alertLoading ? "Loading regional context…" : "Load regional context"}</button>
+            <p className="text-xs text-[var(--ink-3)]">Optional sourced context for the camera area—not independent verification of an incident. No contextual AI call runs automatically.</p>
+            <button type="button" className={cn(workspaceAction, "w-full sm:w-auto sm:justify-self-start")} disabled={alertLoading || loadedReports.length === 0} aria-busy={alertLoading} onClick={() => void fetchRegionalAlertForCoords(mapCenter.lat, mapCenter.lon, true)}>{alertLoading ? "Loading regional context…" : "Load regional context"}</button>
             {alertError && <p role="alert" className="text-sm text-[var(--amber-ink)]">{alertError}</p>}
             {regionalAlert && <RegionalAlertOverlay alert={regionalAlert} loading={alertLoading} dismissed={alertDismissed} onDismiss={() => setAlertDismissed(true)} onRefreshRegion={() => void fetchRegionalAlertForCoords(mapCenter.lat, mapCenter.lon, true)} />}
           </div>
@@ -985,7 +984,7 @@ export function IncidentMap({
                     >
                       <Link
                         href={
-                          canReview && topAdvisory.status !== "reviewed"
+                          canReview && (topAdvisory.status === "needs_review" || topAdvisory.status === "needs_manual_review")
                             ? `/review/${topAdvisory.id}`
                             : `/reports/${topAdvisory.id}`
                         }
@@ -1023,7 +1022,7 @@ export function IncidentMap({
               </div>
 
               {sortedVisible.length === 0 ? (
-                <p className="text-xs text-slate-400">No pinned reports in the current filter.</p>
+                <p className="text-xs text-slate-400">No located reports in the current filter.</p>
               ) : (
                 <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-1">
                   {sortedVisible.slice(0, 8).map((item) => {
@@ -1115,7 +1114,7 @@ export function IncidentMap({
                   onClick={handleDownloadMapSnapshot}
                   disabled={snapshotStatus === "rendering" || mapStatus !== "ready"}
                   data-testid="download-map-snapshot"
-                  className="w-full text-xs font-semibold h-8 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
+                  className="w-full text-xs font-semibold min-h-11 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
                 >
                   {snapshotStatus === "requested" ? (
                     <>
@@ -1140,7 +1139,7 @@ export function IncidentMap({
                     asChild
                     variant="outline"
                     size="sm"
-                    className="text-xs h-8 border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    className="text-xs min-h-11 border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
                   >
                     <Link href="/reports/new">
                       <Upload className="size-3 mr-1" />
@@ -1150,7 +1149,7 @@ export function IncidentMap({
                   <Button
                     asChild
                     size="sm"
-                    className="text-xs h-8 bg-teal-600 hover:bg-teal-500 text-white font-semibold border-0"
+                    className="text-xs min-h-11 bg-teal-600 hover:bg-teal-500 text-white font-semibold border-0"
                   >
                     <Link href={canReview ? "/review" : "/reports"}>
                       {canReview ? <CheckSquare className="size-3 mr-1" /> : <FileText className="size-3 mr-1" />}
