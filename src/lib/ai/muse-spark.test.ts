@@ -140,6 +140,35 @@ describe("analyzeImage (mocked transport)", () => {
     }
   });
 
+  it("classifies an empty response with token-limit finish as empty_output, not schema_invalid", async () => {
+    const transport = vi.fn(async () => makeMockResponse({
+      choices: [{ finish_reason: "length", message: { content: "" } }],
+      usage: { completion_tokens: 900, completion_tokens_details: { reasoning_tokens: 895 } },
+    }));
+    const result = await analyzeImage({ imageBytes: new Uint8Array([0xff]), imageMimeType: "image/jpeg" },
+      transport as unknown as typeof fetch);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.kind).toBe("empty_output");
+      expect(result.diagnostics).toEqual({ finishReason: "length", reasoningTokens: 895, completionTokens: 900, choiceCount: 1 });
+      expect(result.error).toContain("MODEL_OUTPUT_LIMIT");
+      expect(result.rawOutput).toBeUndefined();
+    }
+  });
+
+  it("does not claim an empty provider response was schema validated", async () => {
+    const transport = vi.fn(async () => makeMockResponse({
+      choices: [{ finish_reason: "stop", message: { content: null } }],
+    }));
+    const result = await analyzeImage({ imageBytes: new Uint8Array([0xff]), imageMimeType: "image/jpeg" },
+      transport as unknown as typeof fetch);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.kind).toBe("empty_output");
+      expect(result.error).toContain("MODEL_EMPTY_OUTPUT");
+    }
+  });
+
   it("classifies a 429 as transient", async () => {
     const transport = vi.fn(async () =>
       new Response("rate limited", { status: 429 }),
