@@ -220,11 +220,14 @@ export function ReviewWorkbench({
         }
         if (reviewBody?.ok && Array.isArray(reviewBody.actions) && reviewBody.actions.length > 0) {
           const latest = reviewBody.actions[0];
-          setReviewerName(latest.reviewer_name ?? currentUserDisplayName ?? null);
+          // The current viewer is NOT necessarily the actor who reviewed this report.
+          setReviewerName(latest.reviewer_name ??
+            (latest.reviewer_id === currentUserId ? currentUserDisplayName ?? null : null));
           setReviewedAt(latest.created_at);
           setReviewWasCorrected(latest.action === "comment" && latest.new_observation != null);
         } else if (reportBody.report.status === "reviewed") {
-          setReviewerName(currentUserDisplayName ?? "a reviewer");
+          // Older rows without history have no grounded reviewer display name.
+          setReviewerName(null);
         }
       })
       .catch((err: unknown) => {
@@ -233,7 +236,7 @@ export function ReviewWorkbench({
         setError("Network error while loading the report.");
       });
     return () => ctrl.abort();
-  }, [reportId, currentUserDisplayName]);
+  }, [reportId, currentUserId, currentUserDisplayName]);
 
   if (error) {
     return (
