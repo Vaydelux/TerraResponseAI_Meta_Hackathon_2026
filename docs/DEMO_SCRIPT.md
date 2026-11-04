@@ -1,3 +1,45 @@
+# TerraResponse AI — primary 2½-minute verified workflow demo
+
+> **Current implementation plan, November 5, 2026.** The steps below describe the intended real authenticated staging demonstration. **They have not yet been verified twice in a live browser.** The historical public navigation-showcase script is retained below as a clearly labeled fallback, not proof of end-to-end Meta inference.
+
+## Preflight: trust boundaries
+
+Use the isolated staging Supabase project and two preauthorized distinct accounts (reporter and reviewer). Never seed or create emergency records in production for a judging demonstration. A labeled synthetic photo may be uploaded as a staging test, but the Meta call and human review must genuinely execute for this to count as a real powered demo. Confirm staging MODEL_API_KEY is configured in the protected environment without printing its value.
+
+The landing's fictional sample map is not live disaster data; the original photo's authenticity is **not** assessed by the system. Human confirmation applies to the recorded review decision, not independent verification of a real-world disaster.
+
+## Primary judged path (2:30–3:00)
+
+| Time | Actual presenter action | Required proof |
+| --- | --- | --- |
+| 0:00–0:20 | Open public landing, explain that this is human-reviewed decision support, not dispatch | Clearly labeled fictional landing preview |
+| 0:20–0:55 | Sign in as staging reporter, choose a synthetic/consented image on **Upload photo**, select its manual location, submit | A persistent report ID and the **Open the report** link, not a mock upload |
+| 0:55–1:20 | Show AI status/provenance in the saved report | Actual persisted Muse Spark observation, model ID, provisional severity/uncertainty; or openly show unavailable/manual-review state |
+| 1:20–2:05 | Sign in with a separate authorized staging reviewer, open **Review queue** and the same report, inspect evidence, use **Confirm** or a justified correction | A real atomic reviewer decision, independent reviewer ID and durable audit history |
+| 2:05–2:40 | Open **Incident map**, point to the human-confirmed report and reviewed map index; inspect its report | Correct coordinates, different status from pending AI-only reports, same authorized snapshot |
+| 2:40–3:00 | Explain limitations and fallback | No auto-dispatch, no fabricated location, no unlabeled simulation |
+
+**If a live dependency fails:** show the recorded report's actual error and human-review fallback. If login, model, or map access is unavailable, open the public [fictional sample preview](/#incident-map-preview) and **explicitly state it is a synthetic UI demonstration**, not the reporter→Muse→reviewer transaction. Do not silently replace real inference or confirmation with prerecorded data.
+
+## Two-consecutive-pass acceptance gate
+
+GitHub → Actions → **Staging integration verification** → **Run workflow** on `main` with `run_authenticated_e2e=true`, after staging secrets and authorized accounts are confirmed. This explicitly incurs **two real model inference calls** and exercises two independent synthetic uploads and reviewer actions. The protected job sets `E2E_REQUIRE_AUTHENTICATED=1`, runs `--repeat-each=2 --workers=1 --retries=0`, and fails closed rather than silently skipping. The test is browser-operated for upload and reviewer actions and checks persisted analysis, signed private evidence access, audit history and the reviewed map index. The actual interactive map marker must also be checked during the manual demo: a text fallback cannot prove that WebGL rendered a pin.
+
+Record the exact commit, staging target, two separate pass outcomes, non-secret model identity, reviewer audit verification, map/queue visibility, visual inspection at 320/768/1440, the rehearsal runtime, and any skipped or failed checks. Never paste account passwords, service keys, evidence URLs or private photo contents into a PR, recording or chat.
+
+## Current known limitations (do not hide from judges)
+
+- At the read-only staging audit there was **one located report with a successful Muse Spark 1.3 analysis but zero persisted review actions**. The independent reviewer-to-map proof remains outstanding.
+- The authenticated two-pass workflow has been implemented as an **opt-in** staging gate; it is not part of ordinary CI and has not been observed passing until a real protected run completes.
+- The map index remains usable if map tiles/WebGL fail; that is not proof of a visually rendered pin.
+- Offline upload drafts are local-device storage, not uploaded evidence or live model results. Older drafts without verified owner identity are intentionally not auto-submitted across accounts.
+- Provider outages, missing keys or exhausted budgets can interrupt live inference; human review must remain available when supported by the saved report state.
+- Authentication email verification release blocker #21, migration history issue #30 and security advisor findings are separate unresolved production release gates.
+
+---
+
+## Previous public navigation-showcase script (fallback only)
+
 # TerraResponse AI — 2½-minute judging demo (current UI)
 
 > Updated for the November 4, 2026 command workspace. This is a **rehearsal
