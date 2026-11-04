@@ -310,11 +310,10 @@ export async function POST(request: NextRequest) {
   // Sanitize user-supplied title + description against prompt-injection
   // patterns BEFORE storing. Per the brief: "input validation against
   // prompt injection in user captions." Defense-in-depth: the user
-  // text is NEVER sent to the model (the system prompt is fixed; the
-  // only image input is the derivative), but we sanitize anyway so
-  // the stored text can't be confused with a system instruction by
-  // any downstream consumer (reviewer UI, audit log). Detected
-  // patterns are rewritten to "[redacted:possible-instruction]".
+  // text may reach the optional analysis path only inside a clearly
+  // delimited untrusted metadata block; it never becomes a system
+  // instruction. Sanitization also keeps stored text from being confused
+  // with instructions by downstream consumers (reviewer UI, audit log).
   const titleSanitized = meta.title ? sanitizeUserText(meta.title) : null;
   const descriptionSanitized = meta.description ? sanitizeUserText(meta.description) : null;
   if (titleSanitized?.rewrote || descriptionSanitized?.rewrote) {

@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useOptimistic, useTransition } from "react";
 import Link from "next/link";
 import {
   Cpu,
@@ -40,6 +40,9 @@ import {
   type ServerAnalysisTelemetry,
   type WizardStep,
 } from "@/lib/upload/upload-ux-helpers";
+import { prepareUploadImage } from "@/lib/upload/prepare-image";
+import { enqueueOfflineUpload, flushOfflineUploads, type OfflineUpload } from "@/lib/upload/offline-queue";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Step = WizardStep;
 
@@ -48,8 +51,36 @@ type UploadState =
   | { kind: "uploading"; progress: number }
   | { kind: "duplicate"; existingReportId: string }
   | { kind: "linked"; existingReportId: string }
+  | { kind: "queued"; message: string }
   | { kind: "success"; reportId: string; analysis: AnalysisProgress }
   | { kind: "error"; message: string };
+
+async function directStorageUpload(
+  file: File,
+  metadata: Record<string, unknown>,
+  setUploadState: (state: UploadState) => void,
+): Promise<Response> {
+  const session = await fetch("/api/reports/upload-session", { method: "POST", headers: { Accept: "application/json" } });
+  const sessionBody = await session.json().catch(() => null) as Record<string, unknown> | null;
+  if (!session.ok || !sessionBody || typeof sessionBody.bucket !== "string" || typeof sessionBody.path !== "string" || typeof sessionBody.grant !== "string") {
+    return new Response(JSON.stringify(sessionBody ?? { error: { message: "Could not start direct upload." } }), { status: session.status || 503 });
+  }
+  const supabase = createSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase is not configured.");
+  setUploadState({ kind: "uploading", progress: 35 });
+  const { error } = await supabase.storage.from(sessionBody.bucket).upload(sessionBody.path, file, {
+    contentType: "image/jpeg", upsert: false,
+  });
+  if (error) throw new Error("Direct evidence upload failed.");
+  setUploadState({ kind: "uploading", progress: 80 });
+  const finalized = await fetch("/api/reports/finalize", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ grant: sessionBody.grant, meta: metadata }),
+  });
+  setUploadState({ kind: "uploading", progress: 100 });
+  return finalized;
+}
 
 export interface UploadFlowProps {
   className?: string;
@@ -72,9 +103,29 @@ export function UploadFlow({ className }: UploadFlowProps) {
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stepButtonRefs = useRef<Array<HTMLButtonElement | null>>([null, null, null]);
   const [state, setState] = useState<UploadState>({ kind: "idle" });
+  const [optimisticSubmission, setOptimisticSubmission] = useOptimistic(
+    { pending: false, label: "" },
+    (_current, next: { pending: boolean; label: string }) => next,
+  );
+  const [isTransitionPending, startTransition] = useTransition();
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const uploadInFlightRef = useRef(false);
   const analysisInFlightRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const sendQueued = async (item: OfflineUpload) => {
+      const form = new FormData();
+      form.append("file", new File([item.file], item.fileName, { type: "image/jpeg" }));
+      form.append("meta", item.metadata);
+      const response = await fetch("/api/reports", { method: "POST", body: form });
+      return response.ok;
+    };
+    const handleOnline = () => {
+      void flushOfflineUploads(sendQueued).catch(() => undefined);
+    };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -259,29 +310,35 @@ export function UploadFlow({ className }: UploadFlowProps) {
     const file = files[0];
     if (!file) return;
     uploadInFlightRef.current = true;
+    const metadataPayload = buildMeta(linkToReportId);
+    const metadata = JSON.stringify(metadataPayload);
+    const preparedFile = await prepareUploadImage(file).catch(() => file);
     const fd = new FormData();
-    fd.append("file", file);
-    fd.append("meta", JSON.stringify(buildMeta(linkToReportId)));
+    fd.append("file", preparedFile);
+    fd.append("meta", metadata);
 
+    startTransition(() => setOptimisticSubmission({ pending: true, label: "Saving report" }));
     setState({ kind: "uploading", progress: 0 });
     try {
-      const res = await new Promise<Response>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhrRef.current = xhr;
-        xhr.open("POST", "/api/reports");
-        xhr.upload.onprogress = (ev) => {
-          if (ev.lengthComputable) {
-            setState({
-              kind: "uploading",
-              progress: Math.round((ev.loaded / ev.total) * 100),
-            });
-          }
-        };
-        xhr.onload = () => resolve(new Response(xhr.responseText, { status: xhr.status }));
-        xhr.onerror = () => reject(new Error("Network error"));
-        xhr.onabort = () => reject(new Error("aborted"));
-        xhr.send(fd);
-      });
+      const res = process.env.NEXT_PUBLIC_DIRECT_STORAGE_UPLOADS === "true"
+        ? await directStorageUpload(preparedFile, metadataPayload, setState)
+        : await new Promise<Response>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhrRef.current = xhr;
+            xhr.open("POST", "/api/reports");
+            xhr.upload.onprogress = (ev) => {
+              if (ev.lengthComputable) {
+                setState({
+                  kind: "uploading",
+                  progress: Math.round((ev.loaded / ev.total) * 100),
+                });
+              }
+            };
+            xhr.onload = () => resolve(new Response(xhr.responseText, { status: xhr.status }));
+            xhr.onerror = () => reject(new Error("Network error"));
+            xhr.onabort = () => reject(new Error("aborted"));
+            xhr.send(fd);
+          });
 
       const body = await res.json();
       if (!res.ok) {
@@ -320,8 +377,19 @@ export function UploadFlow({ className }: UploadFlowProps) {
         setState({ kind: "idle" });
         return;
       }
-      setState({ kind: "error", message: "Network error during upload." });
-      toast.error("Network error during upload.");
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        try {
+          await enqueueOfflineUpload({ file: preparedFile, fileName: preparedFile.name, metadata });
+          setState({ kind: "queued", message: "Saved on this device. It will upload automatically when you reconnect." });
+          toast.success("Saved offline; upload will resume when you reconnect.");
+        } catch {
+          setState({ kind: "error", message: "Network unavailable and this browser could not store the upload locally." });
+          toast.error("Could not save the upload offline.");
+        }
+      } else {
+        setState({ kind: "error", message: "Network error during upload." });
+        toast.error("Network error during upload.");
+      }
     } finally {
       xhrRef.current = null;
       uploadInFlightRef.current = false;
@@ -414,7 +482,7 @@ export function UploadFlow({ className }: UploadFlowProps) {
     setState({ kind: "idle" });
   }
 
-  const isUploading = state.kind === "uploading";
+  const isUploading = state.kind === "uploading" || optimisticSubmission.pending || isTransitionPending;
   const hasValidFile = canProceedToStep2();
   const hasConfirmedLocation =
     locationChoice === "unknown" ||
@@ -1364,6 +1432,15 @@ export function UploadFlow({ className }: UploadFlowProps) {
               >
                 Open existing report
               </Link>
+            </div>
+          )}
+          {state.kind === "queued" && (
+            <div className="panel" role="status">
+              <h3 style={{ fontSize: "var(--step-1)" }}>Saved for reconnection</h3>
+              <p className="t-meta" style={{ marginTop: "var(--s-2)" }}>{state.message}</p>
+              <Button variant="quiet" style={{ marginTop: "var(--s-3)" }} onClick={() => setState({ kind: "idle" })}>
+                Keep working
+              </Button>
             </div>
           )}
           {state.kind === "error" && (

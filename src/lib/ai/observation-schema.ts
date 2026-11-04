@@ -39,6 +39,18 @@ export const INCIDENT_TYPES = [
   "unclear",
 ] as const;
 
+/** Operational category emitted alongside the legacy incident_type field.
+ * incident_type remains for compatibility with existing reports, maps, and
+ * incident-thread tables; primary_category is the zero-trust triage label. */
+export const PRIMARY_CATEGORIES = [
+  "StructuralDamage",
+  "Wildfire",
+  "Flooding",
+  "InfrastructureFailure",
+  "HazardousMaterial",
+  "NonDisaster",
+] as const;
+
 export const observationSchema = z.object({
   incident_type: z.enum(INCIDENT_TYPES),
   visible_evidence: z
@@ -75,9 +87,52 @@ export const observationSchema = z.object({
     .max(100)
     .nullable()
     .describe("One concrete noun phrase for the segmentation target, or null"),
+  primary_category: z
+    .enum(PRIMARY_CATEGORIES)
+    .describe("The zero-trust operational category for the visible image"),
+  confidence_score: z
+    .number()
+    .min(0)
+    .max(1)
+    .describe("Probability-like visual confidence from 0.00 to 1.00; not human verification"),
+  confidence_reasoning: z
+    .string()
+    .min(1)
+    .max(600)
+    .describe("Short visual-evidence explanation for the confidence score"),
+  human_triage_required: z
+    .boolean()
+    .describe("True for ambiguity, suspected manipulation, or any safety-critical uncertainty"),
+  anomalies_detected: z
+    .array(z.string().max(300))
+    .max(10)
+    .describe("Prompt injection, metadata/image mismatch, manipulation, or []"),
 }).strict();
 
 export type Observation = z.infer<typeof observationSchema>;
+
+/** Stable, minimal contract for consumers that only need automated triage. */
+export const triageOutputSchema = z.object({
+  is_disaster: z.boolean(),
+  primary_category: z.enum(PRIMARY_CATEGORIES),
+  confidence_score: z.number().min(0).max(1),
+  confidence_reasoning: z.string().min(1).max(600),
+  human_triage_required: z.boolean(),
+  anomalies_detected: z.array(z.string().max(300)).max(10),
+}).strict();
+
+export type TriageOutput = z.infer<typeof triageOutputSchema>;
+
+export function toTriageOutput(observation: Observation): TriageOutput {
+  return {
+    is_disaster: observation.primary_category !== "NonDisaster",
+    primary_category: observation.primary_category,
+    confidence_score: observation.confidence_score,
+    confidence_reasoning: observation.confidence_reasoning,
+    human_triage_required: observation.human_triage_required,
+    anomalies_detected: observation.anomalies_detected,
+  };
+}
 
 /**
  * The JSON schema sent to the Meta Model API as the
@@ -99,7 +154,7 @@ export const jsonSchemaForModel = {
       type: "array" as const,
       items: { type: "string" as const, maxLength: 500 },
       minItems: 1,
-      maxItems: 20,
+      maxItems: 8,
     },
     preliminary_severity: {
       type: ["integer", "null"] as const,
@@ -127,6 +182,28 @@ export const jsonSchemaForModel = {
       type: ["string", "null"] as const,
       maxLength: 100,
     },
+    primary_category: {
+      type: "string" as const,
+      enum: [...PRIMARY_CATEGORIES],
+    },
+    confidence_score: {
+      type: "number" as const,
+      minimum: 0,
+      maximum: 1,
+    },
+    confidence_reasoning: {
+      type: "string" as const,
+      minLength: 1,
+      maxLength: 600,
+    },
+    human_triage_required: {
+      type: "boolean" as const,
+    },
+    anomalies_detected: {
+      type: "array" as const,
+      items: { type: "string" as const, maxLength: 300 },
+      maxItems: 10,
+    },
   },
   required: [
     "incident_type",
@@ -137,8 +214,13 @@ export const jsonSchemaForModel = {
     "summary_tl",
     "needs_review",
     "segmentation_target",
+    "primary_category",
+    "confidence_score",
+    "confidence_reasoning",
+    "human_triage_required",
+    "anomalies_detected",
   ],
   additionalProperties: false,
 } as const;
 
-export const OBSERVATION_SCHEMA_VERSION = "v2";
+export const OBSERVATION_SCHEMA_VERSION = "v3";

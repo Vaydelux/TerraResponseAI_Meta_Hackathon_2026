@@ -52,6 +52,8 @@ export interface CostControlConfig {
   modelCallTimeoutMs: number;
   /** Max retries for transient failures (429/5xx). */
   maxRetries: number;
+  /** Maximum model output tokens for a single visual triage call. */
+  maxOutputTokens: number;
   /** Estimated input cost per 1M tokens, USD. */
   costPer1mInputTokensUsd: number;
   /** Estimated output cost per 1M tokens, USD. */
@@ -78,6 +80,7 @@ export function readCostControlConfig(): CostControlConfig {
     perUserSignedUrlsPerMinute: num("SIGNED_URL_RATE_LIMIT_PER_MIN", 60),
     modelCallTimeoutMs: num("AI_CALL_TIMEOUT_MS", 30_000),
     maxRetries: num("AI_MAX_RETRIES", 4),
+    maxOutputTokens: num("AI_MAX_OUTPUT_TOKENS", 900),
     costPer1mInputTokensUsd: num("AI_COST_PER_1M_INPUT_TOKENS_USD", 0.3),
     costPer1mOutputTokensUsd: num("AI_COST_PER_1M_OUTPUT_TOKENS_USD", 0.6),
     costPerCallFlatUsd: num("AI_COST_PER_CALL_FLAT_USD", 0.001),

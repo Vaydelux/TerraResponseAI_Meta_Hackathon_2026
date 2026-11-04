@@ -11,6 +11,11 @@ const base: Observation = {
   summary_tl: "Posibleng pagbaha",
   needs_review: true,
   segmentation_target: null,
+  primary_category: "Flooding",
+  confidence_score: 0.96,
+  confidence_reasoning: "Floodwater is visibly covering the roadway.",
+  human_triage_required: false,
+  anomalies_detected: [],
 };
 
 describe("report-first safety policy", () => {
@@ -40,6 +45,22 @@ describe("report-first safety policy", () => {
   });
   it("routes an unlocated critical picture for high priority manual review", () => {
     expect(decideTriage(base, false)).toMatchObject({ triageClass: "high_review", priority: "high" });
+  });
+  it("marks only high-confidence, anomaly-free non-disasters as cancellation candidates", () => {
+    const candidate = decideTriage({
+      ...base,
+      incident_type: "other",
+      primary_category: "NonDisaster",
+      confidence_score: 0.99,
+      human_triage_required: false,
+      anomalies_detected: [],
+    }, true);
+    expect(candidate).toMatchObject({
+      triageClass: "unrelated_review",
+      reasonCode: "HIGH_CONFIDENCE_NONDISASTER_CANCELLATION_CANDIDATE",
+      autoCancelCandidate: true,
+    });
+    expect(decideTriage({ ...base, primary_category: "NonDisaster", confidence_score: 0.99, anomalies_detected: ["metadata mismatch"] }, true).autoCancelCandidate).toBe(false);
   });
   it("does not label insufficient evidence or high uncertainty as confirmed", () => {
     const d=decideTriage({ ...base, visible_evidence: ["water"], uncertainties: ["one", "two", "three"] }, true);

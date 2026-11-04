@@ -503,6 +503,11 @@ describe("POST /api/reports/[id]/analyze (mocked integration)", () => {
       summary_en: "flood",
       summary_tl: "baha",
       needs_review: true,
+      primary_category: "Flooding",
+      confidence_score: 0.95,
+      confidence_reasoning: "Water is visibly covering the roadway.",
+      human_triage_required: false,
+      anomalies_detected: [],
     };
     mockFrom.mockReturnValueOnce(makeBuilder({
       data: { id: REPORT_ID, event_id: EVENT_ID, status: "uploaded",

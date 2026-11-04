@@ -7,9 +7,9 @@
 // Defense layers (defense-in-depth — each layer alone is bypassable;
 // together they raise the bar):
 //
-//   1. STRUCTURAL: user-supplied text (title, description) is NEVER
-//      included in the prompt sent to the AI model. The system prompt
-//      in src/lib/ai/prompt.ts is fixed; the only image input is the
+//   1. STRUCTURAL: when metadata is sent to the optional AI analysis
+//      path, it is placed only in a clearly delimited untrusted block.
+//      src/lib/ai/prompt.ts remains fixed; metadata is never an instruction.
 //      derivative image bytes. So even if the user writes
 //      "ignore previous instructions and ...", the model never sees
 //      it. This is the PRIMARY defense — the input never reaches the

@@ -24,6 +24,7 @@ describe("cost-controls: readCostControlConfig", () => {
     delete process.env.SIGNED_URL_RATE_LIMIT_PER_MIN;
     delete process.env.AI_CALL_TIMEOUT_MS;
     delete process.env.AI_MAX_RETRIES;
+    delete process.env.AI_MAX_OUTPUT_TOKENS;
     delete process.env.AI_COST_PER_1M_INPUT_TOKENS_USD;
     delete process.env.AI_COST_PER_1M_OUTPUT_TOKENS_USD;
     delete process.env.AI_COST_PER_CALL_FLAT_USD;
@@ -43,6 +44,7 @@ describe("cost-controls: readCostControlConfig", () => {
     expect(c.perUserSignedUrlsPerMinute).toBe(60);
     expect(c.modelCallTimeoutMs).toBe(30_000);
     expect(c.maxRetries).toBe(4);
+    expect(c.maxOutputTokens).toBe(900);
     expect(c.costPer1mInputTokensUsd).toBe(0.3);
     expect(c.costPer1mOutputTokensUsd).toBe(0.6);
     expect(c.costPerCallFlatUsd).toBe(0.001);

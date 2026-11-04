@@ -15,6 +15,11 @@ const modelOutput = {
   summary_tl: "May baha sa kalsada",
   needs_review: true as const,
   segmentation_target: "standing water",
+  primary_category: "Flooding" as const,
+  confidence_score: 0.9,
+  confidence_reasoning: "Standing water is visibly covering the road surface.",
+  human_triage_required: false,
+  anomalies_detected: [],
 };
 
 describe("review correction preserves strict Meta observation", () => {

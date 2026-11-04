@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { requireServerUser, createSupabaseServerClient } from "@/lib/supabase/server";
 import { isTriageEnabled } from "@/lib/triage/processing";
@@ -20,6 +20,7 @@ export async function markNotificationRead(form: FormData): Promise<void> {
     .update({ read_at: new Date().toISOString() })
     .eq("id", parsed.data).eq("recipient_id", user.id).is("read_at", null);
   if (error) throw new Error("Unable to mark your notification as read.");
+  revalidateTag(`terraresponse:notifications:${user.id}`, "max");
   revalidatePath("/notifications");
 }
 
@@ -31,5 +32,6 @@ export async function markAllNotificationsRead(): Promise<void> {
     .update({ read_at: new Date().toISOString() })
     .eq("recipient_id", user.id).is("read_at", null);
   if (error) throw new Error("Unable to acknowledge notifications.");
+  revalidateTag(`terraresponse:notifications:${user.id}`, "max");
   revalidatePath("/notifications");
 }

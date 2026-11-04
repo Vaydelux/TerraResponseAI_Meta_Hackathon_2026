@@ -142,7 +142,7 @@ export async function processReportTriage(args: {
   const { data: link, error: linkReadError } = await db.from("incident_report_links")
     .select("incident_id").eq("report_id", args.reportId).maybeSingle();
   if (linkReadError) throw new Error("Cannot check incident thread association.");
-  if (!link) {
+  if (!link && !decision.autoCancelCandidate) {
     let incidentId: string | null = null;
     let distanceM: number | null = null;
     if (hasLocation && !["other", "unclear"].includes(stored.incidentType)) {
@@ -185,7 +185,7 @@ export async function processReportTriage(args: {
 
   // After a human review, retries must not resurrect an actionable
   // AI review notification or change the final verification state.
-  if (stored.verificationStatus === "awaiting_human") {
+  if (stored.verificationStatus === "awaiting_human" && !decision.autoCancelCandidate) {
     await notifyRecipients(db, {
       reportId: args.reportId, eventId: args.eventId,
       kind: stored.priority === "critical" ? "critical_provisional"

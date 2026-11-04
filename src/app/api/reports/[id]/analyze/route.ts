@@ -40,13 +40,30 @@ import { checkAllAiCallCeilings } from "@/lib/rate-limit";
 import { lookupCachedAnalysis } from "@/lib/ai/dedup-cache";
 import { logUsage } from "@/lib/ai/usage-log";
 import { decideManualRetry, MAX_MANUAL_RETRIES } from "@/lib/ai/safe-retry";
-import { observationSchema } from "@/lib/ai/observation-schema";
+import { observationSchema, toTriageOutput } from "@/lib/ai/observation-schema";
 import { processReportTriage, isTriageEnabled } from "@/lib/triage/processing";
+import { verifyAnalysisWebhook } from "@/lib/analysis/webhook-signature";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
+  const internalSignature = request.headers.get("x-terra-analysis-signature");
+  let internalActorId: string | null = null;
+
+  if (internalSignature) {
+    const payload = await request.clone().json().catch(() => null) as { actorId?: unknown } | null;
+    const actorId = payload && typeof payload.actorId === "string" ? payload.actorId : null;
+    if (!actorId || !verifyAnalysisWebhook({ signature: internalSignature, reportId: id, actorId })) {
+      return NextResponse.json(
+        { error: { code: "UNAUTHORIZED", message: "Invalid analysis trigger signature." } },
+        { status: 401 },
+      );
+    }
+    internalActorId = actorId;
+  }
+
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
       { error: { code: "NOT_CONFIGURED", message: "Supabase is not configured." } },
@@ -63,34 +80,40 @@ export async function POST(
   }
 
   // 1. Identity verification (server-side, JWT signature checked).
-  let user;
-  try {
-    user = await requireServerUser();
-  } catch {
-    return NextResponse.json(
-      { error: { code: "UNAUTHORIZED", message: "Authentication required." } },
-      { status: 401 },
-    );
-  }
+  let actorId: string;
+  if (internalActorId) {
+    // The Edge Function is a trusted server-side dispatcher. Its HMAC is
+    // bound to both this report ID and the creator ID in the webhook row.
+    actorId = internalActorId;
+  } else {
+    let user;
+    try {
+      user = await requireServerUser();
+    } catch {
+      return NextResponse.json(
+        { error: { code: "UNAUTHORIZED", message: "Authentication required." } },
+        { status: 401 },
+      );
+    }
 
-  // 2. Event authorization (RLS-enforced profile + memberships).
-  const ctx = await getAuthContext(user);
-  if (!ctx) {
-    return NextResponse.json(
-      { error: { code: "UNAUTHORIZED", message: "Profile not found." } },
-      { status: 401 },
-    );
+    // Event authorization (RLS-enforced profile + memberships).
+    const ctx = await getAuthContext(user);
+    if (!ctx) {
+      return NextResponse.json(
+        { error: { code: "UNAUTHORIZED", message: "Profile not found." } },
+        { status: 401 },
+      );
+    }
+    actorId = user.id;
   }
-
-  const { id } = await params;
 
   // 3. Fetch the report (RLS-enforced: creator OR event reviewer+).
   //    Include retry_count (for the safe-retry cap) + sha256 (for the
   //    dedup cache) + event_id (for the per-event AI budget ceiling).
-  const supabase = await createSupabaseServerClient();
+  const supabase = internalActorId ? trustedAnalysisClient() : await createSupabaseServerClient();
   const { data: report, error: reportErr } = await supabase
     .from("reports")
-    .select("id, event_id, creator_id, status, updated_at, derivative_storage_key, image_mime_type, sha256, retry_count")
+    .select("id, event_id, creator_id, status, updated_at, derivative_storage_key, image_mime_type, sha256, retry_count, title, description")
     .eq("id", id)
     .single();
 
@@ -98,6 +121,13 @@ export async function POST(
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Report not found or access denied." } },
       { status: 404 },
+    );
+  }
+
+  if (internalActorId && report.creator_id !== internalActorId) {
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "Analysis trigger is not bound to this report creator." } },
+      { status: 401 },
     );
   }
 
@@ -116,8 +146,8 @@ export async function POST(
       .eq("report_id", id)
       .single();
     if (existing) {
+      const parsed = observationSchema.safeParse(existing.structured_observation);
       if (isTriageEnabled()) {
-        const parsed = observationSchema.safeParse(existing.structured_observation);
         if (!parsed.success) {
           return NextResponse.json({ error: {
             code: "TRIAGE_PENDING", message: "Saved observation needs manual triage.",
@@ -139,6 +169,7 @@ export async function POST(
         ok: true,
         idempotent: true,
         analysis: existing,
+        ...(parsed.success ? { triageOutput: toTriageOutput(parsed.data) } : {}),
       });
     }
     // Status says analyzed but no row — treat as needs_manual_review.
@@ -214,7 +245,7 @@ export async function POST(
     await logUsage({
       reportId: id,
       eventId: report.event_id,
-      userId: user.id,
+      userId: actorId,
       outcome: "budget_exhausted",
       failureKind: "retry_cap_reached",
       errorMessage: retryDecision.reason,
@@ -274,7 +305,7 @@ export async function POST(
       await logUsage({
         reportId: id,
         eventId: report.event_id,
-        userId: user.id,
+        userId: actorId,
         modelId: cached.modelId,
         promptVersion: cached.promptVersion,
         schemaVersion: cached.schemaVersion,
@@ -329,7 +360,7 @@ export async function POST(
   //     spend/request ceilings (configurable)" + "per-user and per-
   //     event server-enforced rate limits."
   const ceiling = await checkAllAiCallCeilings({
-    userId: user.id,
+    userId: actorId,
     eventId: report.event_id,
     config: costConfig,
   });
@@ -338,7 +369,7 @@ export async function POST(
     await logUsage({
       reportId: id,
       eventId: report.event_id,
-      userId: user.id,
+      userId: actorId,
       outcome: ceiling.code === "EVENT_BUDGET_EXCEEDED" ? "budget_exhausted" : "rate_limited",
       failureKind: ceiling.code,
       errorMessage: ceiling.message,
@@ -399,7 +430,7 @@ export async function POST(
     await logUsage({
       reportId: id,
       eventId: report.event_id,
-      userId: user.id,
+      userId: actorId,
       outcome: "download_failed",
       failureKind: "download_failed",
       errorMessage: `Failed to download derivative: ${downloadErr?.message ?? "unknown"}`,
@@ -424,6 +455,8 @@ export async function POST(
       imageBytes,
       imageMimeType: "image/jpeg",
       timeoutMs: Math.min(costConfig.modelCallTimeoutMs, 30_000),
+      maxOutputTokens: costConfig.maxOutputTokens,
+      reporterContext: { title: report.title, description: report.description },
     }),
     (r) => r.ok === false && (r.kind === "transient" || r.kind === "timeout"),
     { maxRetries: 0, baseDelayMs: 1000, maxDelayMs: 1000 },
@@ -439,7 +472,7 @@ export async function POST(
       await logUsage({
         reportId: id,
         eventId: report.event_id,
-        userId: user.id,
+        userId: actorId,
         usage: null,
         latencyMs,
         outcome: "schema_invalid",
@@ -458,7 +491,7 @@ export async function POST(
       await logUsage({
         reportId: id,
         eventId: report.event_id,
-        userId: user.id,
+        userId: actorId,
         usage: null,
         latencyMs,
         outcome: "permanent_failed",
@@ -477,7 +510,7 @@ export async function POST(
     await logUsage({
       reportId: id,
       eventId: report.event_id,
-      userId: user.id,
+        userId: actorId,
       usage: null,
       latencyMs,
       outcome: "transient_failed",
@@ -516,7 +549,7 @@ export async function POST(
     await logUsage({
       reportId: id,
       eventId: report.event_id,
-      userId: user.id,
+      userId: actorId,
       usage: result.usageMetadata,
       latencyMs,
       outcome: "permanent_failed",
@@ -556,7 +589,7 @@ export async function POST(
   await logUsage({
     reportId: id,
     eventId: report.event_id,
-    userId: user.id,
+    userId: actorId,
     modelId: result.modelId,
     promptVersion: result.promptVersion,
     schemaVersion: result.schemaVersion,
@@ -589,6 +622,7 @@ export async function POST(
       ok: true,
       reportId: id,
       observation: result.observation,
+      triageOutput: result.triageOutput,
       ...(triage ? { triage } : {}),
       modelId: result.modelId,
       promptVersion: result.promptVersion,

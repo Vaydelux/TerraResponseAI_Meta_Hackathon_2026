@@ -30,6 +30,11 @@ const VALID_OBSERVATION = {
   summary_tl: "Isang kalsada ang binaha at tumataas ang tubig sa parehong lane. Ilang sasakyan ang tila bahos na.",
   needs_review: true,
   segmentation_target: "submerged vehicle",
+  primary_category: "Flooding",
+  confidence_score: 0.96,
+  confidence_reasoning: "Water visibly covers the roadway and vehicles appear partially submerged.",
+  human_triage_required: false,
+  anomalies_detected: [],
 };
 
 function makeMockResponse(body: unknown, status = 200): Response {
@@ -72,8 +77,8 @@ describe("analyzeImage (mocked transport)", () => {
       expect(result.observation.needs_review).toBe(true);
       expect(result.usageMetadata.total_tokens).toBe(300);
       expect(result.modelId).toBe("muse-spark-1.3");
-      expect(result.promptVersion).toBe("v2");
-      expect(result.schemaVersion).toBe("v2");
+      expect(result.promptVersion).toBe("v3-zero-trust-triage");
+      expect(result.schemaVersion).toBe("v3");
     }
   });
 

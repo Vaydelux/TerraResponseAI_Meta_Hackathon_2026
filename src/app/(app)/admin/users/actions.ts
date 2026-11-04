@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireServerUser } from "@/lib/supabase/server";
@@ -36,6 +36,7 @@ export async function assignUserRole(form: FormData): Promise<void> {
     console.error("[admin] Role mutation denied or unavailable",error?.code??"unknown");
     redirect("/admin/users?result=failed");
   }
+  revalidateTag("terraresponse:profiles", "max");
   revalidatePath("/admin/users");
   redirect("/admin/users?result=updated");
 }

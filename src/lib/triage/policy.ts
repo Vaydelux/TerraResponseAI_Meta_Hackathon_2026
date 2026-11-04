@@ -18,7 +18,11 @@ export type TriageDecision = {
   publicationStatus: "private" | "public_provisional";
   notifyAdmin: boolean;
   priority: "critical" | "high" | "normal";
+  /** Safe routing hint; cancellation still requires an auditable human action. */
+  autoCancelCandidate: boolean;
 };
+
+const AUTO_CANCEL_CONFIDENCE_THRESHOLD = 0.98;
 
 /**
  * Conservative policy. The model does not output a calibrated probability;
@@ -27,14 +31,28 @@ export type TriageDecision = {
  */
 export function decideTriage(
   observation: Pick<Observation,
-    "incident_type" | "preliminary_severity" | "visible_evidence" | "uncertainties">,
+    "incident_type" | "primary_category" | "confidence_score" | "human_triage_required" |
+    "anomalies_detected" | "preliminary_severity" | "visible_evidence" | "uncertainties">,
   hasTrustedLocation: boolean,
   allowProvisionalPublication = false,
 ): TriageDecision {
   const base = {
     verificationStatus: "awaiting_human" as const,
     publicationStatus: "private" as const,
+    autoCancelCandidate: false,
   };
+  if (observation.primary_category === "NonDisaster" &&
+      observation.confidence_score >= AUTO_CANCEL_CONFIDENCE_THRESHOLD &&
+      !observation.human_triage_required && observation.anomalies_detected.length === 0) {
+    return {
+      ...base,
+      triageClass: "unrelated_review",
+      reasonCode: "HIGH_CONFIDENCE_NONDISASTER_CANCELLATION_CANDIDATE",
+      notifyAdmin: false,
+      priority: "normal",
+      autoCancelCandidate: true,
+    };
+  }
   if (observation.incident_type === "other" || observation.incident_type === "unclear") {
     return { ...base, triageClass: "unrelated_review", reasonCode: "NO_RECOGNIZED_DISASTER_TYPE", notifyAdmin: false, priority: "normal" };
   }

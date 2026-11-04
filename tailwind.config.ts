@@ -3,14 +3,25 @@ import tailwindcssAnimate from "tailwindcss-animate";
 
 const config: Config = {
     darkMode: "class",
-    content: [
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+  content: [
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
   	extend: {
-  		colors: {
+		colors: {
+			brand: {
+				obsidian: "#07070a",
+				teal: "#49c5d6",
+				silver: "#f4f4f7",
+				steel: "#9298a5",
+			},
+			hazard: {
+				critical: "var(--brick)",
+				warning: "var(--amber)",
+				success: "var(--green)",
+			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

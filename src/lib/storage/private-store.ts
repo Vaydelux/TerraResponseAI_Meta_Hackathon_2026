@@ -31,14 +31,61 @@ function serviceStorage() {
   });
 }
 
-const BUCKET_ORIGINAL = "evidence-originals";
-const BUCKET_DERIVATIVE = "evidence-derivatives";
-const BUCKET_THUMBNAIL = "evidence-thumbnails";
+export const BUCKET_ORIGINAL = "evidence-originals";
+export const BUCKET_DERIVATIVE = "evidence-derivatives";
+export const BUCKET_THUMBNAIL = "evidence-thumbnails";
 
 export interface StoredKeys {
   originalStorageKey: string;
   derivativeStorageKey: string;
   thumbnailStorageKey: string;
+}
+
+/** Server-only read used after a browser has uploaded to private Storage. */
+export async function downloadPrivateObject(bucket: string, path: string): Promise<Uint8Array> {
+  if (!isSupabaseConfigured()) throw new Error("Supabase is not configured.");
+  const { data, error } = await serviceStorage().storage.from(bucket).download(path);
+  if (error || !data) throw new Error("Private evidence object could not be downloaded.");
+  return new Uint8Array(await data.arrayBuffer());
+}
+
+export async function deletePrivateObject(bucket: string, path: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await serviceStorage().storage.from(bucket).remove([path]);
+}
+
+/** Store only server-produced derivatives when the original already exists. */
+export async function storeDerivedEvidence(args: {
+  eventId: string;
+  reportId: string;
+  derivative: Uint8Array;
+  thumbnail: Uint8Array;
+}): Promise<Pick<StoredKeys, "derivativeStorageKey" | "thumbnailStorageKey">> {
+  if (!isSupabaseConfigured()) throw new Error("Supabase is not configured.");
+  const client = serviceStorage();
+  const derivativePath = `${args.eventId}/${args.reportId}.jpg`;
+  const uploaded: string[] = [];
+  try {
+    const derivative = await client.storage.from(BUCKET_DERIVATIVE).upload(derivativePath, Buffer.from(args.derivative), {
+      contentType: "image/jpeg", upsert: false,
+    });
+    if (derivative.error) throw new Error(`Derivative upload failed: ${derivative.error.message}`);
+    uploaded.push(derivativePath);
+    const thumbnail = await client.storage.from(BUCKET_THUMBNAIL).upload(derivativePath, Buffer.from(args.thumbnail), {
+      contentType: "image/jpeg", upsert: false,
+    });
+    if (thumbnail.error) throw new Error(`Thumbnail upload failed: ${thumbnail.error.message}`);
+    return {
+      derivativeStorageKey: `${BUCKET_DERIVATIVE}/${derivativePath}`,
+      thumbnailStorageKey: `${BUCKET_THUMBNAIL}/${derivativePath}`,
+    };
+  } catch (error) {
+    await Promise.all([
+      ...uploaded.map((path) => client.storage.from(BUCKET_DERIVATIVE).remove([path])),
+      client.storage.from(BUCKET_THUMBNAIL).remove([derivativePath]),
+    ]);
+    throw error;
+  }
 }
 
 /**

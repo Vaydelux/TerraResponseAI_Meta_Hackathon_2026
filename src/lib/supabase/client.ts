@@ -22,7 +22,10 @@ import { supabaseUrl, supabaseAnonKey, isSupabaseConfigured } from "./env";
 let browserClient: ReturnType<typeof createBrowserClient> | null = null;
 
 export function createSupabaseBrowserClient() {
-  if (!isSupabaseConfigured()) return null;
+  // The browser must only require the public pair. The server-only
+  // service-role key is intentionally absent from client bundles, so using
+  // isSupabaseConfigured() here would incorrectly disable browser Storage.
+  if (!supabaseUrl() || !supabaseAnonKey()) return null;
   if (browserClient) return browserClient;
   browserClient = createBrowserClient(supabaseUrl(), supabaseAnonKey());
   return browserClient;
