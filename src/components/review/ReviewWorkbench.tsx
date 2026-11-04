@@ -136,8 +136,9 @@ function readObservation(detail: ReportDetail): ObservationData {
     severity: (obs?.preliminary_severity as number) ?? null,
     visibleEvidence: (obs?.visible_evidence as string[]) ?? [],
     uncertainties: (obs?.uncertainties as string[]) ?? [],
-    modelId: valid ? a?.model_id : undefined,
+    modelId: a?.processing_status === "succeeded" ? a.model_id : undefined,
     analysisAvailable: valid,
+    humanOnlyAssessment: Boolean(hasHumanCorrection && a?.processing_status !== "succeeded"),
     isDemo: a?.model_id === "demo-mock-v1",
   };
 }
