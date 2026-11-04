@@ -1,3 +1,80 @@
+# ACTIVE PLAN — Calm global smooth scrolling (recording preparation)
+
+**Date:** November 5, 2026 (Asia/Manila). **Status:** AWAITING REVIEW — NO APPLICATION EDITS.
+**Baseline:** main \`3cf9f1d4d1b81c041c3b7cc8e2ae35f7f6687c9d\`. Latest merge (#67) is deployed and green.
+**Product:** TerraResponse AI — photo-based community disaster reporting, provisional Meta observations and independently human-reviewed incident map.
+**Core demo:** 2–3 minute capture of landing → authorized reporter upload → saved AI analysis → separate reviewer decision → accurately labeled map result.
+**Stack:** Next.js App Router, React, TypeScript, Tailwind v4 with semantic CSS tokens, Supabase, Meta Muse Spark, MapLibre, Vercel.
+**Scope:** Native, accessible *smooth anchor/programmatic page scrolling* on every public/authenticated route. Do NOT confuse this with full-page route transition animation, wheel/trackpad physics, forced scrolling of map gestures, or Javascript scroll hijacking.
+
+## 1. Findings — concrete code audit
+
+- \`src/app/globals.css\` imports \`styles/base.css\` and defines reduced-motion animation/transition rules but **does not define a root \`scroll-behavior\` or reduced-motion scroll override**.
+- \`src/app/styles/base.css\` owns the \`html\` base selector, making it the appropriate single location to add root scroll behavior and offset tokens instead of patching every \`page.tsx\`.
+- Public landing \`src/app/page.tsx\` has sticky top navigation and real \`#how-it-works\` / \`#incident-map-preview\` links. Abrupt anchor jumps and sticky-header obstruction should be checked. The global \`#main-content\` skip link must remain accessible and should not be delayed for reduced-motion users.
+- Authenticated shell \`WorkspaceFrame\` has a sticky 64px navigation rail, an independent mobile drawer and body-scroll lock while the drawer is open. Internal sidebar scrolling must remain native; smooth root scrolling must not disrupt focus traps or overlay close.
+- Interactive map, timeline, cards, queue overflow and horizontal filter pills include independent scroll/drag gestures. Do not apply \`scroll-behavior: smooth\` universally to \`*\`, \`body *\`, \`overflow-auto\`, or MapLibre's canvas; this would risk performance and perceived responsiveness.
+- No supplied screenshot or recorded benchmark proves current wheel-scrolling is slow. Root CSS smooth behavior affects anchor links, \`scrollIntoView\`, and scroll APIs; it does **not** change OS/browser wheel acceleration. Avoid claiming otherwise.
+
+## 2. Ordered implementation priorities (after review)
+
+### 1 — ENHANCE
+- [ ] Add one \`html\` root \`scroll-behavior: smooth\` under \`@media (prefers-reduced-motion: no-preference)\` for anchor and app-invoked page movement on *all* pages, including landing, login, reports, review, map and dashboard.
+- [ ] Ensure anchor targets are not obscured by the sticky landing or authenticated header using root \`scroll-padding-top\`, drawing from existing \`--nav-h\` / spacing tokens rather than pixel magic.
+
+### 2 — REFINE
+- [ ] Centralize the rule in \`src/app/styles/base.css\`. Reuse existing \`--nav-h\` / \`--s-*\` tokens. Do not duplicate Tailwind \`scroll-smooth\` on each route.
+- [ ] Preserve Next.js App Router default route scroll restoration rather than installing global transition listeners or a smooth scroll library.
+
+### 3 — POLISH
+- [ ] Apply consistent anchor offset across phone/tablet/desktop. Confirm the landing's section headings remain readable beneath its taller sticky header.
+- [ ] Keep map, review queue, dialog, sidebar and hazard-pill native scrolling responsive; no long easing, forced wheel animation or scroll jank.
+- [ ] Avoid altering layout, imagery, typography, buttons or current 65/35 desktop dashboard proportions for this isolated change.
+
+### 4 — SOLIDIFY
+- [ ] Respect \`prefers-reduced-motion: reduce\`: scrolling must be **instant** (override explicitly with \`scroll-behavior: auto !important\` if needed), while existing CSS/JS motion protections remain.
+- [ ] Verify keyboard skip links move focus correctly, hash navigation does not hide headings behind the sticky header, no unintended horizontal body overflow, no focus trap conflict, and touch/mobile drawer scrolling is unchanged.
+- [ ] Keep browser/OS wheel physics and MapLibre drag/zoom untouched. No Javascript wheel interception or animation loop.
+
+### 5 — TEST (only after 1–4)
+- [ ] Lint, typecheck, unit tests, Next production build and Playwright page smoke for 320 / 768 / 1440px, including a real landing hash-link click and return.
+- [ ] In Playwright with \`reducedMotion: "no-preference"\`, assert computed \`document.documentElement\` scroll behavior is \`smooth\`; with \`reducedMotion: "reduce"\`, assert it is \`auto\`. Check sticky heading visibility, focus management and zero horizontal overflow.
+- [ ] Verify signed-in navigation and map drag manually where automated credentials are unavailable; do not claim an authenticated acceptance run succeeded.
+- [ ] For demo preparation, record the landing scroll, reporter/reviewer interface and map separately. Don't present fixture mode as live AI.
+
+## 3. Layout target and component tree
+
+| Breakpoint | Expected result |
+| --- | --- |
+| Mobile 320–480 | Native touch scroll, no hijacked momentum, section anchor below header; drawer scroll isolated and protected; no body overflow |
+| Tablet 768–1024 | Smooth landing anchors, fixed/sticky header clearances, native map/pill/queue gestures |
+| Desktop >=1440 | Sticky landing header and workspace sidebar unaffected, dashboard retains 65% map / 35% detail within content width, accessible page anchors |
+
+\`\`\`text
+RootLayout
+  globals.css → styles/tokens.css → styles/base.css [one root smooth-scroll rule]
+  PublicLanding → sticky header → #how-it-works / #incident-map-preview / #main-content
+  Authenticated AppShell → WorkspaceFrame / TopBar / DesktopSidebar / MobileDrawer
+     Dashboard / Reports / Review / IncidentMap [retain native nested scrolling]
+\`\`\`
+
+**Existing tokens:** \`--nav-h\`, \`--s-2\`, \`--s-3\`, \`--s-4\`, \`--paper\`, \`--sheet\`, \`--ink\`, \`--tide\`. No extra animation-duration token or new dependency required.
+
+## 4. Risks and known limitations
+
+- CSS \`scroll-behavior\` applies to anchor/programmatic movements, **not** inertial mouse-wheel/trackpad motion and not Next.js page-transition animations.
+- A global \`scroll-smooth\` on every element may harm map dragging, large virtualized data sets, timeline gestures and form error focus. Not recommended.
+- Root \`scroll-padding-top\` must account for real sticky header geometry; extra header content such as a banner can still vary, so capture a browser screenshot at target widths before claiming exact fit.
+- Real authenticated staging two-pass demo remains unverified independently of this cosmetic enhancement. Existing auth/migration release issues still apply.
+
+## 5. Next step — review gate
+
+Approve this small root CSS and regression-test scope, then implement in a dedicated feature PR and merge only when exact-head CI passes. **No app code or production deployment is changed by this plan-only PR.**
+
+---
+
+# Previous plans (preserved verbatim)
+
 # ACTIVE PLAN — TerraResponse AI full-app trust, UX, map, report and AI cost hardening
 
 **Date:** 2026-11-05 Asia/Manila. **Status:** APPROVED and IMPLEMENTED on PR #67 branch; final CI and separate authenticated staging acceptance are required before full sign-off.
