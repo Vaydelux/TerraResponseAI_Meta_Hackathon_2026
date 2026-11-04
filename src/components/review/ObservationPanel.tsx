@@ -47,6 +47,8 @@ export interface ObservationData {
   isDemo?: boolean;
   /** True only for a successfully processed or separately recorded human-corrected observation. */
   analysisAvailable?: boolean;
+  /** Human correction exists while original model analysis was unavailable. */
+  humanOnlyAssessment?: boolean;
 }
 
 export interface ObservationPanelProps {
@@ -114,6 +116,7 @@ export function ObservationPanel({
           modelName={observation.modelId}
           isDemo={observation.isDemo}
         />
+        {observation.humanOnlyAssessment && <p className="m-0 mt-2 text-xs font-semibold text-[var(--ink-2)]">Human-recorded assessment; original AI processing was unsuccessful.</p>}
         <h2 className="obs__type">{incidentLabel}</h2>
         <p className="obs__summary">
           {!observation.analysisAvailable
@@ -128,13 +131,13 @@ export function ObservationPanel({
           : <SeverityMeter level={severity} state={state} />}
       </div>
       <div className="obs__section">
-        <div className="obs__section-title">What the model saw</div>
+        <div className="obs__section-title">{observation.humanOnlyAssessment ? "What the reviewer recorded" : "What the model saw"}</div>
         {observation.analysisAvailable
           ? <EvidenceList items={observation.visibleEvidence} />
           : <p className="m-0 text-sm text-[var(--ink-2)]">No validated model evidence. Review the original photo directly.</p>}
       </div>
       <div className="obs__section">
-        <div className="obs__section-title">What the model could not determine</div>
+        <div className="obs__section-title">{observation.humanOnlyAssessment ? "Reviewer-recorded uncertainties" : "What the model could not determine"}</div>
         {observation.analysisAvailable
           ? <UncertaintyList items={observation.uncertainties} />
           : <p className="m-0 text-sm text-[var(--ink-2)]">AI uncertainty was not assessed because analysis failed.</p>}
