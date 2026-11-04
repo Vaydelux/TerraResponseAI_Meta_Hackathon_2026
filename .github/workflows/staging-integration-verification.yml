@@ -1,6 +1,8 @@
 # TerraResponse AI — opt-in, non-destructive staging verification.
 # No migrations, database writes, seeded records or deployment actions
 # unless run_authenticated_e2e is explicitly selected by the owner.
+# The explicitly approved PR #66 branch may run manually as Vaydelux using
+# the protected staging environment; it does NOT deploy to production.
 name: Staging integration verification
 
 on:
@@ -21,7 +23,7 @@ on:
         type: boolean
         default: false
       run_authenticated_e2e:
-        description: "Run the full Reporter -> Muse Spark -> Reviewer -> Map staging E2E flow"
+        description: "Opt-in two real paid Muse calls + independent reviewer tests on staging"
         required: false
         type: boolean
         default: false
@@ -35,7 +37,7 @@ concurrency:
 
 jobs:
   database_read_only:
-    if: github.ref == 'refs/heads/main'
+    if: (github.ref == 'refs/heads/main' || (github.ref == 'refs/heads/plan/demo-two-pass-acceptance-20261105' && github.actor == 'Vaydelux'))
     name: Verify staging database access (read-only)
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -82,7 +84,7 @@ jobs:
         run: bun run db:verify
 
   live_model_smoke:
-    if: github.ref == 'refs/heads/main' && (inputs.run_muse_spark || inputs.run_sam)
+    if: (github.ref == 'refs/heads/main' || (github.ref == 'refs/heads/plan/demo-two-pass-acceptance-20261105' && github.actor == 'Vaydelux')) && (inputs.run_muse_spark || inputs.run_sam)
     needs: database_read_only
     name: Optional live model smoke (uses actual API)
     runs-on: ubuntu-latest
@@ -121,7 +123,7 @@ jobs:
         run: bun x vitest run src/lib/ai/sam.smoke.test.ts
 
   authenticated_staging_e2e:
-    if: github.ref == 'refs/heads/main' && inputs.run_authenticated_e2e
+    if: (github.ref == 'refs/heads/main' || (github.ref == 'refs/heads/plan/demo-two-pass-acceptance-20261105' && github.actor == 'Vaydelux')) && inputs.run_authenticated_e2e
     needs: database_read_only
     name: Two consecutive UI staging demos (Reporter -> Muse -> Reviewer -> Map)
     runs-on: ubuntu-latest
