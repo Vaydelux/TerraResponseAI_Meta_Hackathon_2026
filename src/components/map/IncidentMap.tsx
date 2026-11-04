@@ -567,6 +567,7 @@ export function IncidentMap({
         button.type = "button";
         button.className = "pin";
         button.dataset.state = state;
+        button.dataset.reportId = r.id;
         button.dataset.sev = String(sev);
         button.dataset.hazard = hazardCategory;
         button.dataset.staggerIndex = String(idx);
