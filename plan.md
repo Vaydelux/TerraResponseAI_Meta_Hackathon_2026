@@ -1,10 +1,10 @@
 # TerraResponse AI — demo workspace improvement plan
 
 Date: 2026-11-04 (Asia/Singapore)
-Status: **Earlier plan approved; latest-commit revision above is awaiting review. No new implementation in this plan PR.**
+Status: **Latest revision approved by the owner on 2026-11-04. Implementation and QA tracked in PR #64; see its exact-commit CI results for release readiness.**
 
 
-> **LATEST-HEAD REVIEW GATE — 2026-11-04.** This revision audits GitHub `main` at `8fdcbc1a616dfec045b0b3b19543efc0022b71ac`. The prior plan's approved status applies to its earlier scope; the *new delta below* awaits owner review. No application code, CI, Supabase database, or Vercel deployment is changed by this plan-only branch. Historical findings below describe the earlier implementation state; they are not claims about present-day defects.
+> **LATEST-HEAD IMPLEMENTATION — 2026-11-04.** Owner explicitly approved execution in this conversation. This revision audits the original baseline `8fdcbc1a616dfec045b0b3b19543efc0022b71ac`; changes in PR #64 address its defects. Historical findings below describe an earlier implementation state and are not current defect claims. Supabase roles/schema/secrets remain untouched; do not infer live staging success from CI.
 
 ## Current audit & review plan for `8fdcbc1`
 
@@ -82,7 +82,7 @@ Authenticated AppShell
 
 Use `--paper`, `--sheet`, `--rule`, `--ink`, `--tide`, `--amber` (AI-unverified), `--green` (human-confirmed), `--brick` (rejected/critical), `--s-1..--s-8`, `--step--1..--step-4`, `--r-ctl`, `--r-panel`, `--focus`, and reduced-motion-safe transitions from `src/app/styles/tokens.css`. New touched layouts use Tailwind utility classes. No duplicate token palette.
 
-### 3. Changes — proposed by component (no implementation in this plan PR)
+### 3. Changes — implementation scope in PR #64
 
 | Component / file | Targeted change |
 | --- | --- |
@@ -96,6 +96,18 @@ Use `--paper`, `--sheet`, `--rule`, `--ink`, `--tide`, `--amber` (AI-unverified)
 | `src/app/styles/*` + Tailwind classes | Token-aligned, targeted layout fixes; avoid wholesale stylesheet deletion |
 | Tests + `docs/DEMO_SCRIPT.md` | Only in phase 5; browser/snapshot/failure/demo evidence |
 
+### Implementation notes (as of approved patch)
+
+- Fixed three original React effect-state lint errors: theme preference is an external subscription, and both MapLibre canvases own map initialization/teardown through the ref lifecycle.
+- Improved map/context-loss recovery and retry while keeping the queue usable; adapted neutral map-marker title typing without loosening location validation.
+- Preserved the 65/35 desktop split, tablet/mobile heights, RLS-scoped 200-report window and local pin logic. Added explicit selected-incident announcement and clear-selection action.
+- Updated pending/manual-review labels to avoid claiming an AI observation exists before it is persisted.
+- Kept actual landing synthetic samples; converted internal workspace links to Next.js Link; improved 44px carousel controls and eliminated synchronous Embla effect writes.
+- Keyed legacy reviewer corrections by report+observation to prevent stale form fields and aborted stale review-history requests.
+- Replaced the obsolete demo guide with the current, truthful 2½-minute UI walkthrough.
+- Repaired Playwright's non-existent start script reference; added public responsive/keyboard smoke tests and a Chromium CI job after the core checks. This **does not** stand in for authenticated staging or actual live inference.
+- Retired test assertions tightly coupled to removed fake dispatch and legacy UI mechanics; preserved or replaced them with tests for current truthful report/incident behavior.
+
 ### 4. Risks and verification limits
 
 - Existing `main` **currently fails lint**, and latest CI never reached build, so do not treat previous commit success as proof for `8fdcbc1`.
@@ -107,7 +119,7 @@ Use `--paper`, `--sheet`, `--rule`, `--ink`, `--tide`, `--amber` (AI-unverified)
 
 ### 5. Next step / review gate
 
-**Review this latest-commit delta in the plan-only PR.** After explicit approval, implement phases 1–4 on an isolated feature branch, then perform phase 5 tests, and propose merging only the verified application changes. No code has been built or changed under this latest audit.
+**Owner review was received.** Phase 1–4 fixes and regression updates are committed on the isolated PR #64 branch. Merge only after exact-head lint, TypeScript, unit/integration, production build and responsive Chromium smoke checks pass. Authenticated staging/Meta/reviewer and manual visual rehearsal remain separate acceptance gates and must be reported as unverified if not actually run.
 
 ---
 
