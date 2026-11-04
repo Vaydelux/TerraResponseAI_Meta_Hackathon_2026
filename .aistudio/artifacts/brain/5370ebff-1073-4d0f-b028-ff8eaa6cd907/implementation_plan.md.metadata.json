@@ -1,6 +1,0 @@
-{
-  "summary": "Comprehensive implementation plan for removing legacy Day/Mist/Night Ops/Auto themes, introducing standard System/Light/Dark with a clean dropdown menu, redesigning with Material 3 tonal elevation and shadcn components, and decluttering the dashboard using modal and dialog workflows.",
-  "updatedAt": "2026-11-04T09:25:32.117631592Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

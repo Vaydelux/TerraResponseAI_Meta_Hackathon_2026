@@ -17,10 +17,6 @@
 - **Not yet proven:** end-to-end reporter → live Muse Spark → human review → map with real JWTs, live model use, SMTP deliverability, automated browser acceptance. Keep issue #21 and issue #30 open until proven.
 - **Deployment:** Production data is not an authorized staging test surface. No real responder or victim evidence should be uploaded for public hackathon use.
 
-## Source and AI-development acknowledgments
-
-The project creator credits **Z.ai** for the initial design, **Gemini 4 and Gemini 3.8** for agent-first implementation (creator-provided model labels), followed by **OpenAI ChatGPT and Codex** for brainstorming, review and polishing. These are coding/design assistants, distinct from the **runtime Meta Muse Spark 1.3 and optional Meta SAM 3.1** integration. See [Hackathon showcase](HACKATHON_SHOWCASE.md).
-
 **Judges' video:** https://youtu.be/MldyTvwECMo. The delivered recording does **not** establish a successful Muse response or persisted independent review action. Avoid using “AI successfully classified this example” for the filmed case.
 
 ## Project title

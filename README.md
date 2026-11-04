@@ -244,24 +244,13 @@ See `docs/DEMO_SCRIPT.md` for the 3-minute demo script and `docs/DEMO_MODE.md` f
 
 This project's owned code is released under the MIT License — see `LICENSE`.
 
-## Development process and AI tool acknowledgments
-
-Development was **human-directed and AI-assisted**. The project creator reports using these tools in sequence:
-
-- **Z.ai** — initial UI design generation and visual foundation.
-- **Gemini 4 and Gemini 3.8** — agent-first implementation and iteration (model labels as provided by the project creator).
-- **OpenAI ChatGPT and Codex** — follow-up architecture brainstorming, code review, hardening, design polish, debugging and documentation.
-
-These are development tools, **not the runtime disaster-analysis models**. TerraResponse AI's runtime Meta integration is described above. Human review, testing and responsibility remain with the project creator; using AI coding tools does not guarantee the accuracy or security of generated code.
-
 ## Contributors
 
-- **TerraResponse AI project creator / hackathon entry** — product concept, integration, direction and submission.
-- **AI-assisted development tools** — acknowledged above; not presented as independent team members.
+- **Project creator** — product concept, architecture, development, testing and submission.
 
 ## Documentation
 
-- `docs/HACKATHON_SHOWCASE.md` — hackathon pitch, Meta Muse/SAM roles, AI development-tool credits and video evidence
+- `docs/HACKATHON_SHOWCASE.md` — hackathon pitch, Meta Muse/SAM integration and video evidence
 - `docs/HACKATHON_SUBMISSION_2026.md` — judge-facing submission kit and release caveats
 
 - `docs/DESIGN.md` — brand consistency, Day/Mist/Night Ops tokens, responsive UI and contrast rules

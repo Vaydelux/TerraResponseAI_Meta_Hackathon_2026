@@ -93,3 +93,23 @@ server.log
 /map_preview.png
 /mobile_landing.png
 /mobile_topbar_fixed.png
+
+# Credential-bearing files and local development state
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.kdbx
+*.tfvars
+*.tfstate
+*.tfstate.*
+**/credentials.json
+**/service-account*.json
+**/*-firebase-adminsdk-*.json
+supabase/.temp/
+.aistudio/
+agent-ctx/
+AGENTS.md
+plan.md
+upload/

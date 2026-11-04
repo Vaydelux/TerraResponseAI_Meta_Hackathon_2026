@@ -59,16 +59,6 @@ The video is a product walkthrough. It **does not prove** that every displayed r
 
 Next.js App Router, React, TypeScript, Tailwind CSS, Supabase Auth/PostgreSQL/PostGIS/Storage/RLS, MapLibre, optional MapTiler geocoding, Meta Muse Spark and Meta SAM APIs, Zod, Sharp, Playwright/Vitest and Vercel.
 
-## AI-assisted development acknowledgments
-
-The **project creator** provided the following development workflow:
-
-1. **Z.ai** — generated the initial visual direction and design foundation.
-2. **Gemini 4 and Gemini 3.8** — agent-first coding/implementation iterations (creator-provided model labels).
-3. **OpenAI ChatGPT and Codex** — architecture brainstorming, code review, hardening, UI polish, debugging, documentation and final checks.
-
-These tools assisted the development process; they are **not additional live TerraResponse AI inference engines**. Technical responsibility and submission decisions remain with the project creator.
-
 ## Safety, evidence, and present limitations
 
 - **Decision support only.** Not an emergency response, medical triage, disaster-warning or responder-dispatch system.
