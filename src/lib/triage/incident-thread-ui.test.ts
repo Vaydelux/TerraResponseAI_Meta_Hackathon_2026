@@ -52,6 +52,6 @@ describe("community incident threads and private notification inbox", () => {
 
   it("only adds the incident navigation when triage is enabled", () => {
     expect(nav).toContain('{ href: "/incidents", label: "Incident threads", triageOnly: true }');
-    expect(nav).toContain("!l.triageOnly || showIncidentNotifications");
+    expect(nav).toContain("(!link.triageOnly || showIncidentNotifications)");
   });
 });
