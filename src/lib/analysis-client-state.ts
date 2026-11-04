@@ -30,7 +30,7 @@ export function interpretAnalysisResponse(
       message: "Analysis is already processing. Open the report to see its current status.",
     };
   }
-  if (["MANUAL_REVIEW", "RETRY_CAP_REACHED", "SCHEMA_INVALID", "NO_DERIVATIVE", "PERMANENT_ERROR"].includes(code ?? "")) {
+  if (["MANUAL_REVIEW", "RETRY_CAP_REACHED", "SCHEMA_INVALID", "MODEL_EMPTY_OUTPUT", "NO_DERIVATIVE", "PERMANENT_ERROR"].includes(code ?? "")) {
     return {
       kind: "manual_review",
       message: "Automated analysis could not produce a verified-format result. The saved report needs reviewer attention.",

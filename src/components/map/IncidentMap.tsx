@@ -61,6 +61,8 @@ import { formatRelativeTime } from "@/lib/design/format";
 import { readInitialTheme, resolveIsNight } from "@/components/layout/ThemeToggle";
 import { cn } from "@/lib/utils";
 import { buildSurveyStyle } from "./survey-style";
+import { PlaceSearch } from "./PlaceSearch";
+import type { PlaceSearchResult } from "@/lib/map/location-search";
 import { formatCoords } from "@/lib/design/format";
 import { workspaceAction } from "@/lib/workspace/presentation";
 
@@ -165,6 +167,7 @@ export function IncidentMap({
   const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
+  const searchedPlaceMarkerRef = useRef<maplibregl.Marker | null>(null);
   const reducedMotion = useReducedMotion();
   const [mapAttempt, setMapAttempt] = useState(0);
   const [mapStatus, setMapStatus] = useState<"loading" | "ready" | "tiles-unavailable" | "unavailable">("loading");
@@ -174,6 +177,7 @@ export function IncidentMap({
   const [selectedSeverities, setSelectedSeverities] = useState<number[]>([]);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchedPlace, setSearchedPlace] = useState<PlaceSearchResult | null>(null);
   const [scrubberPct, setScrubberPct] = useState<number>(100);
   const [selected, setSelected] = useState<IncidentMapReport | null>(reports[0] ?? null);
   const loadedReports = reports;
@@ -838,6 +842,21 @@ export function IncidentMap({
   const confirmedPct =
     visibleReports.length > 0 ? Math.round((confirmedCount / visibleReports.length) * 100) : 0;
 
+  // A geocoder result is only a geographic landmark; it never joins the incident report data.
+  useEffect(() => {
+    searchedPlaceMarkerRef.current?.remove();
+    searchedPlaceMarkerRef.current = null;
+    const map = mapRef.current;
+    if (!map || !searchedPlace) return;
+    const element = document.createElement("div");
+    element.className = "grid size-9 place-items-center rounded-full border-[3px] border-[var(--sheet)] bg-[var(--tide)] font-bold text-[var(--on-tide)] shadow-lg";
+    element.textContent = "⌖";
+    element.title = "Place search result — not an incident report";
+    const marker = new maplibregl.Marker({ element }).setLngLat([searchedPlace.lon, searchedPlace.lat]).addTo(map);
+    searchedPlaceMarkerRef.current = marker;
+    return () => { marker.remove(); if (searchedPlaceMarkerRef.current === marker) searchedPlaceMarkerRef.current = null; };
+  }, [searchedPlace, mapAttempt]);
+
   const hasActiveFilters =
     selectedHazards.length > 0 ||
     selectedSeverities.length > 0 ||
@@ -873,6 +892,18 @@ export function IncidentMap({
         viewMode={viewMode}
         onChangeViewMode={setViewMode}
       />
+
+      <div className="grid min-w-0 gap-2 rounded-panel border border-rule bg-sheet p-3 sm:p-4">
+        <PlaceSearch label="Search map places (separate from incident reports)"
+          onSelect={(place) => {
+            setSearchedPlace(place);
+            const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+            mapRef.current?.flyTo({ center: [place.lon, place.lat], zoom: 13, duration: reducedMotion ? 0 : 350 });
+          }} />
+        {searchedPlace && <p className="m-0 break-words rounded-ctl border border-[var(--tide)] bg-[var(--tide-wash)] p-3 text-sm text-ink">
+          Map centered on: <strong>{searchedPlace.label}</strong>. This is a place-search marker, not a verified incident.
+        </p>}
+      </div>
 
       {/* Main Command Center Grid */}
       <div

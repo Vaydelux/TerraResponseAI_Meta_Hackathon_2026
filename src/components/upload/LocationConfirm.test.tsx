@@ -31,15 +31,16 @@ describe("disaster report location confirmation", () => {
     expect(onConfirm).toHaveBeenCalledWith("manual", { lat: 14.5995, lon: 120.9842 });
   });
 
-  it("supports keyboard movement on the manual location pad", () => {
+  it("uses real WGS84 coordinate search without a geocoder or fictional pad", () => {
     const onConfirm = vi.fn();
     render(<LocationConfirm exif={null} onConfirm={onConfirm} />);
-    fireEvent.click(screen.getByRole("button", { name: "Place pin manually" }));
-
-    const pad = screen.getByRole("button", { name: /Illustrative coordinate pad/ });
-    fireEvent.keyDown(pad, { key: "ArrowRight" });
-
-    expect((screen.getByLabelText("Longitude") as HTMLInputElement).value).toBe("121.0550");
+    fireEvent.change(screen.getByTestId("location-place-search"), { target: { value: "14.6331, 121.0942" } });
+    fireEvent.click(screen.getByRole("button", { name: /Locate coordinates: 14.63310, 121.09420/i }));
+    expect((screen.getByLabelText("Latitude") as HTMLInputElement).value).toBe("14.6331");
+    expect((screen.getByLabelText("Longitude") as HTMLInputElement).value).toBe("121.0942");
+    fireEvent.click(screen.getByRole("button", { name: "Use this location" }));
+    expect(onConfirm).toHaveBeenCalledWith("manual", { lat: 14.6331, lon: 121.0942 });
+    expect(screen.queryByRole("button", { name: /Illustrative coordinate pad/i })).toBeNull();
   });
 
   it("explicitly confirms a valid photo GPS reading", () => {

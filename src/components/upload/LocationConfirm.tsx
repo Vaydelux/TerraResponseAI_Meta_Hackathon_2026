@@ -7,27 +7,32 @@
 //   - Includes an "Auto-locate (Use My Current Location)" button that
 //     requests browser geolocation permission (`navigator.geolocation.getCurrentPosition`)
 //     with a "Try again" recovery button if permission is denied or times out.
-//   - Includes an interactive sector map pad + quick sector coordinate presets
+//   - Includes an real geographic MapLibre picker, optional place search, coordinate search
 //     and Latitude / Longitude inputs.
 //   - Includes an explicit "← Back to photo & details" button so the user
 //     can return to Step 1 at any time without losing their upload or form state.
 
 "use client";
 
-import { useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useState } from "react";
+import dynamic from "next/dynamic";
+import { PlaceSearch } from "@/components/map/PlaceSearch";
 import {
   LocateFixed,
   RefreshCw,
-  MapPin,
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  Compass,
 } from "lucide-react";
 import { Segmented, Field, Input, Button } from "@/components/ui-tr";
 import { formatCoords } from "@/lib/design/format";
 import { resolveDefaultLocationChoice } from "@/lib/upload/upload-ux-helpers";
 import { cn } from "@/lib/utils";
+
+const LocationMapPicker = dynamic(
+  () => import("./LocationMapPicker").then((module) => module.LocationMapPicker),
+  { ssr: false, loading: () => <div role="status" className="grid min-h-[320px] place-items-center rounded-panel border border-rule bg-[var(--sheet-sunk)] p-4 text-sm text-[var(--ink-2)]">Loading geographic map…</div> },
+);
 
 export type LocationChoice = "gps" | "manual" | "unknown";
 
@@ -47,12 +52,6 @@ export interface LocationConfirmProps {
   className?: string;
 }
 
-const SECTOR_PRESETS: Array<{ label: string; lat: number; lon: number; sector: string }> = [
-  { label: "Pasig · C-5 Bagong Ilog", lat: 14.5654, lon: 121.0718, sector: "Sector 04" },
-  { label: "Marikina Bridge Station", lat: 14.6331, lon: 121.0942, sector: "River Corridor" },
-  { label: "Marcos Hwy · Santolan", lat: 14.6219, lon: 121.0856, sector: "East Approach" },
-  { label: "EDSA Guadalupe Bridge", lat: 14.5672, lon: 121.0453, sector: "South Arterial" },
-];
 
 export function LocationConfirm({
   exif,
@@ -133,7 +132,7 @@ export function LocationConfirm({
       setGeoStatus({
         kind: "error",
         message:
-          "Browser geolocation is not available in this environment. You can try again, click the interactive map pad, or enter coordinates below.",
+          "Browser geolocation is not available in this environment. You can try again, click the geographic map, or enter coordinates below.",
       });
       return;
     }
@@ -174,30 +173,6 @@ export function LocationConfirm({
     );
   }
 
-  function handleInteractivePadClick(e: MouseEvent<HTMLButtonElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const relX = Math.max(0, Math.min(1, (e.clientX - rect.left) / Math.max(1, rect.width)));
-    const relY = Math.max(0, Math.min(1, (e.clientY - rect.top) / Math.max(1, rect.height)));
-    // Metro Manila operational bounding box (Lat 14.50..14.70, Lon 120.95..121.15)
-    const computedLat = Number((14.70 - relY * 0.20).toFixed(4));
-    const computedLon = Number((120.95 + relX * 0.20).toFixed(4));
-    setChoice("manual");
-    updateManualCoords(String(computedLat), String(computedLon));
-  }
-
-  function handleInteractivePadKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
-    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
-    e.preventDefault();
-
-    const currentLat = manualValid && latValue !== null ? latValue : 14.60;
-    const currentLon = manualValid && lonValue !== null ? lonValue : 121.05;
-    const step = 0.005;
-    const nextLat = e.key === "ArrowUp" ? currentLat + step : e.key === "ArrowDown" ? currentLat - step : currentLat;
-    const nextLon = e.key === "ArrowRight" ? currentLon + step : e.key === "ArrowLeft" ? currentLon - step : currentLon;
-    setChoice("manual");
-    updateManualCoords(nextLat.toFixed(4), nextLon.toFixed(4));
-  }
-
   function confirm() {
     if (choice === "manual") {
       if (!manualValid || latValue === null || lonValue === null) return;
@@ -218,16 +193,6 @@ export function LocationConfirm({
     choice === "unknown" ||
     (choice === "gps" && !!exif) ||
     (choice === "manual" && manualValid);
-
-  // Compute visual pin position on the interactive Metro Manila sector pad
-  const padPinX =
-    manualValid && lonValue !== null
-      ? Math.max(8, Math.min(92, ((lonValue - 120.95) / 0.2) * 100))
-      : 55;
-  const padPinY =
-    manualValid && latValue !== null
-      ? Math.max(10, Math.min(90, ((14.7 - latValue) / 0.2) * 100))
-      : 48;
 
   return (
     <div className={cn("panel", className)} style={{ display: "grid", gap: "var(--s-4)" }}>
@@ -359,108 +324,24 @@ export function LocationConfirm({
 
         {choice === "manual" && (
           <div style={{ display: "grid", gap: "var(--s-3)" }}>
-            <p className="m-0 text-sm leading-relaxed text-[var(--ink-2)]">Schematic coordinate pad — not a geographic map or GPS measurement. Confirm the latitude and longitude against a reliable source before submitting.</p>
-            {/* Interactive Schematic Coordinate Pad */}
-            <button
-              type="button"
-              className="location-map-preview"
-              onClick={handleInteractivePadClick}
-              onKeyDown={handleInteractivePadKeyDown}
-              aria-label="Illustrative coordinate pad, not a live geographic map; click to propose manually checked coordinates"
-              style={{
-                position: "relative",
-                height: 250,
-                width: "100%",
-                padding: 0,
-                borderRadius: "var(--r-ctl)",
-                border: "1px solid var(--rule-strong)",
-                background:
-                  "radial-gradient(circle at 55% 48%, color-mix(in srgb, var(--tide) 20%, transparent), transparent 58%), linear-gradient(135deg, color-mix(in srgb, var(--tide) 9%, var(--sheet-sunk)), var(--sheet-sunk))",
-                cursor: "crosshair",
-                overflow: "hidden",
-                textAlign: "left",
-              }}
-            >
-              <span className="location-map-preview__water" aria-hidden="true" />
-              <span className="location-map-preview__road location-map-preview__road--one" aria-hidden="true" />
-              <span className="location-map-preview__road location-map-preview__road--two" aria-hidden="true" />
-              <span className="location-map-preview__district location-map-preview__district--north">NORTH METRO</span>
-              <span className="location-map-preview__district location-map-preview__district--east">EAST CORRIDOR</span>
-              <span className="location-map-preview__district location-map-preview__district--south">SOUTH ARTERIAL</span>
-              <div
-                className="t-meta num"
-                style={{
-                  position: "absolute",
-                  top: 8,
-                  left: 10,
-                  padding: "3px 8px",
-                  borderRadius: 4,
-                  background: "var(--sheet)",
-                  border: "1px solid var(--rule)",
-                  fontSize: "0.75rem",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <Compass size={13} aria-hidden="true" style={{ color: "var(--tide)" }} />
-                <span>Schematic only · verify coordinates manually</span>
-              </div>
-
-              <div
-                style={{
-                  position: "absolute",
-                  left: `${padPinX}%`,
-                  top: `${padPinY}%`,
-                  transform: "translate(-50%, -100%)",
-                  pointerEvents: "none",
-                  display: "grid",
-                  justifyItems: "center",
-                }}
-              >
-                <span
-                  className="t-meta num"
-                  style={{
-                    padding: "2px 7px",
-                    borderRadius: 4,
-                    background: "var(--tide)",
-                    color: "var(--on-tide)",
-                    fontWeight: 700,
-                    fontSize: "0.72rem",
-                    whiteSpace: "nowrap",
-                    marginBottom: 2,
-                  }}
-                >
-                  {manualValid && latValue !== null && lonValue !== null
-                    ? `${latValue.toFixed(4)}, ${lonValue.toFixed(4)}`
-                    : "Click to place pin"}
-                </span>
-                <MapPin size={24} style={{ color: "var(--tide)", fill: "var(--tide-wash)" }} />
-              </div>
-            </button>
-
-            {/* Quick Sector Presets */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <span className="t-meta" style={{ fontWeight: 600 }}>
-                Sample coordinates (not GPS):
-              </span>
-              {SECTOR_PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  className="btn btn--sm"
-                  style={{ minHeight: 44, padding: "0 12px", fontSize: "0.875rem" }}
-                  onClick={() => {
-                    setChoice("manual");
-                    updateManualCoords(String(preset.lat), String(preset.lon));
-                  }}
-                >
-                  <MapPin size={12} aria-hidden="true" />
-                  <span>{preset.label}</span>
-                </button>
-              ))}
+            <div className="grid min-w-0 gap-2">
+              <p className="m-0 text-sm leading-relaxed text-[var(--ink-2)]">Select an actual geographic point on the map, search a place, or enter verified coordinates. A map result is not evidence that a disaster happened there.</p>
+              <PlaceSearch label="Find a place or enter latitude, longitude"
+                onSelect={(place) => {
+                  setChoice("manual");
+                  updateManualCoords(String(place.lat), String(place.lon));
+                }} />
             </div>
-
+            <LocationMapPicker
+              selected={manualValid && latValue !== null && lonValue !== null ? { lat: latValue, lon: lonValue } : null}
+              onSelect={(point) => {
+                setChoice("manual");
+                updateManualCoords(String(point.lat), String(point.lon));
+              }}
+            />
+            <p className="m-0 rounded-ctl border border-rule bg-[var(--sheet-sunk)] p-3 text-xs leading-relaxed text-[var(--ink-2)]">
+              The coordinates below are a proposed report location, not the browser GPS position unless you explicitly used Auto-Locate. Verify the point before submitting evidence.
+            </p>
             <div
               style={{
                 display: "grid",
@@ -506,8 +387,7 @@ export function LocationConfirm({
 
         {choice === "manual" && !manualValid && (
           <p role="status" className="t-meta">
-            Enter both coordinates (latitude −90 to 90, longitude −180 to 180), click a quick
-            sector pin above, or use <strong>Auto-Locate</strong>.
+            Enter both coordinates (latitude −90 to 90, longitude −180 to 180), search for a place, click the real map, or use <strong>Auto-Locate</strong>.
           </p>
         )}
       </div>

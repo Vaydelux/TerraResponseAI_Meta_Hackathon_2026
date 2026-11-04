@@ -1,3 +1,130 @@
+# ACTIVE PLAN — Fix empty Meta analysis response + replace schematic pin pad with real searchable map
+
+**Date:** 2026-11-05 (Asia/Manila).
+**Status:** APPROVED AND IMPLEMENTED ON PR #69; awaiting exact-head CI and separate live staging acceptance.
+**Baseline:** \`main\` commit \`4042261727bde688616803738556eb946d7ed71c\`; PR #68 merged; Vercel production still on earlier commit \`3cf9f1d4\` due deployment API quota 402 at last verification.
+**Product:** TerraResponse AI, disaster-photo triage with provisional Muse Spark observations and independent human review.
+**Core 2–3-min demo:** Consented/synthetic photo → real geolocated pin → saved report → real provisional Muse analysis or truthful degraded state → independent reviewer → clearly labeled reviewed report on map.
+**Stack:** Next.js App Router, TypeScript, Tailwind v4 + semantic CSS tokens, Supabase private evidence/Postgres/PostGIS/RLS, MapLibre GL JS and current shared \`buildSurveyStyle\`, Meta Muse Spark 1.3 Standard, Vercel.
+**Devices:** 320–480px mobile, 768–1024px tablet, >=1440px desktop. Maintain 65/35 map/detail dashboard within available content width.
+
+## Approved implementation checkpoint
+
+Owner approved the plan and authorized merge/deploy after validation. Code implemented on this branch:
+- Server-backed empty Meta-output diagnostics (finish reason, reasoning-token count, completion-token count, number of choices), with no raw response or evidence logged; low reasoning effort to improve chance of a visible structured output within the bounded budget.
+- Explicit `MODEL_OUTPUT_LIMIT` retryable state for `finish_reason=length`; `MODEL_EMPTY_OUTPUT` goes to human review. No hidden automatic extra inference.
+- The report timeline now explicitly distinguishes failed analysis from validated analysis and retains the photo and human review.
+- Real MapLibre picker on upload with click/drag/keyboard pin, theme-aware real OSM tiles/attribution, independent numeric coordinates, EXIF GPS, browser permission GPS, and Unknown mode.
+- Local latitude/longitude search without a key, optional signed-in MapTiler place-name search via server-only `MAPTILER_API_KEY`, result validation, timeout/debounce and best-effort request throttling. No report evidence or private descriptions are sent to the geocoder.
+- Independent map-place search (a marker clearly labeled `not an incident`) alongside existing report search.
+- Added API/data/unit tests and responsive CI gates.
+
+**Operational limitations:** MapTiler search needs a MapTiler key in Vercel; coordinate lookup and manual map pinning do not. The static OSM basemap is a real map, but its tiles still require network and must comply with provider usage terms. The existing failed staging report was not re-analyzed and no new paid Meta calls were made; real cause of its empty response remains unknown without historic `finish_reason`. Protected two-pass staging acceptance is still unverified. Vercel account may be blocked by its deployment quota.
+
+## 1. Audit findings (confirmed, do not treat hypotheses as facts)
+
+### P0 — the user's reported failed analysis is NOT confirmed Zod validation failure
+- Staging has a report submitted **2026-11-04 19:41:27 UTC**, whose report status is **\`needs_manual_review\`** and \`report_analyses.processing_status\` is **\`failed\`**. The persisted \`reports.last_error\` is exactly **\`Meta API returned an empty response.\`**. A separate earlier staging report has succeeded. Production was empty at the same read-only check.
+- \`src/lib/ai/muse-spark.ts\` currently treats \`body.choices[0].message.content ?? ""\` as the only accepted content shape and **classifies empty content as permanent**. It has no safe diagnostic of \`finish_reason\`, content type, choices count, or \`usage.completion_tokens_details.reasoning_tokens\`. Therefore **we cannot yet establish why** the provider returned empty content (finish_reason \`length\`, refusal/content filter, alternative documented response shape, etc.).
+- \`src/lib/ai/cost-controls.ts\` defaults to \`AI_MAX_OUTPUT_TOKENS=900\`; \`muse-spark.ts\` defaults to 900, clamps to 1200 and omits \`reasoning_effort\`. Official Meta documentation confirms reasoning tokens consume the output-token budget and that \`finish_reason='length'\` means a cap was hit. **Output-budget exhaustion is a hypothesis, not yet proven.** Changing limits or re-calling AI blindly wastes money and could degrade visual accuracy.
+- \`src/app/api/reports/[id]/analyze/route.ts\` calls \`markAsManualReview\` and \`persistFailedAnalysis\` on a permanent result, recording a failed observation row. A saved photo is not lost; no automatic re-upload is warranted. Retry/manual-review handling must remain state-safe, cost bounded and idempotent.
+- **Confirmed contradictory UI:** \`src/components/report/StatusTimeline.tsx\` renders \`Analyzed · failed\` but always uses the successful description \`AI observation produced, schema validated\`. On failure it should say **\`No usable AI observation was saved; manual review required\`**, not imply schema validation succeeded. The upload telemetry should show real \`NO_CONTENT\` / manual review vs \`SCHEMA_INVALID\`, with no raw provider detail or private images.
+
+### P1 — the manual coordinate pad is schematic, not geographically accurate
+- \`src/components/upload/LocationConfirm.tsx\` generates longitude/latitude from a **hard-coded Metro Manila rectangle** (lat 14.50–14.70, lon 120.95–121.15). The screenshot displays fictional water/road/sector overlays; clicking these is not identifying a real street or position.
+- Hardcoded local \`SECTOR_PRESETS\` provide example locations that could accidentally be submitted as real evidence. The manual mode starts selected; it must not imply the location is verified until a deliberate confirmation.
+- The project already uses **MapLibre GL JS** in \`src/components/map/IncidentMap.tsx\`, \`GeoCanvas.tsx\` and a shared theme-dependent style \`buildSurveyStyle\` (currently standard OSM raster tiles). Reuse this stack instead of loading Google Maps, another map SDK, or an additional heavyweight dependency.
+- Existing \`LocationConfirm\` supports manual numeric latitude/longitude, optional actual EXIF GPS, permission-gated browser geolocation and \`unknown\` location. Keep every option and the current \`initialCoords\`, \`onDraftChange\`, \`onConfirm\` contract.
+- Existing incident map \`searchQuery\` filters **reports**, not place names/addresses. Map location search must be visually separate from **Search reports**, never misrepresent a geocoder result as an independently verified disaster.
+
+### P1 — provider and privacy constraints
+- Real geocoding requires a supported data provider. Recommend an optional configurable **MapTiler Geocoding** adapter, subject to user-provided API key and quota; map clicks and numeric coordinate lookup must work without this key. Its official geocoding API supports forward/reverse search and MapLibre. The existing OSM basemap tiles may remain subject to OSM tile usage/attribution policy; evaluate an authorized configurable tile provider if needed.
+- **Do not implement autocomplete against the public OSM Nominatim service:** the OSMF policy explicitly forbids autocomplete and imposes strict shared rate limits. No external service should receive private report text, images or user IDs. Send *only a user-entered place query* to the configured geocoder, with consent/clear disclosure where needed.
+- Provider outages must not block coordinate entry, evidence upload (when location is unknown is permitted), or user-controlled manual pin placement on already loaded map tiles.
+
+## 2. Ordered priorities (owner review gate applies)
+
+### 1. ENHANCE — repair the core demo journey
+- [ ] Correct \`StatusTimeline\` to derive per-step text from actual persisted status, never show schema validated for failed analysis. Include accessible status and helpful next step to review report.
+- [ ] Add a narrow, secret-safe classification for **empty model content**: count choices, note validated \`finish_reason\`, available token counts/reasoning-token count, request ID and error category **only**; never log full prompts, response text, private image, bearer token, or signed storage URL.
+- [ ] Keep \`SCHEMA_INVALID\`, \`MODEL_EMPTY_OUTPUT\`, provider HTTP failure, timeout, budget denied and database persist failure visibly distinct. If a report is already \`needs_manual_review\`, do not silently re-trigger paid analysis or auto-publish it.
+- [ ] Replace \`LocationConfirm\` schematic pad with a **real MapLibre map picker**. Click to place a marker, drag it to refine, and receive exact \`event.lngLat.lat/lng\`. Numeric fields and pin remain synchronized. Keyboard-accessible default draggable marker (or explicitly implemented accessible custom element). Preserve explicit manual, EXIF GPS, browser GPS and Unknown flows.
+- [ ] Add place/address search via optional geocoding, plus universally available **coordinate search** with no API key; move/fly to search results, require explicit **Use this location** confirmation before submitting.
+
+### 2. REFINE — shared types, no unnecessary new services
+- [ ] Extract \`LocationMapPicker\` (dynamic/client-only) under \`src/components/upload\`, using \`buildSurveyStyle\`, current theme resolver, \`MapLibre.NavigationControl\`, cleanup hooks, bounded default view rather than an invented user/report location, and one selected marker. Keep a single source of truth for \`{lat,lon}\` and geolocation source.
+- [ ] Keep \`LocationConfirm\` small: coordinates/mode/search/confirm and privacy messaging. Remove fake road shapes, relative-pad projection and invented business/location examples from the live submission path (demo presets belong in clearly isolated fictional preview only).
+- [ ] Introduce a typed search service boundary \`PlaceSearchAdapter\`: coordinate-string parsing works offline; optional \`/api/map/geocode\` proxy does server-side provider calls with allowlisted endpoint, input sanitization, geo bounds, response schema validation, timeouts and cost limits, minimal cached results. No extra AI calls.
+- [ ] Reuse map style, theme and status tokens from existing design system. Do not refactor the large incident map beyond a shared search field and small hook where practical.
+- [ ] Add a configurable, documented \`META_REASONING_EFFORT\` that defaults only after comparing structured-output validity. Prefer targeted modest \`low\` reasoning in triage if it measurably avoids empty output without misclassifying incidents; avoid a much higher token cap or uncontrolled retry.
+
+### 3. POLISH — clarity on every device
+- [ ] Mobile 320–480: one column, searchable field + results below, real map height ~300–360px, numeric coordinates below map, 44px targets, full-width confirm; no horizontal document scrolling or clipped geocoding results.
+- [ ] Tablet 768–1024: map first, 400px viewport, search and coordinates below or alongside in available width; no overflow from geographic labels.
+- [ ] Desktop >=1440: map and location detail side-by-side if useful (roughly 65/35 within remaining content); sticky primary submit only if it does not cover attribution/keyboard.
+- [ ] Theme-aware map controls, brand colored selected marker, visible attribution, focus rings and hover/active states, reduced-motion camera, readable error/no-results/permission-denied states, 16:9 image fit unchanged.
+- [ ] Optional place search can be scoped to \`/map\` via a separate tab/filter \`Places\` vs \`Reports\`, with provenance labels; no live-disaster claim for simple geocoder results.
+
+### 4. SOLIDIFY — data quality, cost, failure recovery
+- [ ] Preserve validated lat [-90,90], lon [-180,180], finite numbers and explicit user confirmation; never infer a selected location from current map center alone. Keep manual edits and pin synchronized when navigating steps backward/forward.
+- [ ] MapLibre initialization/tiles/WebGL failure shows the manual lat/lon form with usable confirmation and optional \`unknown\`; keep available geocoding result selection if map fails.
+- [ ] Geocoding proxy: 2–3 char minimum query, debounce 400–600 ms, AbortController cancel on edit, server rate limit and short query cache, strict URL allowlist, provider quota guard and timeouts. Avoid log storage of private user-typed data and guard against SSRF.
+- [ ] Meta empty outputs: classify based on documented \`finish_reason\` where available; do not call absence of text a Zod violation. For \`length\` consider one deliberate, cost-guarded retry/low-reasoning request **in a new idempotent HTTP request only after QA**. No unbounded retries, no silent fallback invented analysis.
+- [ ] Keep RLS, private storage, manual-review path and audit immutable. No production seed or migration unless approved separately.
+- [ ] Check authorized map tiles/geocoding provider terms and configured key restrictions before production rollout.
+
+### 5. TEST — after the implementation
+- [ ] Vitest: successful structured output, empty content + \`finish_reason=length\`, empty content + \`stop\`, malformed JSON, schema invalid, provider HTTP failures, retry budget and status timeline copy.
+- [ ] Location picker tests: map click -> coordinates, marker drag, search result -> marker, coordinate-only input, EXIF, browser GPS permission denied, unknown location, back/forward wizard preservation, geocoder unavailable and stale-result race.
+- [ ] Next lint/typecheck/build + Playwright at **320 / 768 / 1440** and authenticated staging reporter flow. Test keyboard and touch, WebGL failure and no overflowing viewport. Verify search is not silently sending report data.
+- [ ] Demo script: 0:00 intro, 0:30 real map and saved report, 1:00 model observation or labeled honest failure, 1:30 independent reviewer, 2:10 map pin and review status, 2:50 limitations.
+- [ ] Full acceptance still requires two consecutive **real** staging Muse/reviewer/map passes; don't claim demo complete from mocked responses or screenshot inspection.
+- [ ] Keep telemetry cheap and privacy-safe; compare provider output schema consistency and manual-review rate before deciding to alter reasoning budget.
+
+## 3. Target component tree
+
+\`\`\`text
+ReportUploadFlow
+ └─ LocationConfirm
+     ├─ LocationModeTabs (manual, EXIF GPS, unknown)
+     ├─ PlaceSearchField (coordinates always; optional provider search)
+     │   └─ SearchResultList (select suggests, does not submit)
+     ├─ LocationMapPicker (dynamic client MapLibre, shared theme style)
+     │   ├─ real click/drag pin + map control + map attribution
+     │   └─ NoWebGLFallback
+     ├─ LatLonFields (single source of truth; strict validation)
+     └─ UseThisLocation (explicit confirmation to Step 3)
+ReportDetail / UploadProgress
+ └─ StatusTimeline (truthful done/failed text, manual-review route)
+Server
+ ├─ analyzeImage / output-contract diagnostics (private)
+ ├─ AnalysisHandler (existing bounded, idempotent DB state machine)
+ └─ /api/map/geocode (optional provider; input validation/cache/rate limit)
+IncidentMap
+ ├─ SearchReports (current RLS-authorized report filters)
+ └─ SearchPlaces (geocoding results; never incident proof)
+\`\`\`
+
+## 4. Existing tokens and scope
+
+Use \`--paper\`, \`--sheet\`, \`--sheet-sunk\`, \`--ink\`, \`--ink-2\`, \`--ink-3\`, \`--rule\`, \`--tide\`, \`--tide-wash\`, \`--on-tide\`, \`--r-ctl\`, \`--r-panel\`, \`--s-2\`, \`--s-3\`, \`--s-4\`, \`--step-0\`, \`--step-1\`. Preserve reduced-motion and active day/night styles.
+
+**No application code, Supabase data, paid Meta request, key setting or Vercel deployment is changed in this plan-only PR.**
+
+## 5. Risks and approval gate
+
+- Empty Meta response is confirmed; **cause of empty output is not yet known** because \`finish_reason\`/reasoning usage were not stored. No image-analysis bypass or fake schema compliance.
+- Geocoder requires a configured provider and key; coordinate search + real map pin works without one. Provider-dependent search may incur external usage charges; no public Nominatim autocomplete.
+- Real map tiles are network-dependent. Keep manual numeric lat/lon and \`Location unknown\` as first-class options.
+- The screenshot may be from staging, where the relevant saved failure exists. Production DB contained no reports at the same read-only check; don't assume a production failure.
+- Vercel account returned daily-deployment-quota HTTP 402 recently; a passing code review or merge does not imply the new features are actually deployed.
+
+**NEXT STEP:** Owner reviews the proposed P0 truthful failure UI + Meta empty-output diagnostics, then MapLibre pin replacement + optional search. Upon approval, implement in a focused branch; run exact-head CI and separate real staging acceptance before claiming readiness.
+
+---
+
+# Earlier plans (preserved verbatim)
+
 # ACTIVE PLAN — Calm global smooth scrolling (recording preparation)
 
 **Date:** November 5, 2026 (Asia/Manila). **Status:** APPROVED, IMPLEMENTATION COMMITTED ON PR #68 — awaiting exact-commit CI and deployment.

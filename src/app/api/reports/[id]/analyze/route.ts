@@ -486,6 +486,46 @@ export async function POST(
       );
     }
 
+    if (result.kind === "empty_output") {
+      // A response can be HTTP 200 but contain no visible output. This is
+      // NOT a Zod schema failure and must not be displayed as one.
+      const d = result.diagnostics;
+      console.warn("[analyze] model returned no content", {
+        reportId: id,
+        finishReason: d?.finishReason ?? "unknown",
+        reasoningTokens: d?.reasoningTokens ?? null,
+        completionTokens: d?.completionTokens ?? null,
+        choiceCount: d?.choiceCount ?? 0,
+      });
+      const hitLimit = d?.finishReason === "length";
+      if (hitLimit) {
+        // One provider call per HTTP request. This stored report can retry
+        // through existing bounded/idempotent recovery, never in a hidden loop.
+        await markAsRetryable(id, "MODEL_OUTPUT_LIMIT: response exhausted model output budget.");
+      } else {
+        await markAsManualReview(id, "MODEL_EMPTY_OUTPUT: response contained no usable text.");
+      }
+      await persistFailedAnalysis(id, result);
+      await logUsage({
+        reportId: id,
+        eventId: report.event_id,
+        userId: actorId,
+        usage: { completionTokens: d?.completionTokens ?? null },
+        latencyMs,
+        outcome: hitLimit ? "transient_failed" : "permanent_failed",
+        failureKind: hitLimit ? "output_limit" : "empty_output",
+        errorMessage: result.error,
+      });
+      return NextResponse.json({
+        error: {
+          code: hitLimit ? "MODEL_OUTPUT_LIMIT" : "MODEL_EMPTY_OUTPUT",
+          message: hitLimit
+            ? "The model reached its output-token budget without a usable observation. The report remains saved for a bounded retry."
+            : "The model returned no usable observation. The saved report requires manual review.",
+        },
+      }, { status: hitLimit ? 503 : 422 });
+    }
+
     if (result.kind === "permanent") {
       await markAsManualReview(id, result.error);
       await persistFailedAnalysis(id, result);

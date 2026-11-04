@@ -52,7 +52,7 @@ function statusToStep(status: string): { done: number; current: number | null; f
     case "needs_manual_review":
       return { done: 2, current: 2, failed: true };
     case "retryable_error":
-      return { done: 1, current: 1, failed: true };
+      return { done: 2, current: 2, failed: true };
     case "reviewed":
       return { done: 4, current: null, failed: false };
     default:
@@ -92,7 +92,11 @@ export function StatusTimeline({ status, className }: StatusTimelineProps) {
                 {step.label}
                 {isFailed && <span style={{ color: "var(--brick-ink)" }}> · failed</span>}
               </div>
-              {step.description && <div className="t-meta">{step.description}</div>}
+              {step.description && <div className="t-meta">{isFailed && step.label === "Analyzed"
+                ? status === "retryable_error"
+                  ? "Model output was unavailable. The report is saved and can be retried within the request limits."
+                  : "No validated AI observation was saved. The evidence remains available for independent human review."
+                : step.description}</div>}
             </div>
           </li>
         );
