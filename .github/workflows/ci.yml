@@ -3,9 +3,9 @@
 # CI/CD pipeline for TerraResponse AI.
 # Runs on every push to main + every pull request.
 # Steps: lint → typecheck → unit tests → build.
-# E2E tests are NOT run in CI (they require a running dev server;
-# the workflow would need a webServer config + browser binaries —
-# added in a future enhancement).
+# A focused production-artifact browser job covers the public demo at
+# 320/768/1440. Protected authenticated E2E requires owner-supplied staging
+# credentials and is deliberately NOT run in public PRs.
 
 name: CI
 
@@ -47,3 +47,39 @@ jobs:
           # The build doesn't need real secrets — the app renders a
           # "Setup required" state when Supabase env vars are empty.
           NODE_ENV: production
+
+  responsive-browser-smoke:
+    name: browser-smoke-320-768-1440
+    needs: lint-typecheck-test-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Build standalone demo
+        run: bun run build
+        env:
+          NODE_ENV: production
+
+      - name: Public demo responsive and keyboard smoke
+        run: bunx playwright test tests/e2e/responsive-demo.spec.ts --project=chromium-desktop --project=chromium-tablet --project=chromium-mobile
+
+      - name: Upload browser traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-browser-smoke
+          path: test-results/
+          if-no-files-found: ignore

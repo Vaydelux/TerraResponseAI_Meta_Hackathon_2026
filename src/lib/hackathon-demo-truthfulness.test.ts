@@ -19,12 +19,15 @@ describe("hackathon demo must not fabricate real operations", () => {
     expect(workspace).not.toContain("Authorize Pre-position");
     expect(workspace).not.toContain("Meta Llama Vision · Live Model");
     expect(workspace).not.toContain('badge: "98%"');
-    expect(workspace).toContain("No review activity recorded yet");
+    expect(workspace).toContain("No reports to display.");
+    expect(workspace).toContain("No reports in this event yet");
+    expect(workspace).toContain("AI priority remains provisional.");
   });
   it("never claims verification with no submitted reports or from rejection", () => {
     const dashboard = file("src/app/(app)/dashboard/page.tsx");
-    expect(dashboard).toContain('.eq("review_outcome", "confirmed")');
-    expect(dashboard).toContain('totalReviewed / totalReceived) * 100) : 0');
+    expect(dashboard).toContain('loadIncidentWorkspaceSnapshot(ctx)');
+    expect(dashboard).toContain('report.review_outcome === "confirmed"');
+    expect(dashboard).toContain('dataAvailable ? metric.value : "—"');
     expect(dashboard).not.toContain("Metro Manila Sector 04");
     expect(dashboard).not.toContain("Live Telemetry Synced");
     expect(dashboard).not.toContain('Math.max(1, awaitingReview)');

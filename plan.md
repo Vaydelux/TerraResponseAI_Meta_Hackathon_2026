@@ -1,7 +1,130 @@
 # TerraResponse AI — demo workspace improvement plan
 
 Date: 2026-11-04 (Asia/Singapore)
-Status: **Approved by owner on 2026-11-04. Local implementation in progress on `feat/demo-command-workspace`.**
+Status: **Latest revision approved by the owner on 2026-11-04. Implementation and QA tracked in PR #64; see its exact-commit CI results for release readiness.**
+
+
+> **LATEST-HEAD IMPLEMENTATION — 2026-11-04.** Owner explicitly approved execution in this conversation. This revision audits the original baseline `8fdcbc1a616dfec045b0b3b19543efc0022b71ac`; changes in PR #64 address its defects. Historical findings below describe an earlier implementation state and are not current defect claims. Supabase roles/schema/secrets remain untouched; do not infer live staging success from CI.
+
+## Current audit & review plan for `8fdcbc1`
+
+### 1. Findings — evidence on the latest commit
+
+**Confirmed P0 release blocker:** GitHub Actions run [41845521118](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/actions/runs/41845521118) stopped at `bun run lint`: 3 errors (`ThemeToggle.tsx:75`, `GeoCanvas.tsx:74`, `IncidentMap.tsx:432`, all React's synchronous-effect state update rule) plus 2 warnings (`terra/reviewer-action-panel.tsx:116`, `ui/carousel.tsx:98`). **Typecheck, tests, and build were skipped**, not passed.
+
+**Already implemented; preserve:**
+- `dashboard/page.tsx` and `DashboardCommandWorkspace.tsx` present a real event-scoped snapshot, metrics, controlled hazard/search/sort and reported-time filters, map/queue selection, pin/unpin, clear-filter, and truthful stale/unavailable banners.
+- `DashboardCommandWorkspace.tsx:61` defines `min-[1440px]:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]`; below 1440 it stacks. `workspace/presentation.ts:4` sets map height 320px at narrow mobile, 400px from 768px, 480px at 1025px, fluid 480–640px from 1440px.
+- `IncidentFilters.tsx:35` uses horizontal-scrolling hazard pills; `workspaceAction` and the mobile menu generally enforce 44px controls.
+- `IncidentEvidenceDetails.tsx:168-175` uses a solid, readable **AI generated, not verified** banner and explicitly says original-image authenticity was not assessed. Landing samples have explicit synthetic/demo labels.
+- `load-snapshot.ts:12,116-154` scopes a 200-row maximum to the authorized event, distinguishes partial/unavailable/ready and does not invent missing coordinates. Keep its RLS/auth boundaries.
+
+**Confirmed code-level weaknesses / verification gaps:**
+- `DashboardCommandWorkspace.tsx:19-52` currently holds filtering, selected ID, saved-last snapshot, pins, pagination, and refresh in one component, with setState during render when `snapshot` changes (lines 28–37). This makes refresh/filter/selection interactions harder to reason about; keep the external component contract, but simplify internal state derivation without introducing a global state library.
+- Map error handling exists, but fails the current React lint gate (`GeoCanvas.tsx:53-75`, `IncidentMap.tsx:414-433`). Map event listeners, tile errors, retry and stale selection need one consistent recoverable state model. The dashboard's modern `GeoCanvas` and older `IncidentMap` both compile in the repo; fix both without rewriting their feature sets.
+- `WorkspaceLink.tsx:6` uses a native `<a>` to navigate inside the app; switch to `next/link` so the demo does not reload the app shell unnecessarily.
+- Many dashboard/map components are written as dense single-line JSX, complicating safe accessibility fixes, but **do not** reformat unrelated files or replace the entire map library.
+- The map/queue responsive classes are present, but no 320px/768px/1440px rendered screenshot or horizontal-overflow measurement is supplied by this audit. Do not claim overlap, text clipping, broken tablet layout, color-contrast failure, or a working live demo until measured.
+- Existing tokens live in `src/app/styles/tokens.css`; `globals.css` has a Tailwind v4 token bridge and still imports legacy CSS layers. Honor the user's **utility-first flex/grid** goal for touched layouts, but avoid a destabilizing whole-app CSS rewrite during the hackathon.
+
+### 2. Plan — ordered priorities (implement only after this delta is reviewed)
+
+#### 1 — ENHANCE
+- [ ] Make the 2–3 minute workflow easy to operate: landing CTA → authorized command workspace → hazard pill → time filter → map pin/queue card → details → pin/unpin → actual report/review destination.
+- [ ] For an empty authorized account, offer a **clearly isolated, labeled sample-only walkthrough** *if required by demo setup*. Do not seed fake reports into Supabase or pass local simulated incidents off as live production data. Prefer the already implemented synthetic landing preview if sufficient.
+- [ ] Keep one common selection/filter/pinned state for map and queue, with an obvious way to return from out-of-filter pinned reports to the selected report.
+
+#### 2 — REFINE
+- [ ] Simplify `DashboardCommandWorkspace` state transitions, including authorized-ID changes on refresh; keep the current component and prop contracts stable, dedupe only demonstrably repeated logic.
+- [ ] Centralize hazard category lookup and workspace selection/filter helpers in existing `lib/workspace`; avoid inferring Hazmat/Medical from keywords when the stored incident type is `other`/`unclear`.
+- [ ] Convert **touched** dashboard/map/landing layout rules to Tailwind flex/grid utility classes and reuse the existing semantic CSS variables. Do not remove shared stylesheet rules still used by other pages.
+- [ ] Convert internal landing workspace CTA to `next/link`, preserving its active/focus styling.
+
+#### 3 — POLISH
+- [ ] Desktop **>=1440px**: stable 65% map+timeline / 35% details+queue+pins, with `min-w-0` and no clipped coordinate strings. Map height 480–640px.
+- [ ] Tablet **768–1024px**: single column, map first at **400px**, timeline second, details/queue/pins below. Keep search/sort clear and uncramped.
+- [ ] Mobile **320–480px**: single column, map at **320px**, horizontal hazard-pill scroller, snap-scrolling pinned cards, vertically stacked full-width CTAs; no full-document horizontal scroll.
+- [ ] Use existing 4/8px space and typography tokens, 44px minimum touch targets, visible hover/focus/active/disabled states, scrims/solid text banners, `object-cover`/`object-contain` with intentional aspect ratios, and reduced-motion-safe movement.
+- [ ] Confirm user-menu popup, long titles, long email, high-precision GPS and empty/error copy at all widths; no absolute-positioned **text** on critical card surfaces.
+
+#### 4 — SOLIDIFY
+- [ ] Fix the **three blocking lint errors** with correct React effect/event lifecycles, not global ESLint suppression or `setTimeout` band-aids. Resolve the two warnings where feasible.
+- [ ] Make the map resilient to WebGL failures, blocked tiles, timeouts, resize/cleanup and repeated retries. The timeline/queue/details must remain accessible without the map.
+- [ ] Keep RLS-scoped data loading; handle partial data, invalid timestamps, missing images, absent AI analysis, stale refresh and explicit unknown locations without fabricated values.
+- [ ] Preserve the true AI/human verification distinction, avoid dispatch claims, and keep landing samples clearly fictional. Ensure every failure is visible or safely recoverable.
+- [ ] Do not change Supabase schema, roles, environment secrets, auto-deploy settings, or incident-report lifecycle for this UI-focused pass.
+
+#### 5 — TEST (only after phases 1–4)
+- [ ] Run `bun install --frozen-lockfile`, `bun run lint`, `bun run typecheck`, `bun run test`, `bun run build`, and relevant Playwright tests; save actual exit statuses and fix failures.
+- [ ] Browser-check **320×800, 768×1024, 1440×900**, plus adjacent widths, portrait/landscape, long text, on-screen keyboard, motion reduction and day/night contrast. Assert `document.documentElement.scrollWidth <= window.innerWidth` for each view.
+- [ ] Keyboard-run hazard selection, timeline, map pin selection, queue pin/unpin, report navigation, account menu and recovery links. Test missing-image and failed-map/network fallback.
+- [ ] Rehearse one 2–3 minute flow and report whether it used **staging real data**, a **clearly labeled isolated mock**, or no authenticated account. Do not equate mock tests or a passing build with genuine Muse Spark/reviewer/production evidence.
+- [ ] Only then propose merging a minimal reviewed PR; deployment requires user authorization per release scope.
+
+### Target component tree
+
+```text
+LandingPage
+  Hero / SyntheticSample / WorkspaceLink
+  DemoFlow / MapPreview / MetaAIShowcase
+Authenticated AppShell
+  TopBar → UserMenu / ThemeToggle / nav
+  DashboardPage → loadIncidentWorkspaceSnapshot (Supabase RLS)
+    WorkspaceMetrics
+    DashboardCommandWorkspace [one coherent local filter/selection state]
+      IncidentFilters (horizontal pills, search, sort)
+      Left: DeferredGeoCanvas → GeoCanvas + TemporalScrubber
+      Right: IncidentEvidenceDetails + IncidentQueue + PinnedReports
+  Review / Reports / Map pages (keep existing auth and data contracts)
+```
+
+### Design-token contract
+
+Use `--paper`, `--sheet`, `--rule`, `--ink`, `--tide`, `--amber` (AI-unverified), `--green` (human-confirmed), `--brick` (rejected/critical), `--s-1..--s-8`, `--step--1..--step-4`, `--r-ctl`, `--r-panel`, `--focus`, and reduced-motion-safe transitions from `src/app/styles/tokens.css`. New touched layouts use Tailwind utility classes. No duplicate token palette.
+
+### 3. Changes — implementation scope in PR #64
+
+| Component / file | Targeted change |
+| --- | --- |
+| `ThemeToggle.tsx` | Replace sync effect state sync with a React-compliant subscription/initialization pattern; preserve system preference + localStorage behavior |
+| `GeoCanvas.tsx`, `IncidentMap.tsx` | React-compliant failure transitions; lifecycle clean-up and explicit retryable map/tiles fallback |
+| `DashboardCommandWorkspace.tsx` | Simplify snapshot refresh, selection/pin/filter state while preserving 65/35 layout and existing functional demo path |
+| `IncidentFilters.tsx`, `IncidentQueue.tsx` | Tighten semantics and 44px/overflow responsiveness; no fake hazard classification |
+| `IncidentEvidenceDetails.tsx`, `ReportThumb.tsx` | Preserve evidence provenance, missing-image fallback, long-text readability |
+| `TopBar.tsx`, `UserMenu.tsx`, `WorkspaceLink.tsx` | Focus-safe menu, click targets, internal Next.js navigation |
+| `Hero.tsx`, `MapPreview.tsx`, `MetaAIShowcase.tsx` | Preserve labeled synthetic examples; focus, contrast and responsive copy |
+| `src/app/styles/*` + Tailwind classes | Token-aligned, targeted layout fixes; avoid wholesale stylesheet deletion |
+| Tests + `docs/DEMO_SCRIPT.md` | Only in phase 5; browser/snapshot/failure/demo evidence |
+
+### Implementation notes (as of approved patch)
+
+- Fixed three original React effect-state lint errors: theme preference is an external subscription, and both MapLibre canvases own map initialization/teardown through the ref lifecycle.
+- Improved map/context-loss recovery and retry while keeping the queue usable; adapted neutral map-marker title typing without loosening location validation.
+- Preserved the 65/35 desktop split, tablet/mobile heights, RLS-scoped 200-report window and local pin logic. Added explicit selected-incident announcement and clear-selection action.
+- Updated pending/manual-review labels to avoid claiming an AI observation exists before it is persisted.
+- Kept actual landing synthetic samples; converted internal workspace links to Next.js Link; improved 44px carousel controls and eliminated synchronous Embla effect writes.
+- Keyed legacy reviewer corrections by report+observation to prevent stale form fields and aborted stale review-history requests.
+- Replaced the obsolete demo guide with the current, truthful 2½-minute UI walkthrough.
+- Repaired Playwright's non-existent start script reference; added public responsive/keyboard smoke tests and a Chromium CI job after the core checks. This **does not** stand in for authenticated staging or actual live inference.
+- Retired test assertions tightly coupled to removed fake dispatch and legacy UI mechanics; preserved or replaced them with tests for current truthful report/incident behavior.
+
+### 4. Risks and verification limits
+
+- Existing `main` **currently fails lint**, and latest CI never reached build, so do not treat previous commit success as proof for `8fdcbc1`.
+- Rendering quality and mobile overflow are **unverified** until actual screenshots/measurements. The current code includes many good responsive constraints, not proof that every state works.
+- Sample landing interaction is legitimate only with explicit **synthetic/demonstration** labels. A displayed sample must never become a live incident, confirmed report or agency dispatch.
+- Report access must remain Supabase RLS-scoped. Never print credentials or expose service-role keys to a client.
+- Vercel automatic deployments were previously enabled; **avoid any direct change to `main` until a green reviewed PR is ready**. This plan-only branch has no deployment effects on Production.
+- Keep the 200-report loaded-window distinction vs event totals; do not call it a live all-incidents view.
+
+### 5. Next step / review gate
+
+**Owner review was received.** Phase 1–4 fixes and regression updates are committed on the isolated PR #64 branch. Merge only after exact-head lint, TypeScript, unit/integration, production build and responsive Chromium smoke checks pass. Authenticated staging/Meta/reviewer and manual visual rehearsal remain separate acceptance gates and must be reported as unverified if not actually run.
+
+---
+
+
+## Historical approved plan (preserved for reference)
 
 ## 1. Findings
 

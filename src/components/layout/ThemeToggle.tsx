@@ -6,7 +6,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { Sun, Moon, Monitor, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
@@ -64,57 +64,54 @@ export function readInitialTheme(): ThemeMode {
   return "system";
 }
 
+/**
+ * The persisted preference is the external store, so the initial client
+ * render matches SSR ("system") and hydration never sets React state from
+ * a synchronous effect. Subscriptions also cover a second tab/provider.
+ */
+function subscribeToTheme(notify: () => void): () => void {
+  const onThemeChange = (event: Event) => {
+    const mode = (event as CustomEvent<{ mode?: ThemeMode }>).detail?.mode;
+    if (mode === "system" || mode === "light" || mode === "dark") {
+      try { window.localStorage.setItem(STORAGE_KEY, mode); } catch { /* private browsing */ }
+    }
+    notify();
+  };
+  const onPreferenceChange = () => notify();
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== STORAGE_KEY) return;
+    applyMode(readInitialTheme());
+    notify();
+  };
+  window.addEventListener("tr-theme-change", onThemeChange);
+  window.addEventListener("tr-theme-preference", onPreferenceChange);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener("tr-theme-change", onThemeChange);
+    window.removeEventListener("tr-theme-preference", onPreferenceChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
 export function ThemeToggle() {
-  // The initial markup must match server rendering; storage is synchronized after mount.
-  const [mode, setMode] = useState<ThemeMode>("system");
-  const modeRef = useRef<ThemeMode>("system");
+  const mode = useSyncExternalStore(subscribeToTheme, readInitialTheme, () => "system");
 
   useEffect(() => {
-    const initial = readInitialTheme();
-    modeRef.current = initial;
-    setMode(initial);
-    applyMode(initial);
-
-    const onExternalChange = (e: Event) => {
-      const custom = e as CustomEvent<{ mode: ThemeMode; isNight: boolean }>;
-      if (custom.detail?.mode) {
-        const nextMode = custom.detail.mode;
-        if (nextMode === "system" || nextMode === "light" || nextMode === "dark") {
-          modeRef.current = nextMode;
-          setMode(nextMode);
-        }
-      }
-    };
-
+    applyMode(readInitialTheme());
     const mql = window.matchMedia?.("(prefers-color-scheme: dark)");
     const onMediaChange = () => {
-      const current = modeRef.current;
-      if (current === "system") applyMode("system");
+      if (readInitialTheme() === "system") applyMode("system");
     };
-
-    window.addEventListener("tr-theme-change", onExternalChange);
     mql?.addEventListener?.("change", onMediaChange);
-    return () => {
-      window.removeEventListener("tr-theme-change", onExternalChange);
-      mql?.removeEventListener?.("change", onMediaChange);
-    };
+    return () => mql?.removeEventListener?.("change", onMediaChange);
   }, []);
 
   function change(next: ThemeMode) {
-    modeRef.current = next;
-    setMode(next);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // storage unavailable
-    }
-    if (
-      typeof window !== "undefined" &&
-      (window as unknown as { __tr_has_theme_provider__?: boolean }).__tr_has_theme_provider__
-    ) {
-      window.dispatchEvent(
-        new CustomEvent("tr-theme-request", { detail: { mode: next } })
-      );
+    try { window.localStorage.setItem(STORAGE_KEY, next); }
+    catch { /* Storage is unavailable; the DOM still responds. */ }
+    window.dispatchEvent(new Event("tr-theme-preference"));
+    if ((window as unknown as { __tr_has_theme_provider__?: boolean }).__tr_has_theme_provider__) {
+      window.dispatchEvent(new CustomEvent("tr-theme-request", { detail: { mode: next } }));
     } else {
       applyMode(next);
     }
