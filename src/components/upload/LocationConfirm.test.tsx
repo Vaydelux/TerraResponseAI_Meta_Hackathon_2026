@@ -36,7 +36,7 @@ describe("disaster report location confirmation", () => {
     render(<LocationConfirm exif={null} onConfirm={onConfirm} />);
     fireEvent.click(screen.getByRole("button", { name: "Place pin manually" }));
 
-    const pad = screen.getByRole("button", { name: /Interactive sector pin placement pad/ });
+    const pad = screen.getByRole("button", { name: /Illustrative coordinate pad/ });
     fireEvent.keyDown(pad, { key: "ArrowRight" });
 
     expect((screen.getByLabelText("Longitude") as HTMLInputElement).value).toBe("121.0550");
