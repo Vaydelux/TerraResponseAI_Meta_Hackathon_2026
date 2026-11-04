@@ -29,7 +29,7 @@ export function GeoCanvas({ reports, selectedId, onSelectReport }: GeoCanvasProp
   const [status, setStatus] = useState<"loading" | "ready" | "tiles-unavailable" | "unavailable">("loading");
 
   useEffect(() => { selectionRef.current = onSelectReport; }, [onSelectReport]);
-  const located = useMemo<IncidentMapReport[]>(() => reports.filter(hasMapLocation).map((report) => ({
+  const located = useMemo<Array<WorkspaceReport & IncidentMapReport>>(() => reports.filter(hasMapLocation).map((report) => ({
     ...report,
     latitude: report.latitude as number,
     longitude: report.longitude as number,
