@@ -7,8 +7,8 @@
 // location and failure cases. Test accessibility, keyboard focus,
 // mobile viewport, loading and empty states."
 //
-// IMPORTANT: The E2E tests run against the REAL built Next.js server
-// (next dev on :3000). The dev server is NOT mocked — it's the same
+// IMPORTANT: The E2E tests run against the real built standalone Next.js server
+// on port 3000, matching the production runtime. The dev server is NOT mocked — it's the same
 // code the user runs. What IS "absent" is the Supabase backend
 // (the env vars aren't set in the sandbox), so the app surfaces the
 // "Setup required" state and every API endpoint returns 503
@@ -72,7 +72,9 @@ export default defineConfig({
   // before a release.
   ...(process.env.PLAYWRIGHT_BASE_URL ? {} : {
     webServer: {
-      command: "node scripts/local-demo-check.mjs serve",
+      // The production build already copies static assets to .next/standalone.
+      // The previous command pointed at a non-existent helper script.
+      command: "bun run start",
       url: "http://localhost:3000",
       reuseExistingServer: false,
       timeout: 120 * 1000,
