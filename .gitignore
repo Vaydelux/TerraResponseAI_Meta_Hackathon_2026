@@ -86,3 +86,10 @@ server.log
 
 # Development journal (not part of the product)
 /worklog.md
+
+# Hackathon repository hygiene — keep source assets in public/, not scratch
+/upload/
+/.aistudio/artifacts/brain/**/.tempmediaStorage/
+/map_preview.png
+/mobile_landing.png
+/mobile_topbar_fixed.png

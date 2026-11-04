@@ -6,6 +6,8 @@
 
 - **Track:** Indie Developer (if entered as an individual) or Startup (if entered as a startup team); select the track actually registered.
 - **Theme:** Build for Your World.
+- **Published 3-minute demo (YouTube):** https://youtu.be/MldyTvwECMo
+- **What the video proves:** UI walkthrough with real recorded analysis-unavailable fallback; not proof of a completed live Meta output or persisted independent reviewer transaction.
 - **Repository:** https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026
 - **Application:** https://terra-response-ai.vercel.app
 - **Official deadline:** November 4, 2026, 9:00 PM US Eastern Time (November 5, 2026, 10:00 AM Philippine time).
@@ -14,6 +16,12 @@
 - **Security verified with read-only SQL:** 11 public application tables with RLS enabled, 3 private evidence buckets, zero privileged `SECURITY DEFINER` functions executable by `anon` after staging permission hardening.
 - **Not yet proven:** end-to-end reporter → live Muse Spark → human review → map with real JWTs, live model use, SMTP deliverability, automated browser acceptance. Keep issue #21 and issue #30 open until proven.
 - **Deployment:** Production data is not an authorized staging test surface. No real responder or victim evidence should be uploaded for public hackathon use.
+
+## Source and AI-development acknowledgments
+
+The project creator credits **Z.ai** for the initial design, **Gemini 4 and Gemini 3.8** for agent-first implementation (creator-provided model labels), followed by **OpenAI ChatGPT and Codex** for brainstorming, review and polishing. These are coding/design assistants, distinct from the **runtime Meta Muse Spark 1.3 and optional Meta SAM 3.1** integration. See [Hackathon showcase](HACKATHON_SHOWCASE.md).
+
+**Judges' video:** https://youtu.be/MldyTvwECMo. The delivered recording does **not** establish a successful Muse response or persisted independent review action. Avoid using “AI successfully classified this example” for the filmed case.
 
 ## Project title
 
@@ -50,7 +58,7 @@ Record **one continuous successful end-to-end path** if possible. If a step fail
 
 ## Submission artifacts to collect
 
-- [ ] Screen recording/video link (user-owned; not yet created)
+- [x] Final 3:00 narrated YouTube demo link: https://youtu.be/MldyTvwECMo (shows AI-unavailable/manual-review fallback)
 - [ ] Public GitHub repository and deployed URL confirmed accessible without revealing secrets
 - [ ] Concise README with setup and model APIs
 - [ ] One genuine live Muse Spark run logged with a non-secret request ID, response status, model ID, Zod validation and saved report/analysis

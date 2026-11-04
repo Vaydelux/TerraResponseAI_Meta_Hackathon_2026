@@ -1,9 +1,3 @@
-> [!WARNING]
-> **SECURITY RELEASE BLOCKER — [Issue #21](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/21).**
-> Temporary test-account email confirmation exceptions must be removed before launch.
-> Every new AI coding assistant should read [AGENTS.md](AGENTS.md) and ask the owner
-> if confirmation, SMTP and demo-account cleanup have been completed.
-
 <p align="center">
   <img src="public/brand/readme-banner.svg" width="100%" alt="TerraResponse AI — See the evidence. Share the signal." />
 </p>
@@ -11,6 +5,21 @@
 <h1 align="center">TerraResponse AI</h1>
 <p align="center"><strong>See the evidence. Share the signal.</strong><br />
 Community-powered disaster photo reporting, AI-assisted observations and human verification.</p>
+
+<p align="center">
+  <a href="https://youtu.be/MldyTvwECMo"><strong>▶ Watch the 3-minute hackathon demo</strong></a> ·
+  <a href="https://terra-response-ai.vercel.app/"><strong>Live application</strong></a> ·
+  <a href="docs/HACKATHON_SHOWCASE.md"><strong>Meta AI feature showcase</strong></a> ·
+  <a href="docs/HACKATHON_SUBMISSION_2026.md"><strong>Submission kit</strong></a>
+</p>
+
+> **Meta Global AI Developer Hackathon 2026 · Build for Your World.**
+> TerraResponse AI is a **human-reviewed disaster photo intelligence prototype**.
+> The [actual 3:00 demo video](https://youtu.be/MldyTvwECMo) shows report submission,
+> an **AI-unavailable/manual-review fallback**, review controls, and map exploration.
+> It does **not** establish that the recorded model call completed successfully,
+> that every review button committed a real transaction, or that a photographed
+> incident is authentic. This is **not** emergency dispatch or a public warning feed.
 
 <p align="center">
   <a href="docs/DESIGN.md">Design system</a> ·
@@ -24,6 +33,19 @@ Community-powered disaster photo reporting, AI-assisted observations and human v
 > finding; an urgent review priority does not mean a public warning has been issued.
 
 Built for the [Meta Global AI Developer Hackathon](https://dev.meta.ai/events/global-hackathon).
+
+## Meta Hackathon 2026 — where Meta AI is used
+
+| Meta capability | Actual implementation | Status / trust boundary |
+| :-- | :-- | :-- |
+| **Meta Muse Spark 1.3** · vision-language model | Receives a validated photo derivative through the Meta Model API `/v1/chat/completions`. Requests a structured incident category, visible evidence, preliminary severity, uncertainty, and summary. A separate Zod schema validates usable output. | **Integrated, but fallible.** An empty or invalid response is recorded as unavailable/manual-review; the video shows such a fallback. AI cannot confirm a disaster. |
+| **Meta SAM 3.1** · image segmentation | Optional reviewer-requested text-target segmentation through `/v1/responses` using an actual image. The app decodes Meta's mask stream and only displays validated image-aligned masks. | **Optional and cost-bounded.** Requires `SAM_API_KEY` and an explicit target. Live paid SAM and photo-mask alignment have not been independently demonstrated in the uploaded video. |
+| **Human-in-the-loop verification** · product workflow, **not a Meta AI model** | Separate reporter/reviewer roles, event-level permissions, private stored photos, explicit confirmation/correction/flag/rejection, and audited decisions. | Human decisions do not prove a photo's historical authenticity, GPS origin, or real-world incident severity. |
+| **Geographic context** · app integration, **not a Meta AI model** | MapLibre geographic pinning, coordinates, optional MapTiler place-name lookup, report map, and review-status indicators. | Locations are user-supplied/confirmed, not automatically verified evidence. |
+
+This entry **uses Muse Spark 1.3 and optional SAM 3.1**. Other models in the broader hackathon ecosystem (for example Muse Wonder, Muse Image, or Muse Voice Transcribe) **are not claimed as integrations**. No synthetic model output is passed off as a successful real inference.
+
+The complete [Meta feature and architecture explanation](docs/HACKATHON_SHOWCASE.md) includes the fallback pathway, privacy and safety boundaries, and a reproducible judging checklist.
 
 ## A simpler way to report
 
@@ -136,8 +158,8 @@ Contributor                Server                 Muse Spark    Supabase
 
 | Model | API endpoint | Why it's meaningful |
 |---|---|---|
-| **Muse Spark 1.3** (`muse-spark-1.3`) | `POST /v1/chat/completions` | Vision-language model that produces structured observations (incident type, severity, evidence, uncertainties, summaries) from disaster photos. Uses JSON-schema-constrained decoding (`response_format: { type: "json_schema", strict: true }`) for guaranteed-valid structured output. A second Zod validation layer catches any schema drift. |
-| **SAM 3.1** (`sam-3.1`) | `POST /v1/responses` | Media segmentation model that produces pixel-accurate masks for a concrete target (e.g., "floodwater"). Uses the Responses API with streaming (`stream: true`). Opt-in — never runs automatically. If unavailable, the rest of the report is fully usable. |
+| **Muse Spark 1.3** (`muse-spark-1.3`) | `POST /v1/chat/completions` | Vision-language model that produces structured observations (incident type, severity, evidence, uncertainties, summaries) from disaster photos. Uses JSON-schema-constrained decoding (`response_format: { type: "json_schema", strict: true }`) to request structured output. A separate Zod validation layer rejects malformed or incompatible results; empty model responses are handled explicitly and never counted as validated findings. |
+| **SAM 3.1** (`sam-3.1`) | `POST /v1/responses` | Media segmentation model that can produce image-segmentation masks for a concrete reviewer-provided target (e.g., "floodwater"). Uses the Responses API with streaming (`stream: true`). Opt-in — never runs automatically. If unavailable, the rest of the report is fully usable. |
 
 Both models use the Meta Model API at `https://api.meta.ai/v1` with Bearer token auth.
 
@@ -197,7 +219,7 @@ bun run build         # Production build
 4. **No self-signup for reviewer/admin** — the first admin is bootstrapped via a server-side script.
 5. **Evidence photos in private storage** — 60-second signed URLs, never publicly accessible.
 6. **Retention workflow** — contributors/reviewers can request evidence deletion; storage purged after 7 days.
-7. **Prompt-injection defenses** — user text never reaches the model; input is sanitized before storage.
+7. **Prompt-injection defenses** — prompts use constrained templates and validated inputs. The explicitly entered SAM object target is sent to Meta when a reviewer opts in; untrusted inputs are not assumed safe.
 8. **Bounded API spend** — per-user, per-event, and daily ceilings prevent runaway costs.
 
 ## Demo data
@@ -206,17 +228,41 @@ The demo seed (`scripts/seed-demo.ts`) creates 5 rights-cleared demo reports wit
 
 See `docs/DEMO_SCRIPT.md` for the 3-minute demo script and `docs/DEMO_MODE.md` for the demo data details.
 
+## Submission readiness and unresolved safety gates
+
+> [!WARNING]
+> **SECURITY RELEASE BLOCKER — Hackathon prototype ≠ approved emergency service or fully verified production release.**
+> [Issue #21](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/21)
+> still requires owner-confirmed email verification, SMTP and staging-demo-account cleanup.
+> Other open issues cover [database authorization boundaries (#48)](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/48),
+> [privileged RPC security (#23)](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/23),
+> [migration-ledger reconciliation (#30)](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/30)
+> and [separate-role preview acceptance (#42)](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/42).
+> Automated CI/build and a production READY deployment **do not prove** two consecutive live authenticated reporter → Meta → reviewer → map demonstrations.
+
 ## License
 
 This project's owned code is released under the MIT License — see `LICENSE`.
 
+## Development process and AI tool acknowledgments
+
+Development was **human-directed and AI-assisted**. The project creator reports using these tools in sequence:
+
+- **Z.ai** — initial UI design generation and visual foundation.
+- **Gemini 4 and Gemini 3.8** — agent-first implementation and iteration (model labels as provided by the project creator).
+- **OpenAI ChatGPT and Codex** — follow-up architecture brainstorming, code review, hardening, design polish, debugging and documentation.
+
+These are development tools, **not the runtime disaster-analysis models**. TerraResponse AI's runtime Meta integration is described above. Human review, testing and responsibility remain with the project creator; using AI coding tools does not guarantee the accuracy or security of generated code.
+
 ## Contributors
 
-- **TerraResponse Team** — built during the Meta Global AI Developer Hackathon
-
-> Update this section with individual contributor names before the public repo push.
+- **TerraResponse AI project creator / hackathon entry** — product concept, integration, direction and submission.
+- **AI-assisted development tools** — acknowledged above; not presented as independent team members.
 
 ## Documentation
+
+- `docs/HACKATHON_SHOWCASE.md` — hackathon pitch, Meta Muse/SAM roles, AI development-tool credits and video evidence
+- `docs/HACKATHON_SUBMISSION_2026.md` — judge-facing submission kit and release caveats
 
 - `docs/DESIGN.md` — brand consistency, Day/Mist/Night Ops tokens, responsive UI and contrast rules
 
