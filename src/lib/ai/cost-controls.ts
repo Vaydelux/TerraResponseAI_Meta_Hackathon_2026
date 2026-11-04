@@ -24,6 +24,10 @@
 // token counts + latency + estimated cost, never the prompt body
 // or the image bytes).
 //
+// Cost estimation: default Muse Spark 1.3 Standard-mode pricing verified at
+// https://dev.meta.ai/docs/pricing-rate-limits on 2026-11-05.
+// Explicit env overrides may reflect negotiated/updated provider rates.
+// Historic usage rows are not retroactively repriced.
 // Cost estimation: the model provider's pricing is read from env
 // (per-1M-tokens input + output, USD). The estimate is a rough
 // upper-bound approximation and is LABELED as such in every consumer
@@ -81,9 +85,9 @@ export function readCostControlConfig(): CostControlConfig {
     modelCallTimeoutMs: num("AI_CALL_TIMEOUT_MS", 30_000),
     maxRetries: num("AI_MAX_RETRIES", 4),
     maxOutputTokens: num("AI_MAX_OUTPUT_TOKENS", 900),
-    costPer1mInputTokensUsd: num("AI_COST_PER_1M_INPUT_TOKENS_USD", 0.3),
-    costPer1mOutputTokensUsd: num("AI_COST_PER_1M_OUTPUT_TOKENS_USD", 0.6),
-    costPerCallFlatUsd: num("AI_COST_PER_CALL_FLAT_USD", 0.001),
+    costPer1mInputTokensUsd: num("AI_COST_PER_1M_INPUT_TOKENS_USD", 1.25),
+    costPer1mOutputTokensUsd: num("AI_COST_PER_1M_OUTPUT_TOKENS_USD", 4.25),
+    costPerCallFlatUsd: num("AI_COST_PER_CALL_FLAT_USD", 0.01),
   };
 }
 
