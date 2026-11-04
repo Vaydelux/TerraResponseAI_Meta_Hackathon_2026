@@ -67,3 +67,45 @@ test.describe("public judging-demo responsiveness", () => {
     await expect(first).toHaveAttribute("aria-pressed", "true");
   });
 });
+
+
+test.describe("smooth scrolling and floating back-to-top", () => {
+  test("uses smooth anchors, respects sticky headers and returns to the top without overflow", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.goto("/");
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).toBe("smooth");
+
+    await page.goto("/#how-it-works");
+    const heading = page.getByRole("heading", { name: "How it works" });
+    await expect(heading).toBeVisible();
+    await expect.poll(async () => heading.evaluate((el) => el.getBoundingClientRect().top), { timeout: 5000 })
+      .toBeGreaterThanOrEqual(64);
+
+    await page.evaluate(() => window.scrollTo({ top: 1400, behavior: "instant" }));
+    const backToTop = page.getByTestId("back-to-top");
+    await expect(backToTop).toBeVisible();
+    const bounds = await backToTop.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.width).toBeGreaterThanOrEqual(44);
+    expect(bounds!.height).toBeGreaterThanOrEqual(44);
+    await backToTop.click();
+    await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 5000 }).toBeLessThan(8);
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(2);
+  });
+
+  test("honors reduced motion across the public and authentication shells", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/");
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).toBe("auto");
+    await page.goto("/login");
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).toBe("auto");
+    await page.evaluate(() => window.scrollTo({ top: 900, behavior: "instant" }));
+    const backToTop = page.getByTestId("back-to-top");
+    if (await backToTop.isVisible()) {
+      await backToTop.click();
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(8);
+    }
+  });
+});
