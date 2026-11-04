@@ -1,3 +1,96 @@
+# ACTIVE PLAN — TerraResponse AI two-pass hackathon demo readiness
+
+**Date:** November 5, 2026 (Asia/Manila). **State:** AWAITING OWNER REVIEW — PLAN ONLY.
+**Baseline:** main commit ac6713141d6aefa70d05a2bb3c641f4bca71bff4, post-merge GitHub CI run 41875117439 succeeded, Vercel production deployment dpl_CBgT2jiZA5LsE5u96NGL5A2DKrYb READY.
+**Product:** Human-reviewed disaster-photo incident intelligence prototype for community reporters and authorized reviewers. Not emergency dispatch.
+**Core 2–3 minute demo:** Reporter saves a consented or clearly synthetic disaster photo and its real location; Meta Muse Spark provides a provisional structured observation; a separate authorized reviewer confirms or corrects it; an audited, human-reviewed, located incident appears distinctly on the map.
+**Stack:** Next.js 16, React/TypeScript, Tailwind plus existing semantic tokens, Supabase Auth/Postgres/PostGIS/RLS/private storage, Meta Muse Spark, Vercel. Preserve the newly merged collapsible sidebar.
+
+## 1. Findings — factual and code audit
+
+- GitHub main and production Vercel are aligned and build CI passed. The public browser smoke does NOT demonstrate authenticated reporter-to-reviewer behavior.
+- Staging Supabase project ytfaetqvtbsbmcsdlkvk: one located report in needs_review, one successful persisted muse-spark-1.3 analysis and successful AI usage record; ZERO review actions and ZERO reviewed reports. Reporter, reviewer and admin roles exist, but verified cross-account access and a reviewed-map result have not been demonstrated.
+- Production Supabase ywopsafppyykhwrejliz: zero reports, analyses and reviews. Never seed production just to populate a demo.
+- The repository already includes UploadFlow, an idempotent analysis API, a transactional review RPC, role-scoped reports, map/detail views, DEMO_MODE, labeled synthetic landing samples and a safeguarded staging seed script. Preserve these rather than rebuilding.
+- The opt-in protected GitHub workflow .github/workflows/staging-integration-verification.yml can run tests/e2e/authenticated-flow.spec.ts using staging secrets; run_authenticated_e2e is false by default. No observed passing authenticated run, and no double-run evidence. Its automated flow is API-heavy and still needs a genuine UI rehearsal.
+- The existing docs/DEMO_SCRIPT.md describes a navigation showcase. docs/HACKATHON_SUBMISSION_2026.md describes the full real reporting demonstration. Unify the judge-facing path and explicit fallback without claiming a staged fixture is real.
+- Open release issues #21 (SMTP/email confirmation and temporary test users), #30 (migration ledger reconciliation). Staging security advisor warns about callable security-definer functions and disabled leaked-password protection; do not broadly change grants during a demo UI pass.
+
+## 2. Ordered implementation plan — only after review
+
+### Priority 1 — ENHANCE
+- [ ] Use the existing pending staging report to determine reviewer visibility, event membership and available review actions through authorized, read-only inspection before creating any new records.
+- [ ] Make the real demo path obvious: landing → reporter login → photo upload with explicitly selected location → saved report ID → provisional Muse analysis → separate reviewer login → confirm/correct → review audit → appropriately labeled map pin.
+- [ ] Offer a clearly separated sample-only tour (landing sample map and labeled synthetic fixtures) when accounts, network, AI budget, model provider or map tiles fail. It never masquerades as live inference or modifies real Supabase records.
+- [ ] Keep all model output tagged provisional; no automatic emergency dispatch, no invented coordinates, no AI self-verification.
+
+### Priority 2 — REFINE
+- [ ] Retain AppShell/WorkspaceFrame/WorkspaceSidebar, UploadFlow, ReviewWorkbench, DashboardCommandWorkspace, IncidentMap and their API and RLS contracts. Fix only reproduced issues, not speculative design flaws.
+- [ ] Align status language across report card, queue, detail, notifications and map: uploaded, analyzing, needs_review, needs_manual_review, reviewed, retryable_error.
+- [ ] Use an isolated demo-only fixture adapter for the fallback; never quietly return synthetic records from live authenticated APIs. Preserve the explicit demo-mock-v1 provenance marker.
+- [ ] Reuse shared role-aware navigation, design tokens and pending-report status; avoid duplicate controls.
+
+### Priority 3 — POLISH
+- [ ] Desktop >=1440px: compact top bar plus collapsible navigation, with remaining dashboard width split 65% map/timeline versus 35% queue/details/pins; no clipping or long-coordinate overflow.
+- [ ] Tablet 768–1024px: top-bar navigation drawer; map first at 400px; stacked timeline/queue/details; no overlay covering reviewer buttons.
+- [ ] Mobile 320–480px: single column, map at 320px, scrollable hazard pills, stacked/accordion details, vertically stacked full-width actions, touch targets at least 44x44px.
+- [ ] Reuse semantic tokens from src/app/styles/tokens.css: --paper, --sheet, --rule, --ink, --tide, --amber (AI provisional), --green (human-reviewed), --brick, spacing --s-*, typography --step-*, radius --r-panel / --r-ctl.
+- [ ] Add honest loading/empty/error, 4/8px spacing, visible hover/focus/active, long-text wrap, scrims over images, image aspect ratios, reduced motion, no absolute-positioned text.
+
+### Priority 4 — SOLIDIFY
+- [ ] Keep private original/derivative storage and RLS; never expose the service-role secret or signed URLs through UI or test artifacts.
+- [ ] A failed model request must preserve the uploaded report, show clear manual-review or bounded retry, and never silently upload duplicate evidence. Confirm idempotent analysis behavior and transient-failure handling.
+- [ ] Distinct reviewer must be authorized for the event and action. Use existing atomic review RPC and immutable review history; do not invent approvals.
+- [ ] Confirm that pending/AI-only map items are never styled or described as human-confirmed, and unknown-location reports are never assigned coordinates.
+- [ ] Handle expired sessions, missing AI key, provider errors, broken images, blocked map/WebGL tiles, offline upload and unexpected API responses with visible recoverable states.
+- [ ] No blind Supabase db push. No modifications to production data or authentication exemptions. Keep owner approval separate for any paid AI execution.
+
+### Priority 5 — TEST LAST
+- [ ] Run lint, typecheck, unit/integration tests, production build and Playwright at 320x800, 768x1024 and 1440x900. Assert no horizontal scrolling, focus, 44px controls, semantic warnings and reduced motion.
+- [ ] Use owner-approved protected staging credentials and explicitly opt in to real Meta calls on Staging integration verification. Verify reporter→real Muse→independent reviewer→review history→map with real JWTs.
+- [ ] Rehearse the **complete live demo twice consecutively** at the same intended presentation target. Record each attempt independently (result, exact SHA, non-secret model ID, reviewer audit existence, map proof, elapsed time). A skipped or mocked test does not count.
+- [ ] Test degraded modes: model outage, offline/network loss, expired token, map tile failure, unknown location, double submit, denied cross-user evidence access and retry after server interruption.
+- [ ] Define Done only when both full passes succeed, CI is green, the UI meets target breakpoints, one-paragraph script and known limitations are published.
+
+## 3. Target component tree
+
+PublicLanding
+  Hero / WorkspaceLink / MapPreview (always labeled sample)
+Authenticated AppShell
+  WorkspaceFrame / CollapsibleSidebar / MobileDrawer
+  UploadFlow → report upload API → analysis API (real, provisional)
+  ReviewQueue → ReviewWorkbench → atomic review API
+  DashboardCommandWorkspace → IncidentMap + Timeline (65%) / Queue + Details (35%)
+DemoFallback (isolated static/seeded tour, never presented as live data)
+
+## 4. Risks and owner verifications
+
+- Staging report is pending despite saved real Muse analysis; distinct reviewer permission, atomic write, audit and map are the immediate blockers.
+- Protected GitHub staging secrets are unavailable through this read-only audit; do not request passwords in chat. Live AI calls can incur usage and need explicit opt-in.
+- API-heavy E2E does not substitute for two browser-driven complete demos. The standalone browser tests are not signed-in tests.
+- Static sample tour can still work without AI; it is not a guaranteed offline upload or real persisted analysis. Do not store/replay sensitive photos as demos.
+- Issue #21 (email verification) and #30 (migration history) and security-advisor warnings remain unresolved release risks.
+
+## 5. One-paragraph judge script (target 2½ minutes)
+
+“TerraResponse AI helps communities organize disaster evidence without treating AI guesses as confirmed emergencies. As a reporter, I submit a clearly labeled synthetic test photo with its chosen location, and the platform saves a private report. Meta Muse Spark suggests the incident category, preliminary severity and uncertainties; everything is labeled unverified. A different authorized reviewer inspects that evidence and confirms or corrects it, leaving a durable audit action. The human-reviewed located report is then identifiable on the incident map and in the response queue. If the model or map tiles are unavailable, the report stays available for human review, while our separate, openly labeled sample tour shows the interface without claiming real inference. This is decision support, not emergency dispatch.”
+
+## 6. Known limitations
+
+- One staging report and one successful Muse analysis; no review action or reviewed map record at audit.
+- Two consecutive authenticated browser demos have not been verified; ordinary CI covers primarily public/isolated surfaces.
+- Production database is empty and is not a demonstration seed target.
+- Muse depends on network/provider credentials and a budget; map tiles depend on network/WebGL; offline fixture mode is not live inference.
+- Auth email confirmation exception (#21), staging migration history (#30) and security-advisor warnings remain open.
+
+## 7. Next step / stop gate
+
+Owner reviews this plan before any application code, database, accounts, paid model activity or deployment changes. After approval, execute priorities 1–4 on a separate feature branch and priority 5 last. Merge only with passing evidence and reviewed scope.
+
+---
+
+# Earlier planning history (retained verbatim)
+
 # TerraResponse AI — demo workspace improvement plan
 
 Date: 2026-11-04 (Asia/Singapore)
