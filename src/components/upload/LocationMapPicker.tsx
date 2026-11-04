@@ -42,7 +42,7 @@ export function LocationMapPicker({ selected, onSelect }: LocationMapPickerProps
         center: [121.0, 13.5],
         zoom: 5,
         scrollZoom: false,
-        attributionControl: true,
+        attributionControl: { compact: true },
       });
     } catch {
       // Report the WebGL initialization failure asynchronously; no effect-body setState.
