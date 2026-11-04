@@ -92,7 +92,7 @@ describe("DetailsModal component", () => {
     expect(screen.getByText("AI generated, not verified")).toBeDefined();
     expect(screen.getByText("Provisional severity")).toBeDefined();
     expect(screen.getByText("Submitted description")).toBeDefined();
-    expect(screen.getByText("Responder Elena")).toBeDefined();
+    expect(screen.getByText(/Responder Elena/)).toBeDefined();
     expect(screen.getByRole("link", { name: /Open full report/i })).toBeDefined();
     expect(screen.getByRole("link", { name: /Open review workbench/i })).toBeDefined();
     expect(screen.queryByText("MMDA Road Ops")).toBeNull();
