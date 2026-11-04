@@ -55,13 +55,18 @@ export async function removeOfflineUpload(id: string): Promise<void> {
   db.close();
 }
 
+/** Reject unowned/legacy drafts and drafts created by a different account. */
+export function canReplayOfflineUpload(item: Pick<OfflineUpload, "ownerId">, ownerId: string): boolean {
+  return Boolean(ownerId && item.ownerId && item.ownerId === ownerId);
+}
+
 /** Flushes only successful uploads; failed items remain queued for retry. */
 export async function flushOfflineUploads(send: (item: OfflineUpload) => Promise<boolean>, ownerId: string): Promise<number> {
   if (!ownerId) return 0;
   const items = await listOfflineUploads();
   let flushed = 0;
   for (const item of items) {
-    if (!item.ownerId || item.ownerId !== ownerId) continue;
+    if (!canReplayOfflineUpload(item, ownerId)) continue;
     if (await send(item)) {
       await removeOfflineUpload(item.id);
       flushed += 1;
