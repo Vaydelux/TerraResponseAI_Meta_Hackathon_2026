@@ -70,7 +70,7 @@ describe("linked command workspace", () => {
   it("announces selected incidents and can clear selection without changing filters", () => {
     render(<DashboardCommandWorkspace snapshot={snapshot()} canReview />);
     fireEvent.click(queue().getByRole("button", { name: "Select Transformer fire" }));
-    expect(screen.getByRole("status", { name: "" }).textContent).toContain("Selected incident");
+    expect(screen.getByText("Selected incident: Transformer fire")).toBeDefined();
     expect(details().getByRole("heading", { name: "Transformer fire" })).toBeDefined();
     fireEvent.click(details().getByRole("button", { name: "Clear selected incident" }));
     expect(details().queryByRole("heading", { name: "Transformer fire" })).toBeNull();
