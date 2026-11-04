@@ -153,6 +153,26 @@ describe("logUsage", () => {
     expect(row.estimated_cost_usd).toBeGreaterThan(0); // the flat rate
   });
 
+  it("charges zero estimated provider cost for cache hits and preflight rejections", async () => {
+    const builder = makeInsertBuilder({ data: [{}], error: null });
+    mockFrom.mockReturnValue(builder);
+    await logUsage({
+      reportId: "r1", eventId: "e1", userId: "u1",
+      outcome: "succeeded", noProviderCall: true,
+    });
+    await logUsage({
+      reportId: "r1", eventId: "e1", userId: "u1",
+      outcome: "rate_limited",
+    });
+    await logUsage({
+      reportId: "r1", eventId: "e1", userId: "u1",
+      outcome: "budget_exhausted",
+    });
+    const calls = (builder.insert as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls).toHaveLength(3);
+    expect(calls.map(([row]) => row.estimated_cost_usd)).toEqual([0, 0, 0]);
+  });
+
   it("sanitizes error messages: strips JWTs", async () => {
     const builder = makeInsertBuilder({ data: [{}], error: null });
     mockFrom.mockReturnValue(builder);
