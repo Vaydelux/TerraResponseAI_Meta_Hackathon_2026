@@ -71,10 +71,12 @@ export interface AnalyzeSuccess {
 
 export interface AnalyzeFailure {
   ok: false;
-  kind: "transient" | "permanent" | "schema_invalid" | "timeout";
+  kind: "transient" | "permanent" | "schema_invalid" | "empty_output" | "timeout";
   error: string;
   statusCode?: number;
   rawOutput?: string;
+  /** No image, prompt, model text or secrets: safe operational metadata only. */
+  diagnostics?: { finishReason: string; reasoningTokens: number | null; completionTokens: number | null; choiceCount: number };
 }
 
 export type AnalyzeResult = AnalyzeSuccess | AnalyzeFailure;
@@ -137,6 +139,9 @@ export async function analyzeImage(
     },
     max_tokens: Math.max(256, Math.min(args.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS, 1200)),
     temperature: 0,
+    // Meta Muse Spark's reasoning consumes output tokens. Light effort reduces
+    // the chance that thinking exhausts the fixed, inexpensive output budget.
+    reasoning_effort: "low" as const,
   };
 
   // Call the model with a timeout.
@@ -171,14 +176,27 @@ export async function analyzeImage(
     }
 
     const body = await response.json();
-    const rawOutput: string = body?.choices?.[0]?.message?.content ?? "";
+    const content: unknown = body?.choices?.[0]?.message?.content;
+    const rawOutput = typeof content === "string" ? content :
+      Array.isArray(content) ? content.filter((part: unknown): part is { type: string; text: string } =>
+        !!part && typeof part === "object" && (part as { type?: unknown }).type === "text" &&
+        typeof (part as { text?: unknown }).text === "string").map((part: { text: string }) => part.text).join("") : "";
 
-    if (!rawOutput) {
+    if (!rawOutput.trim()) {
+      const finishReason = typeof body?.choices?.[0]?.finish_reason === "string"
+        ? body.choices[0].finish_reason.slice(0, 32) : "unknown";
+      const details = body?.usage?.completion_tokens_details;
+      const reasoningTokens = Number.isFinite(details?.reasoning_tokens) ? details.reasoning_tokens : null;
+      const completionTokens = Number.isFinite(body?.usage?.completion_tokens) ? body.usage.completion_tokens : null;
+      const choiceCount = Array.isArray(body?.choices) ? body.choices.length : 0;
       return {
         ok: false,
-        kind: "permanent",
-        error: "Meta API returned an empty response.",
+        kind: "empty_output",
+        error: finishReason === "length"
+          ? "MODEL_OUTPUT_LIMIT: Meta ended generation at its token limit without usable text."
+          : "MODEL_EMPTY_OUTPUT: Meta returned no usable analysis text.",
         statusCode: response.status,
+        diagnostics: { finishReason, reasoningTokens, completionTokens, choiceCount },
       };
     }
 
