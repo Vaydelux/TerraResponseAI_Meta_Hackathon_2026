@@ -163,6 +163,8 @@ export function ReviewQueueTable({
   // normally for keyboard and assistive-technology users.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // The letter shortcuts are desktop-only; never intercept typing or touch layouts.
+      if (typeof window.matchMedia === "function" && !window.matchMedia("(min-width: 1024px)").matches) return;
       if (!filteredRows?.length || e.defaultPrevented || e.repeat ||
           e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
       const target = e.target;
@@ -278,8 +280,48 @@ export function ReviewQueueTable({
           }
         />
       ) : (
-        <Table>
-          <THead>
+        <>
+          <div className="grid min-w-0 gap-3 lg:hidden" aria-label="Review queue mobile report cards" data-testid="mobile-review-cards">
+            {filteredRows.map((r) => {
+              const analysis = Array.isArray(r.report_analyses) ? r.report_analyses[0] : r.report_analyses;
+              const obs = (analysis as { structured_observation?: { incident_type?: string; preliminary_severity?: number } } | undefined)?.structured_observation;
+              const type = obs?.incident_type ?? null;
+              const title = type ? (INCIDENT_LABEL[type] ?? type) : r.title || `Report ${r.id.slice(0, 8)}`;
+              const state = stateFromReport({ status: r.status, reviewOutcome: r.review_outcome });
+              const severity = obs?.preliminary_severity ?? r.report_triage?.preliminary_severity ?? null;
+              return <article key={r.id} className="grid min-w-0 gap-3 rounded-panel border border-rule bg-sheet p-4" data-testid={`mobile-review-${r.id}`}>
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                  <div className="grid min-w-0 flex-1 gap-1">
+                    <p className="m-0 break-words text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">Awaiting human assessment</p>
+                    <h3 className="m-0 break-words text-base font-bold text-ink [overflow-wrap:anywhere]">{title}</h3>
+                    {r.description && <p className="m-0 line-clamp-3 break-words text-sm text-[var(--ink-2)] [overflow-wrap:anywhere]">{r.description}</p>}
+                  </div>
+                  <SealBadge state={state} />
+                </div>
+                <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                  <div className="rounded-ctl border border-rule bg-[var(--sheet-sunk)] p-3">
+                    <p className="m-0 text-xs font-semibold text-[var(--ink-3)]">AI triage · provisional</p>
+                    <p className="m-0 mt-1 break-words text-sm text-ink">{triageLabel(r)}</p>
+                  </div>
+                  <div className="rounded-ctl border border-rule bg-[var(--sheet-sunk)] p-3">
+                    <p className="m-0 text-xs font-semibold text-[var(--ink-3)]">Priority · loaded queue</p>
+                    <p className="m-0 mt-1 text-sm font-semibold tabular-nums text-ink">{r.priority_score ?? "Unavailable"}</p>
+                  </div>
+                </div>
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs text-[var(--ink-2)]">{formatRelativeTime(r.uploaded_at)}</span>
+                  <div className="flex items-center gap-2"><span className="text-xs text-[var(--ink-3)]">Severity</span><SeverityMeter level={toSeverityLevel(severity)} state={state} compact /></div>
+                </div>
+                <Link href={`/review/${r.id}`} aria-label={`Review ${title}`}
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-ctl border border-[var(--tide)] bg-[var(--tide)] px-4 text-center text-sm font-semibold text-[var(--on-tide)] transition-colors hover:bg-[var(--tide-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tide active:bg-[var(--tide-press)] motion-reduce:transition-none">
+                  Open review workbench
+                </Link>
+              </article>;
+            })}
+          </div>
+          <div className="hidden min-w-0 overflow-x-auto lg:block" data-testid="desktop-review-table">
+            <Table>
+              <THead>
             <TR>
               <TH>Photo</TH>
               <TH>Incident</TH>
@@ -343,7 +385,9 @@ export function ReviewQueueTable({
               );
             })}
           </TBody>
-        </Table>
+            </Table>
+          </div>
+        </>
       )}
     </div>
   );
