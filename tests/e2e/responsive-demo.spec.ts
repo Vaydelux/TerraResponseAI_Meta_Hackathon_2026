@@ -1,5 +1,56 @@
 import { test, expect } from "@playwright/test";
 
+test.describe("resettable sample workflow (simulation only)", () => {
+  test("completes twice consecutively without network, including unavailable AI", async ({ page, context }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    await page.goto("/demo/walkthrough");
+    await expect(page.getByText("Simulated walkthrough · No live reports or Meta calls")).toBeVisible();
+    await expect.poll(() => page.locator('img[src="/demo/flood-aerial.png"]').evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await context.setOffline(true);
+    for (let pass = 0; pass < 2; pass++) {
+      if (pass === 1) await page.getByRole("radio", { name: /AI unavailable/ }).check();
+      await page.getByRole("button", { name: "Use sample report" }).click();
+      await expect(page.getByRole("heading", { name: "Keep uncertainty in view." })).toBeFocused();
+      if (pass === 0) await expect(page.getByText("Prewritten sample · Not Meta-generated output")).toBeVisible();
+      else await expect(page.getByRole("heading", { name: "AI unavailable · sample fallback" })).toBeVisible();
+      await page.getByRole("button", { name: "Continue to sample review" }).click();
+      await page.getByRole("textbox", { name: /Explain your decision/ }).fill(`Rehearsal ${pass + 1}: visible water only; depth and location remain unverified.`);
+      const save = page.getByRole("button", { name: "Save simulated decision" });
+      await save.focus();
+      await page.keyboard.press("Enter");
+      await expect(page.getByTestId("demo-reviewed-report")).toBeVisible();
+      await expect(page.getByText("This local history demonstrates provenance. It is not a persisted audit record.")).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(2);
+      await page.getByRole("button", { name: "Run another walkthrough" }).click();
+      await expect(page.getByRole("heading", { name: "Start with the evidence." })).toBeFocused();
+      await expect(page.getByRole("radio", { name: "Sample observation available" })).toBeChecked();
+      await expect(page.getByTestId("demo-reviewed-report")).toHaveCount(0);
+    }
+    await context.setOffline(false);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("missing image preserves manual review and rejection never publishes a sample", async ({ page }) => {
+    await page.route("**/demo/flood-aerial.png", (route) => route.abort());
+    await page.goto("/demo/walkthrough");
+    await expect(page.getByText("Sample image unavailable. You can continue exploring the workflow.")).toBeVisible();
+    await page.getByRole("button", { name: "Retry sample image" }).click();
+    await expect(page.getByText("Sample image unavailable. You can continue exploring the workflow.")).toBeVisible();
+    await page.getByRole("radio", { name: /AI unavailable/ }).check();
+    await page.getByRole("button", { name: "Use sample report" }).click();
+    await page.getByRole("button", { name: "Continue to sample review" }).click();
+    await page.getByRole("radio", { name: "Reject this sample report" }).check();
+    await page.getByRole("textbox", { name: /Explain your decision/ }).fill("Cannot inspect the unavailable sample image; reject this demonstration.");
+    await page.getByRole("button", { name: "Save simulated decision" }).click();
+    await expect(page.getByTestId("demo-empty-index")).toBeVisible();
+    await expect(page.getByTestId("demo-reviewed-report")).toHaveCount(0);
+    await page.getByRole("button", { name: "Reset walkthrough", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Start with the evidence." })).toBeFocused();
+  });
+});
+
 test.describe("public asset availability", () => {
   test("brand, editorial and hero assets return media rather than a login redirect", async ({ page, request }) => {
     for (const [path, mime] of [

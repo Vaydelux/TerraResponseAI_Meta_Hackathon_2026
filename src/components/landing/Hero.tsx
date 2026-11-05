@@ -7,6 +7,7 @@ import { SampleImage } from "./SampleImage";
 import { WorkspaceLink } from "./WorkspaceLink";
 import { SAMPLE_OBSERVATIONS, SAMPLE_UNCERTAINTIES } from "./sample-data";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui-tr/Button";
 
 export interface HeroProps {
   signedIn?: boolean;
@@ -26,6 +27,7 @@ export function Hero({ signedIn = false, className }: HeroProps) {
           <p className="max-w-[44ch] text-base leading-relaxed">AI organizes the evidence. People verify the findings. Your team keeps the map, priority queue, and next action in view.</p>
           <div className="grid min-w-0 gap-3 sm:flex sm:flex-wrap">
             <WorkspaceLink signedIn={signedIn} className="sm:w-auto focus-visible:outline-[var(--on-brand-tile)]" />
+            <Button href="/demo/walkthrough" className="sm:w-auto">Try the sample walkthrough</Button>
             <a href="#incident-map-preview" className="inline-flex min-h-12 w-full items-center justify-center rounded-[var(--r-ctl)] border border-current px-5 py-3 text-center text-sm font-semibold text-[var(--on-brand-tile)] transition-colors hover:bg-[var(--brand-tile)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current active:bg-[var(--tide-hover)] sm:w-auto motion-reduce:transition-none">Explore sample incidents</a>
           </div>
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm" aria-label="Product principles">
