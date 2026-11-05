@@ -30,6 +30,16 @@ beforeEach(() => {
 });
 
 describe("login callback and session redirect", () => {
+  it("keeps the landing page and isolated walkthrough public when auth is configured", async () => {
+    for (const path of ["/", "/demo/walkthrough"]) {
+      const res = await middleware(request(path));
+      expect(res.headers.get("location")).toBeNull();
+      expect(res.status).toBe(200);
+    }
+    expect(mocks.refreshSupabaseSession).not.toHaveBeenCalled();
+    const protectedResponse = await middleware(request("/dashboard"));
+    expect(protectedResponse.headers.get("location")).toContain("/login?callbackUrl=");
+  });
   it("does not auto-redirect a visitor from /login to /dashboard", async () => {
     const res = await middleware(request("/login?callbackUrl=%2Fdashboard"));
     expect(res.headers.get("location")).toBeNull();

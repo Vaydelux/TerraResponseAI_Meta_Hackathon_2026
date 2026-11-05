@@ -18,10 +18,10 @@ import { refreshSupabaseSession } from "@/lib/supabase/middleware-client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 // Routes that don't require authentication. Everything else does.
-const PUBLIC_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password", "/auth/confirm", "/auth/callback", "/account-unavailable"];
+const PUBLIC_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password", "/auth/confirm", "/auth/callback", "/account-unavailable", "/demo/walkthrough"];
 
 function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
+  return pathname === "/" || PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
 }
 
 // Explicit public assets are always accessible, even when Supabase Auth is

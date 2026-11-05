@@ -59,6 +59,12 @@ Optional Google/Gemini features in the repository provide contextual search, map
 
 The complete [Meta feature and architecture explanation](docs/HACKATHON_SHOWCASE.md) includes the fallback pathway, privacy and safety boundaries, and a reproducible judging checklist.
 
+## Try the resettable sample walkthrough
+
+Open [the interactive sample](https://terra-response-ai.vercel.app/demo/walkthrough) or select **Try the sample walkthrough** on the landing page. Walk through a seeded photo, prewritten observation, simulated reviewer decision and illustrative map index. Switch to **AI unavailable** to rehearse manual review, or reject the sample to keep it out of the reviewed index. Reset or reload to start again.
+
+This fallback requires no accounts or API keys and makes no real uploads, Meta calls or database writes. It runs without network interaction after the page assets load. All evidence, observations and decisions are explicitly labeled synthetic or simulated. Use [the demo script](docs/DEMO_SCRIPT.md) for narration and the separate live acceptance requirements.
+
 ## A simpler way to report
 
 People do **not** need to predict a disaster, create an event, or choose a
