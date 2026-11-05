@@ -4,6 +4,8 @@
 
 ## Submission snapshot (verify immediately before submission)
 
+The staging and SQL observations below are historical rollout notes. GitHub issue status was refreshed on November 5, 2026; deployment configuration and live acceptance were not independently rerun during the documentation cleanup.
+
 - **Track:** Indie Developer (if entered as an individual) or Startup (if entered as a startup team); select the track actually registered.
 - **Theme:** Build for Your World.
 - **Published 3-minute demo (YouTube):** https://youtu.be/MldyTvwECMo
@@ -14,7 +16,7 @@
 - **Review gate:** GitHub CI success and Vercel deployment READY are necessary, not sufficient.
 - **Connected staging:** `ytfaetqvtbsbmcsdlkvk` — separate from production; all twelve source migrations are now applied and recorded, including 0010's transactional reviewer RPC. Its remote migration history uses connector-generated timestamps rather than the repository's four-digit versions; do not use `db push` until reconciled. The RPC schema, grants and unauthenticated denial were verified, but live distinct-user role tests are pending.
 - **Security verified with read-only SQL:** 11 public application tables with RLS enabled, 3 private evidence buckets, zero privileged `SECURITY DEFINER` functions executable by `anon` after staging permission hardening.
-- **Not yet proven:** end-to-end reporter → live Muse Spark → human review → map with real JWTs, live model use, SMTP deliverability, automated browser acceptance. Keep issue #21 and issue #30 open until proven.
+- **Not yet proven:** end-to-end reporter → live Muse Spark → human review → map with real JWTs, live model use, SMTP deliverability, automated browser acceptance. Issues #21 and #30 are now closed on GitHub; retain explicit acceptance evidence separately from issue status.
 - **Deployment:** Production data is not an authorized staging test surface. No real responder or victim evidence should be uploaded for public hackathon use.
 
 **Judges' video:** https://youtu.be/MldyTvwECMo. The delivered recording does **not** establish a successful Muse response or persisted independent review action. Avoid using “AI successfully classified this example” for the filmed case.
