@@ -45,6 +45,18 @@ Built for the [Meta Global AI Developer Hackathon](https://dev.meta.ai/events/gl
 
 This entry **uses Muse Spark 1.3 and optional SAM 3.1**. Other models in the broader hackathon ecosystem (for example Muse Wonder, Muse Image, or Muse Voice Transcribe) **are not claimed as integrations**. No synthetic model output is passed off as a successful real inference.
 
+### Meta features judges can inspect
+
+- **Photo understanding:** Muse Spark receives a server-prepared image derivative and returns incident categories, visible evidence, provisional severity, confidence, uncertainty and a summary.
+- **Structured observations:** JSON-schema-constrained requests and independent Zod validation keep malformed or incomplete responses out of successful analysis records.
+- **Bilingual summaries:** The observation schema requests English and draft Tagalog summaries, which reviewers can inspect and correct.
+- **Visual inspection:** SAM accepts a reviewer's concrete object target, decodes streamed segmentation output, and returns validated masks and bounding boxes for image overlays.
+- **Traceable analysis:** Model, prompt and schema versions accompany successful observations; human review preserves the distinction between an AI suggestion and a review decision.
+- **Resilient operation:** Timeouts, rate/budget limits and explicit unavailable/no-match outcomes keep reports usable for manual review when Meta services fail.
+- **Private server integration:** Meta API credentials stay on the server; image derivatives are sent inline rather than exposing original storage URLs.
+
+Optional Google/Gemini features in the repository provide contextual search, map alerts and audio transcription. These are separate from the Meta integrations and require their own configuration; they are not Meta model capabilities.
+
 The complete [Meta feature and architecture explanation](docs/HACKATHON_SHOWCASE.md) includes the fallback pathway, privacy and safety boundaries, and a reproducible judging checklist.
 
 ## A simpler way to report
@@ -228,17 +240,11 @@ The demo seed (`scripts/seed-demo.ts`) creates 5 rights-cleared demo reports wit
 
 See `docs/DEMO_SCRIPT.md` for the 3-minute demo script and `docs/DEMO_MODE.md` for the demo data details.
 
-## Submission readiness and unresolved safety gates
+## Hackathon submission status
 
-> [!WARNING]
-> **SECURITY RELEASE BLOCKER — Hackathon prototype ≠ approved emergency service or fully verified production release.**
-> [Issue #21](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/21)
-> still requires owner-confirmed email verification, SMTP and staging-demo-account cleanup.
-> Other open issues cover [database authorization boundaries (#48)](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/48),
-> [privileged RPC security (#23)](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/23),
-> [migration-ledger reconciliation (#30)](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/30)
-> and [separate-role preview acceptance (#42)](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/42).
-> Automated CI/build and a production READY deployment **do not prove** two consecutive live authenticated reporter → Meta → reviewer → map demonstrations.
+The repository includes a [3-minute demo](https://youtu.be/MldyTvwECMo), [live application](https://terra-response-ai.vercel.app/), [Meta feature showcase](docs/HACKATHON_SHOWCASE.md) and [submission kit](docs/HACKATHON_SUBMISSION_2026.md).
+
+As checked on **November 5, 2026 (Asia/Singapore)**, GitHub issues [#21](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/21), [#23](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/23), [#30](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/30), [#42](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/42) and [#48](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/48) are **closed**. Their discussions remain historical engineering context. Issue closure alone does not establish live deployment acceptance: the recorded demo shows manual-review fallback, and successful live Muse inference, paid SAM overlays and separate-role end-to-end acceptance still need their own evidence.
 
 ## License
 
@@ -247,6 +253,12 @@ This project's owned code is released under the MIT License — see `LICENSE`.
 ## Contributors
 
 - **Project creator** — product concept, architecture, development, testing and submission.
+
+### AI-assisted development workflow
+
+TerraResponse AI was built iteratively for **Meta Hackathon 2026**. The creator used **z.ai** for the initial design and build, **Gemini 4 and Gemini 3.8** for agent-first development, then **ChatGPT and Codex** for polishing and brainstorming. These are the creator's development-tool credits; they are separate from the models called by the deployed application.
+
+The hackathon's Meta integrations are **Muse Spark 1.3** for photo understanding and **SAM 3.1** for optional object segmentation. The creator retains responsibility for product decisions, reviewing generated work, testing and submission.
 
 ## Documentation
 

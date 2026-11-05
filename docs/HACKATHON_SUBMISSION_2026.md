@@ -56,7 +56,7 @@ Record **one continuous successful end-to-end path** if possible. If a step fail
 
 - [x] Final 3:00 narrated YouTube demo link: https://youtu.be/MldyTvwECMo (shows AI-unavailable/manual-review fallback)
 - [ ] Public GitHub repository and deployed URL confirmed accessible without revealing secrets
-- [ ] Concise README with setup and model APIs
+- [x] README with setup, model APIs, Meta feature details and AI development credits
 - [ ] One genuine live Muse Spark run logged with a non-secret request ID, response status, model ID, Zod validation and saved report/analysis
 - [ ] One actual separate reviewer action stored and visible in the map
 - [ ] Privacy-safe demo images (rights-cleared, synthetic or authorized) with clear labels
@@ -73,7 +73,9 @@ Record **one continuous successful end-to-end path** if possible. If a step fail
 
 **NO-GO for claiming end-to-end working:** Missing `submit_review_atomic`/review RPC; unconfigured staging server secret; unavailable real model; no live reviewed-map flow; or unverified email confirmation. Fallback demo data must never be passed off as real inference.
 
-## Current blocking items
+## Historical rollout items and remaining verification
+
+Issues #21 and #30 below are closed on GitHub as checked November 5, 2026. The following notes describe earlier rollout conditions, not a fresh inspection of deployment configuration. Revalidate configuration and live acceptance before claiming those conditions are resolved in a deployed environment.
 
 1. [Issue #30](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/30): Staging SQL parser issue fixed and reviewer RPC installed; legacy/timestamped migration history still needs reconciliation and live role tests. A source fix is under review; do not ship API changes before the matching database function exists.
 2. [Issue #21](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/21): Custom SMTP, email confirmation and removal of temporary staging test identities require evidence and owner signoff.

@@ -65,7 +65,7 @@ Next.js App Router, React, TypeScript, Tailwind CSS, Supabase Auth/PostgreSQL/Po
 - Photographs and reported coordinates may be inaccurate, historic, fictional, synthetic or unverified.
 - Human confirmation records a *review decision*, not forensic proof of the photo's source, location or disaster status.
 - Full signed-in two-pass staging acceptance and paid SAM mask demonstration have not been independently verified in the published demo.
-- Open security issues must not be concealed as passed gates: [#21 email verification](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/21), [#23 privileged RPCs](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/23), [#30 migration ledger](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/30), [#42 role/login staging acceptance](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/42), [#48 moderation severity restrictions](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/48).
+- Historical security and staging issues (all closed on GitHub as checked November 5, 2026; closure is not independent live acceptance evidence): [#21 email verification](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/21), [#23 privileged RPCs](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/23), [#30 migration ledger](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/30), [#42 role/login staging acceptance](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/42), [#48 moderation severity restrictions](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/issues/48).
 
 ## Judge-friendly links
 

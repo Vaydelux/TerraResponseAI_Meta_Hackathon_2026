@@ -1,23 +1,10 @@
-# src/services
+# Integration locations
 
-Reserved for **service-layer modules** that wrap external integrations
-(AI providers, object storage, email, etc.). The active auth, audit,
-and database services live in `src/lib/` per the planning gate
-(`docs/ARCHITECTURE.md` §2.3, `docs/DECISIONS.md` ADR-001). New
-service modules added in later phases (e.g., `src/services/ai/` for
-Muse Spark, `src/services/storage/` for S3) will live here when they
-need to coordinate more than one external system; thin wrappers stay
-in `src/lib/`.
+Active server integrations live in `src/lib/`:
 
-## Planned (per `docs/BUILD_PLAN.md`)
+- `src/lib/ai/muse-spark.ts`: Meta photo observations.
+- `src/lib/ai/sam.ts` and `sam-protocol.ts`: optional Meta segmentation and mask validation.
+- `src/lib/ai/contextual-intelligence.ts`: optional Gemini contextual search.
+- `src/lib/supabase/`: Supabase clients for authentication, database and storage access.
 
-- `src/services/ai/` — Phase 3. Wraps the configured vision model
-  (Meta Muse Spark in production; `z-ai-web-dev-sdk` VLM in the
-  sandbox). Server-only.
-- `src/services/storage/` — Phase 2. Wraps image storage (local
-  filesystem in the sandbox; S3 in production). Server-only.
-- `src/services/review/` — Phase 4. Coordinates the reviewer-action
-  transaction (`ReviewAction` + `Report.update` + `AuditLog.create`
-  in one Prisma transaction).
-
-This directory is intentionally empty in the scaffold.
+API orchestration lives in `src/app/api/`. Database schema and authorization changes live in `supabase/migrations/`. The earlier Prisma/SQLite, local-upload and S3 service plan is historical; it does not describe the current runtime.

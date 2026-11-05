@@ -6,6 +6,8 @@
 > point; the target schema in §5 adds `Event`, `EventMember`, and the
 > revised report lifecycle.
 
+> **Historical design document:** The Prisma/SQLite sandbox plan below predates the current implementation. Runtime persistence, authentication and private evidence storage use Supabase; Meta clients live in `src/lib/ai/`. Use the [README](../README.md) and source-controlled `supabase/migrations/` for the current implementation. The unused Prisma scaffold has been removed.
+
 ## 1. System Overview
 
 TerraResponse AI is a single Next.js 16 application. The browser talks to
