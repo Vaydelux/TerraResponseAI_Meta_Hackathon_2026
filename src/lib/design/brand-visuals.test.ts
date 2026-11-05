@@ -53,9 +53,10 @@ describe("TerraResponse AI visual identity", () => {
     expect(css).not.toContain("transition: background-color 200ms ease, border-color 200ms ease, color 150ms ease");
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
   });
-  it("retains the existing security disclaimer in the README", () => {
+  it("retains prototype safety and live-verification limitations in the README", () => {
     const readme = read("README.md");
-    expect(readme).toContain("SECURITY RELEASE BLOCKER");
+    expect(readme).toContain("human-reviewed disaster photo intelligence prototype");
+    expect(readme).toContain("Issue closure alone does not establish live deployment acceptance");
     expect(readme).toContain("not an emergency alert or dispatch service");
     expect(readme).toContain("docs/DESIGN.md");
   });
