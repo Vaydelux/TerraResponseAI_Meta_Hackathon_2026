@@ -6,6 +6,11 @@ test.describe("resettable sample workflow (simulation only)", () => {
     page.on("pageerror", (error) => pageErrors.push(error.message));
     await page.goto("/demo/walkthrough");
     await expect(page.getByText("Simulated walkthrough · No live reports or Meta calls")).toBeVisible();
+    const brandText = await page.locator("header .wordmark__name").boundingBox();
+    const themeControl = await page.getByRole("button", { name: /Select theme/ }).boundingBox();
+    expect(brandText).not.toBeNull();
+    expect(themeControl).not.toBeNull();
+    expect(brandText!.x + brandText!.width).toBeLessThanOrEqual(themeControl!.x);
     await expect.poll(() => page.locator('img[src="/demo/flood-aerial.png"]').evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await context.setOffline(true);

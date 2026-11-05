@@ -10,6 +10,10 @@ Open `/demo/walkthrough` (or **Try the sample walkthrough** on the landing page)
 
 **Rehearsal gate:** Complete this sample path twice consecutively from reset at 320/768/1440; check keyboard focus, no horizontal scrolling, missing-image recovery, unavailable-analysis and rejection. Record results separately from real staging acceptance. The sample map is an offline coordinate diagram; it does not prove real WebGL marker rendering or geographic correctness.
 
+### Sample walkthrough verification ? November 5, 2026
+
+The standalone production build started successfully on Windows. Edge/Playwright passed all **six critical browser cases** at 320?800, 768?1024 and 1440?900: two consecutive reset-separated runs per width (sample observation, then AI unavailable) with network disabled after load, plus missing-image retry and rejection exclusion. Keyboard submission, stage-heading focus, reset isolation and the mobile header separation were checked. Screenshot inspection covered report/review/map layouts and mobile dark mode; measured document overflow was zero at all three widths. Hosted Chromium CI for [PR #72](https://github.com/Vaydelux/TerraResponseAI_Meta_Hackathon_2026/pull/72) covers the same sample journey alongside the existing public responsiveness checks. These automated runs are accelerated smoke tests, not a timed narrated presentation or live authenticated Meta acceptance.
+
 ## Preflight: trust boundaries
 
 Use the isolated staging Supabase project and two preauthorized distinct accounts (reporter and reviewer). Never seed or create emergency records in production for a judging demonstration. A labeled synthetic photo may be uploaded as a staging test, but the Meta call and human review must genuinely execute for this to count as a real powered demo. Confirm staging MODEL_API_KEY is configured in the protected environment without printing its value.
