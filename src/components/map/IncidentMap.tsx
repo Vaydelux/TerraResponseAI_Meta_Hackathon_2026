@@ -424,6 +424,7 @@ export function IncidentMap({
         // Default camera position only; no report is assigned these coordinates.
         center: firstLocated ? [firstLocated.longitude, firstLocated.latitude] : [0, 0],
         zoom: firstLocated ? 11 : 2,
+        scrollZoom: true,
         attributionControl: {},
         canvasContextAttributes: { preserveDrawingBuffer: true },
       });
@@ -915,6 +916,7 @@ export function IncidentMap({
         )}
       >
         <section className="grid min-w-0 gap-4" aria-label="Map and timeline">
+          <p className="text-xs text-[var(--ink-3)]">Scroll over the map to zoom in or out. You can also use the +/− controls or focus the map and use the keyboard.</p>
           <div className="relative h-[320px] min-[481px]:h-[360px] md:h-[400px] min-[1025px]:h-[480px] min-[1440px]:h-[560px] min-w-0 overflow-hidden rounded-panel border border-rule bg-[var(--sheet-sunk)] [&_.maplibregl-ctrl-group_button]:size-11">
             <div className={cn("relative h-full w-full", className)} ref={attachMap} data-zoomed-labels={mapZoom >= ZOOM_HAZARD_LABEL_THRESHOLD ? "true" : "false"} />
             <canvas ref={heatmapCanvasRef} className="map-heatmap-overlay" aria-hidden="true" style={{ opacity: showHeatmap ? 1 : 0 }} />

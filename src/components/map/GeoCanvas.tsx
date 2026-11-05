@@ -65,7 +65,7 @@ export function GeoCanvas({ reports, selectedId, onSelectReport }: GeoCanvasProp
           ? [locatedRef.current[0].longitude, locatedRef.current[0].latitude]
           : [121, 14.6],
         zoom: 11,
-        scrollZoom: false,
+        scrollZoom: true,
         attributionControl: {},
       });
       mapRef.current = map;
@@ -170,7 +170,7 @@ export function GeoCanvas({ reports, selectedId, onSelectReport }: GeoCanvasProp
   return (
     <div className="grid min-w-0 gap-3">
       <div className="grid min-w-0 overflow-hidden rounded-panel border border-rule bg-[var(--sheet-sunk)] [grid-template-areas:'map'] [&_.maplibregl-ctrl-group_button]:size-11 [&_.maplibregl-ctrl-attrib]:max-w-full [&_.maplibregl-ctrl-attrib]:text-[10px]">
-        <div ref={attachMap} className={`${viewportClass} min-w-0 w-full [grid-area:map]`} role="region" aria-label="Incident map. Select a pin or use the priority queue below." data-testid="workspace-map" />
+        <div ref={attachMap} className={`${viewportClass} min-w-0 w-full [grid-area:map]`} role="region" aria-label="Incident map. Scroll to zoom, use the zoom buttons, or select a report in the priority queue." data-testid="workspace-map" />
         {(status === "unavailable" || status === "loading") && (
           <div className={`${viewportClass} z-10 flex flex-col items-center justify-center gap-3 bg-[var(--sheet-sunk)] px-6 text-center [grid-area:map]`} role="status">
             <MapPinOff className="size-8 text-[var(--ink-3)]" aria-hidden="true" />
@@ -180,6 +180,7 @@ export function GeoCanvas({ reports, selectedId, onSelectReport }: GeoCanvasProp
           </div>
         )}
       </div>
+      <p className="text-xs text-[var(--ink-3)]">Scroll over the map to zoom in or out. You can also use the +/− controls or focus the map and use the keyboard.</p>
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-[var(--ink-2)]" role="status">
           {status === "tiles-unavailable" ? "Basemap tiles unavailable. Report pins and the queue remain usable." : status === "unavailable" ? "Map unavailable; report data is unchanged." : `${located.length} located reports · ? pending · ✓ human confirmed · numbers group nearby reports`}
